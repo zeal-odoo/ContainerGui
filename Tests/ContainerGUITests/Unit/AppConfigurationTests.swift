@@ -12,6 +12,7 @@ final class AppConfigurationTests: XCTestCase {
         XCTAssertEqual(configuration.maximumCommandOutputBytes, 16 * 1024 * 1024)
         XCTAssertEqual(configuration.queryTimeout, .seconds(5))
         XCTAssertEqual(configuration.mutationTimeout, .seconds(30))
+        XCTAssertEqual(configuration.imagePullTimeout, .seconds(30 * 60))
         XCTAssertEqual(configuration.operationTTL, .seconds(15 * 60))
         XCTAssertEqual(configuration.maximumConcurrentMutations, 4)
         XCTAssertEqual(configuration.maximumOperationRecords, 1_000)

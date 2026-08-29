@@ -6,15 +6,19 @@ enum OperationKind: String, Codable, Sendable {
     case runContainer
     case deleteContainer
     case startSystem
+    case pullImage
+    case createContainer
 }
 
 enum OperationTarget: Codable, Equatable, Hashable, Sendable {
     case container(id: String)
+    case image(reference: String)
     case system
 
     var id: String {
         switch self {
         case .container(let id): id
+        case .image(let reference): reference
         case .system: "system"
         }
     }
@@ -27,6 +31,7 @@ enum OperationTarget: Codable, Equatable, Hashable, Sendable {
         let id = try container.decode(String.self, forKey: .id)
         switch kind {
         case "container": self = .container(id: id)
+        case "image": self = .image(reference: id)
         case "system": self = .system
         default:
             throw DecodingError.dataCorruptedError(forKey: .kind, in: container, debugDescription: "Unknown target kind")
@@ -39,6 +44,9 @@ enum OperationTarget: Codable, Equatable, Hashable, Sendable {
         case .container(let id):
             try container.encode("container", forKey: .kind)
             try container.encode(id, forKey: .id)
+        case .image(let reference):
+            try container.encode("image", forKey: .kind)
+            try container.encode(reference, forKey: .id)
         case .system:
             try container.encode("system", forKey: .kind)
             try container.encode("system", forKey: .id)
@@ -60,12 +68,13 @@ enum OperationState: String, Codable, Equatable, Sendable {
 struct OperationReadback: Codable, Equatable, Sendable {
     let expectationMatched: Bool
     let observedContainer: JSONValue?
+    let observedImage: JSONValue?
     let observedSystemState: String?
     let targetAbsent: Bool?
     let observedAt: Date
 
     enum CodingKeys: String, CodingKey {
-        case observedContainer, observedSystemState, targetAbsent, observedAt
+        case observedContainer, observedImage, observedSystemState, targetAbsent, observedAt
         case expectationMatched = "matchedExpectation"
     }
 
@@ -73,11 +82,13 @@ struct OperationReadback: Codable, Equatable, Sendable {
         observedState: String? = nil,
         expectationMatched: Bool,
         observedContainer: JSONValue? = nil,
+        observedImage: JSONValue? = nil,
         targetAbsent: Bool? = nil,
         observedAt: Date = Date()
     ) {
         self.expectationMatched = expectationMatched
         self.observedContainer = observedContainer
+        self.observedImage = observedImage
         self.observedSystemState = observedState
         self.targetAbsent = targetAbsent
         self.observedAt = observedAt

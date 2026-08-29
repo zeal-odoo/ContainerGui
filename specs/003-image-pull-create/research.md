@@ -7,11 +7,11 @@
 - 镜像列表：`container image list --format json`
 - 镜像详情：`container image inspect <reference>`
 - 镜像拉取：`container image pull --progress none [--platform <platform>] <reference>`
-- 容器创建：`container create --name <name> [受控选项] <image> [参数...]`
+- 容器创建：`container create --name <name> [受控选项] -- <image> [参数...]`
 - 容器回读：`container list --all --format json`
 
-**Rationale**: 本机 `--help` 和只读 JSON 已验证，参数全部可作为独立数组元素传递；拉取与创建
-输出无需作为成功事实，最终均由结构化只读命令验证。
+**Rationale**: 本机 `--help` 和只读 JSON 已验证，参数全部可作为独立数组元素传递；`--` 防止镜像后的
+进程参数被重新解释为创建选项。拉取与创建输出无需作为成功事实，最终均由结构化只读命令验证。
 
 **Alternatives considered**:
 

@@ -44,7 +44,7 @@ enum ProblemCode: String, Codable, CaseIterable, Sendable {
         case .cliExitNonzero: "容器命令执行失败。"
         case .cliOutputInvalid: "容器命令返回了无法识别的数据。"
         case .targetNotFound: "未找到指定容器。"
-        case .stateConflict: "容器当前状态不允许此操作。"
+        case .stateConflict: "目标当前状态不允许此操作。"
         case .operationInProgress: "该目标已有操作正在进行。"
         case .idempotencyConflict: "该幂等键已用于不同请求。"
         case .confirmationMismatch: "确认目标与实际目标不一致。"

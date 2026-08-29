@@ -4,7 +4,7 @@ import XCTest
 @testable import ContainerGUI
 
 final class ReadOnlyCLISmokeTests: XCTestCase {
-    func testLiveVersionStatusListMetricsAndOptionalDetail() async throws {
+    func testLiveVersionStatusContainerAndImageReads() async throws {
         try XCTSkipUnless(
             ProcessInfo.processInfo.environment["CONTAINER_GUI_LIVE_READONLY"] == "1",
             "Set CONTAINER_GUI_LIVE_READONLY=1 to run non-mutating compatibility checks"
@@ -28,6 +28,13 @@ final class ReadOnlyCLISmokeTests: XCTestCase {
 
         let list = try await client.listContainers()
         XCTAssertLessThanOrEqual(list.items.count, 1_000)
+        let images = try await client.listImages()
+        XCTAssertLessThanOrEqual(images.items.count, 1_000)
+        if let firstImage = images.items.first {
+            let inspected = try await client.inspectImage(reference: firstImage.name)
+            XCTAssertEqual(inspected.name, firstImage.name)
+            XCTAssertEqual(inspected.digest, firstImage.digest)
+        }
         for _ in 0..<4 {
             let cancelledWaiter = Task { try await client.containerMetrics() }
             try await Task.sleep(for: .milliseconds(50))

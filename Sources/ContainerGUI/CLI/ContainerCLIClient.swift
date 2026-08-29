@@ -38,6 +38,16 @@ protocol ContainerMetricsReading: Sendable {
     func containerMetrics() async throws -> ContainerMetricsSnapshot
 }
 
+protocol ImageReading: Sendable {
+    func listImages() async throws -> ImageList
+    func inspectImage(reference: String) async throws -> ImageSummary
+}
+
+protocol ResourceMutating: Sendable {
+    func pullImage(_ request: ImagePullRequest) async throws -> ImagePullOutcome
+    func createContainer(_ request: ContainerCreateRequest) async throws -> ContainerCreateOutcome
+}
+
 protocol ContainerControlling: Sendable {
     func listContainers() async throws -> ContainerList
     func startContainer(id: String) async throws -> ContainerControlOutcome
@@ -49,12 +59,13 @@ protocol ContainerLogReading: Sendable {
     func followLogs(id: String, tail: Int) async throws -> AsyncThrowingStream<CommandStreamEvent, Error>
 }
 
-final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, ContainerControlling, ContainerLogReading, @unchecked Sendable {
+final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, ContainerControlling, ContainerLogReading, ImageReading, ResourceMutating, @unchecked Sendable {
     private let executor: any CommandExecuting
     private let executableURL: URL?
     private let unavailableCompatibility: CLICompatibility
     private let queryTimeout: Duration
     private let mutationTimeout: Duration
+    private let imagePullTimeout: Duration
     private let maximumOutputBytes: Int
     private let installationCache = CLIInstallationCache()
     private let metricsSampler = ContainerMetricsSampler()
@@ -65,6 +76,7 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
         unavailableCompatibility: CLICompatibility = .missing,
         queryTimeout: Duration = .seconds(5),
         mutationTimeout: Duration = .seconds(30),
+        imagePullTimeout: Duration = .seconds(30 * 60),
         maximumOutputBytes: Int = 16 * 1024 * 1024
     ) {
         self.executor = executor
@@ -72,6 +84,7 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
         self.unavailableCompatibility = unavailableCompatibility
         self.queryTimeout = queryTimeout
         self.mutationTimeout = mutationTimeout
+        self.imagePullTimeout = imagePullTimeout
         self.maximumOutputBytes = maximumOutputBytes
     }
 
@@ -177,6 +190,98 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
         }
     }
 
+    func listImages() async throws -> ImageList {
+        try await requireSupportedInstallation()
+        let result = try await execute(["image", "list", "--format", "json"])
+        guard result.exitCode == 0 else { throw ContainerCLIError.nonZeroExit(result.exitCode) }
+        return try CLIOutputParser.parseImageList(data: result.stdout)
+    }
+
+    func inspectImage(reference: String) async throws -> ImageSummary {
+        _ = try ImagePullRequest(reference: reference).validated()
+        try await requireSupportedInstallation()
+        let result = try await execute(["image", "inspect", reference])
+        guard result.exitCode == 0 else { throw ContainerCLIError.nonZeroExit(result.exitCode) }
+        return try CLIOutputParser.parseImageInspect(data: result.stdout)
+    }
+
+    func pullImage(_ request: ImagePullRequest) async throws -> ImagePullOutcome {
+        let request = try request.validated()
+        try await requireSupportedInstallation()
+        var arguments = ["image", "pull", "--progress", "none"]
+        if let platform = request.platform {
+            arguments += ["--platform", platform]
+        }
+        arguments.append(request.reference)
+        let result = try await execute(arguments, timeout: imagePullTimeout)
+        guard result.exitCode == 0 else { throw ContainerCLIError.nonZeroExit(result.exitCode) }
+        let observed = try await inspectImage(reference: request.reference)
+        let platformMatched = request.platform.map { expected in
+            let allowsVariant = expected.split(separator: "/").count == 2
+            return observed.platforms.contains { platform in
+                platform.identifier == expected
+                    || (allowsVariant && platform.identifier.hasPrefix(expected + "/"))
+            }
+        } ?? true
+        return ImagePullOutcome(
+            exitCode: result.exitCode,
+            observedImage: observed,
+            matchedExpectation: platformMatched
+        )
+    }
+
+    func createContainer(_ request: ContainerCreateRequest) async throws -> ContainerCreateOutcome {
+        let request = try request.validated()
+        try await requireSupportedInstallation()
+        var arguments = ["create", "--name", request.name]
+        if let cpus = request.cpus {
+            arguments += ["--cpus", String(cpus)]
+        }
+        if let memoryMiB = request.memoryMiB {
+            arguments += ["--memory", "\(memoryMiB)M"]
+        }
+        for port in request.ports {
+            arguments += ["--publish", port.normalizedSpec]
+        }
+        for environment in request.environment {
+            arguments += ["--env", "\(environment.name)=\(environment.value)"]
+        }
+        arguments += ["--", request.image]
+        arguments += request.arguments
+
+        let createResult = try await execute(arguments, timeout: mutationTimeout)
+        guard createResult.exitCode == 0 else {
+            throw ContainerCLIError.nonZeroExit(createResult.exitCode)
+        }
+        let created = try await findContainer(named: request.name)
+        guard let created,
+              created.state == .created || created.state == .stopped else {
+            return ContainerCreateOutcome(
+                exitCode: createResult.exitCode,
+                observedContainer: created,
+                matchedExpectation: false
+            )
+        }
+        guard request.startAfterCreate else {
+            return ContainerCreateOutcome(
+                exitCode: createResult.exitCode,
+                observedContainer: created,
+                matchedExpectation: true
+            )
+        }
+
+        let startResult = try await execute(["start", request.name], timeout: mutationTimeout)
+        guard startResult.exitCode == 0 else {
+            throw ContainerCLIError.nonZeroExit(startResult.exitCode)
+        }
+        let running = try await findContainer(named: request.name)
+        return ContainerCreateOutcome(
+            exitCode: startResult.exitCode,
+            observedContainer: running,
+            matchedExpectation: running?.state == .running
+        )
+    }
+
     func startContainer(id: String) async throws -> ContainerControlOutcome {
         let current = try await requireContainer(id: id)
         guard current.state == .stopped || current.state == .created else {
@@ -260,6 +365,11 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
             throw ContainerCLIError.targetNotFound
         }
         return summary
+    }
+
+    private func findContainer(named name: String) async throws -> ContainerSummary? {
+        let list = try await listContainers()
+        return list.items.first { $0.id == name || $0.displayName == name }
     }
 
     private func validateTail(_ tail: Int) throws {

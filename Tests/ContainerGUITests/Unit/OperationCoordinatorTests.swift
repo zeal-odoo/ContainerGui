@@ -62,6 +62,61 @@ final class OperationCoordinatorTests: XCTestCase {
         }
     }
 
+    func testSerializesSameImageTarget() async throws {
+        let coordinator = OperationCoordinator()
+        let target = OperationTarget.image(reference: "postgres:latest")
+        _ = try await coordinator.create(
+            idempotencyKey: "key-1",
+            fingerprint: "pull:postgres:latest",
+            kind: .pullImage,
+            target: target,
+            safeRequestSummary: ["reference": .string("postgres:latest")]
+        )
+
+        do {
+            _ = try await coordinator.create(
+                idempotencyKey: "key-2",
+                fingerprint: "pull:postgres:latest:linux/arm64",
+                kind: .pullImage,
+                target: target,
+                safeRequestSummary: ["reference": .string("postgres:latest")]
+            )
+            XCTFail("Expected image target serialization")
+        } catch {
+            XCTAssertEqual(error as? OperationCoordinatorError, .operationInProgress)
+        }
+    }
+
+    func testImageTargetAndReadbackRoundTrip() throws {
+        let observedImage: JSONValue = .object([
+            "name": .string("docker.io/library/postgres:latest"),
+            "digest": .string("sha256:" + String(repeating: "a", count: 64)),
+        ])
+        let operation = Operation(
+            id: UUID(),
+            kind: .pullImage,
+            target: .image(reference: "postgres:latest"),
+            state: .succeeded,
+            requestedAt: Date(timeIntervalSince1970: 100),
+            startedAt: Date(timeIntervalSince1970: 101),
+            finishedAt: Date(timeIntervalSince1970: 102),
+            safeRequestSummary: ["reference": .string("postgres:latest")],
+            exitCode: 0,
+            error: nil,
+            readback: OperationReadback(
+                expectationMatched: true,
+                observedImage: observedImage,
+                observedAt: Date(timeIntervalSince1970: 102)
+            )
+        )
+
+        let encoded = try JSONEncoder.containerGUI.encode(operation)
+        let decoded = try JSONDecoder.containerGUI.decode(Operation.self, from: encoded)
+
+        XCTAssertEqual(decoded.target, .image(reference: "postgres:latest"))
+        XCTAssertEqual(decoded.readback?.observedImage, observedImage)
+    }
+
     func testEnforcesGlobalMutationLimit() async throws {
         let coordinator = OperationCoordinator(maximumConcurrentMutations: 2)
         var ids: [UUID] = []

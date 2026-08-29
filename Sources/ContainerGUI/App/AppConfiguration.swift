@@ -25,6 +25,7 @@ struct AppConfiguration: Sendable, Equatable {
     let maximumCommandOutputBytes = 16 * 1024 * 1024
     let queryTimeout: Duration = .seconds(5)
     let mutationTimeout: Duration = .seconds(30)
+    let imagePullTimeout: Duration = .seconds(30 * 60)
     let gracefulStopTimeout: Duration = .seconds(10)
     let operationTTL: Duration = .seconds(15 * 60)
     let maximumConcurrentMutations = 4

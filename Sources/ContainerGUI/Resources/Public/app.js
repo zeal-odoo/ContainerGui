@@ -4,6 +4,8 @@ const ENDPOINTS = {
   health: "/api/v1/system/health",
   containers: "/api/v1/containers",
   metrics: "/api/v1/containers/metrics",
+  images: "/api/v1/images",
+  imagePull: "/api/v1/images/pull",
   operations: "/api/v1/operations/"
 };
 const REFRESH_INTERVAL_MS = 5000;
@@ -16,13 +18,23 @@ const elements = Object.fromEntries([
   "detailPanel", "detailPlaceholder", "detailContent", "detailTitle", "detailFacts",
   "containerActions", "operationStatus", "closeDetailButton", "loadLogsButton", "followLogsButton",
   "logStatus", "logOutput", "rawDetail", "confirmDialog", "confirmTitle", "confirmMessage",
-  "confirmTarget", "confirmActionButton", "toast"
+  "confirmTarget", "confirmActionButton", "toast", "imagesSection", "openPullImageButton",
+  "imageOperationStatus", "imageLoadingState",
+  "imageEmptyState", "imageErrorState", "imageTableWrap", "imageTableBody", "pullImageDialog",
+  "pullImageForm", "pullImageReference", "pullImagePlatform", "pullReferenceError",
+  "pullPlatformError", "pullFormStatus", "cancelPullImageButton", "submitPullImageButton",
+  "openCreateContainerButton", "localImageOptions", "createContainerDialog", "createContainerForm",
+  "createName", "createImage", "createCPUs", "createMemory", "createPorts", "createEnvironment",
+  "createArguments", "createStartAfter", "createNameError", "createImageError", "createCPUsError",
+  "createMemoryError", "createPortsError", "createEnvironmentError", "createArgumentsError",
+  "createFormStatus", "cancelCreateContainerButton", "submitCreateContainerButton"
 ].map((id) => [id, document.getElementById(id)]));
 
 const state = {
   containers: [], selectedID: null, selectedDetail: null, detailController: null,
   refreshing: false, submitting: false, eventSource: null,
-  reconnectAttempts: 0, reconnectTimer: null, metricsByID: new Map(), metricsStatus: "loading"
+  reconnectAttempts: 0, reconnectTimer: null, metricsByID: new Map(), metricsStatus: "loading",
+  images: [], imageSubmitting: false, createSubmitting: false
 };
 
 const stateLabels = {
@@ -181,6 +193,60 @@ function showListError(error) {
   elements.errorState.textContent = `${error.message}${code}`;
 }
 
+function renderImages(snapshot) {
+  state.images = snapshot.items;
+  elements.imageTableBody.replaceChildren();
+  elements.localImageOptions.replaceChildren();
+  for (const image of snapshot.items) {
+    const option = document.createElement("option");
+    option.value = image.name;
+    elements.localImageOptions.append(option);
+    const row = document.createElement("tr");
+    const nameCell = document.createElement("td");
+    const name = document.createElement("span");
+    name.className = "container-name";
+    name.textContent = image.name;
+    const identifier = document.createElement("code");
+    identifier.textContent = image.id;
+    name.append(identifier);
+    nameCell.append(name);
+    const digestCell = document.createElement("td");
+    const digest = document.createElement("code");
+    digest.textContent = image.digest;
+    digestCell.append(digest);
+    const platformsCell = document.createElement("td");
+    platformsCell.textContent = image.platforms.length
+      ? image.platforms.map((platform) => [platform.os, platform.architecture, platform.variant].filter(Boolean).join("/")).join("、")
+      : "—";
+    const sizeCell = document.createElement("td");
+    sizeCell.textContent = formatBytes(image.sizeBytes);
+    const timeCell = document.createElement("td");
+    timeCell.textContent = formatTime(image.observedAt);
+    row.append(nameCell, digestCell, platformsCell, sizeCell, timeCell);
+    elements.imageTableBody.append(row);
+  }
+  elements.imageLoadingState.hidden = true;
+  elements.imageErrorState.hidden = true;
+  elements.imageEmptyState.hidden = snapshot.items.length !== 0;
+  elements.imageTableWrap.hidden = snapshot.items.length === 0;
+}
+
+function showImageError(error) {
+  elements.imageLoadingState.hidden = true;
+  elements.imageEmptyState.hidden = true;
+  elements.imageTableWrap.hidden = true;
+  elements.imageErrorState.hidden = false;
+  elements.imageErrorState.textContent = formatProblem(error);
+}
+
+async function loadImages() {
+  try {
+    renderImages(await fetchJSON(ENDPOINTS.images));
+  } catch (error) {
+    showImageError(error);
+  }
+}
+
 async function refreshDashboard({ announce = false } = {}) {
   if (state.refreshing) return;
   state.metricsStatus = "loading";
@@ -189,6 +255,7 @@ async function refreshDashboard({ announce = false } = {}) {
   const metricsResultPromise = Promise.allSettled([
     fetchJSON(ENDPOINTS.metrics)
   ]).then(([result]) => result);
+  const imagesPromise = loadImages();
   const [healthResult, listResult] = await Promise.allSettled([
     fetchJSON(ENDPOINTS.health),
     fetchJSON(ENDPOINTS.containers)
@@ -220,6 +287,7 @@ async function refreshDashboard({ announce = false } = {}) {
   }
   if (listResult.status === "fulfilled") renderContainers();
   if (state.selectedDetail) renderFacts(state.selectedDetail.summary);
+  await imagesPromise;
   setBusy(false);
   document.documentElement.dataset.containerGui = "ready";
 }
@@ -369,14 +437,14 @@ async function submitContainerOperation(action, id, body) {
   }
 }
 
-async function pollOperation(id) {
+async function pollOperation(id, statusElement = elements.operationStatus) {
   const labels = {
     queued: "已排队", running: "正在执行 CLI 命令", verifying: "正在重新读取状态",
     succeeded: "已验证完成", failed: "操作失败", cancelled: "操作已取消"
   };
   for (let attempt = 0; attempt < 120; attempt += 1) {
     const operation = await fetchJSON(`${ENDPOINTS.operations}${encodeURIComponent(id)}`);
-    showOperationStatus(labels[operation.state] || operation.state, operation.state === "failed");
+    showOperationStatus(labels[operation.state] || operation.state, operation.state === "failed", statusElement);
     if (["succeeded", "failed", "cancelled"].includes(operation.state)) {
       if (operation.state !== "succeeded") {
         throw Object.assign(new Error(operation.error?.message || labels[operation.state]), { problem: operation.error });
@@ -390,16 +458,230 @@ async function pollOperation(id) {
   throw new Error("操作仍在进行，请稍后刷新查看。");
 }
 
-function showOperationStatus(message, isError = false) {
-  elements.operationStatus.hidden = false;
-  elements.operationStatus.className = `operation-status${isError ? " error" : ""}`;
-  elements.operationStatus.textContent = message;
+function showOperationStatus(message, isError = false, target = elements.operationStatus) {
+  target.hidden = false;
+  target.className = `operation-status${target === elements.imageOperationStatus ? " resource-status" : ""}${isError ? " error" : ""}`;
+  target.textContent = message;
+}
+
+function openPullImageDialog() {
+  clearPullImageErrors();
+  elements.pullFormStatus.textContent = "";
+  elements.pullImageDialog.showModal();
+  elements.pullImageReference.focus();
+}
+
+function clearPullImageErrors() {
+  elements.pullReferenceError.textContent = "";
+  elements.pullPlatformError.textContent = "";
+  elements.pullImageReference.removeAttribute("aria-invalid");
+  elements.pullImagePlatform.removeAttribute("aria-invalid");
+}
+
+function renderPullImageErrors(problem) {
+  const targets = {
+    reference: [elements.pullImageReference, elements.pullReferenceError],
+    platform: [elements.pullImagePlatform, elements.pullPlatformError]
+  };
+  for (const error of problem?.fieldErrors || []) {
+    const target = targets[error.field];
+    if (!target) continue;
+    target[0].setAttribute("aria-invalid", "true");
+    target[1].textContent = error.message;
+  }
+}
+
+function validateImagePull(reference, platform) {
+  const errors = [];
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,511}$/.test(reference)) {
+    errors.push({ field: "reference", message: "镜像引用格式无效" });
+  }
+  if (platform && !/^linux\/(arm64|amd64)(\/[A-Za-z0-9._-]+)?$/.test(platform)) {
+    errors.push({ field: "platform", message: "平台必须为 Linux ARM64 或 AMD64" });
+  }
+  return errors;
+}
+
+async function submitImagePull(event) {
+  event.preventDefault();
+  if (state.imageSubmitting) return;
+  clearPullImageErrors();
+  const platform = elements.pullImagePlatform.value;
+  const body = { reference: elements.pullImageReference.value.trim() };
+  if (platform) body.platform = platform;
+  const fieldErrors = validateImagePull(body.reference, platform);
+  if (fieldErrors.length) {
+    renderPullImageErrors({ fieldErrors });
+    elements.pullFormStatus.textContent = "请修正标出的字段。";
+    return;
+  }
+  state.imageSubmitting = true;
+  elements.submitPullImageButton.disabled = true;
+  elements.pullFormStatus.textContent = "正在提交拉取操作…";
+  try {
+    const operation = await fetchJSON(ENDPOINTS.imagePull, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": crypto.randomUUID()
+      },
+      body: JSON.stringify(body)
+    });
+    elements.pullImageDialog.close();
+    showOperationStatus("镜像拉取已排队", false, elements.imageOperationStatus);
+    await pollOperation(operation.id, elements.imageOperationStatus);
+  } catch (error) {
+    renderPullImageErrors(error.problem);
+    elements.pullFormStatus.textContent = formatProblem(error);
+    showOperationStatus(formatProblem(error), true, elements.imageOperationStatus);
+  } finally {
+    state.imageSubmitting = false;
+    elements.submitPullImageButton.disabled = false;
+  }
+}
+
+function openCreateContainerDialog() {
+  clearCreateErrors();
+  elements.createFormStatus.textContent = "";
+  elements.createContainerDialog.showModal();
+  elements.createName.focus();
+}
+
+const createFieldTargets = {
+  name: [elements.createName, elements.createNameError],
+  image: [elements.createImage, elements.createImageError],
+  cpus: [elements.createCPUs, elements.createCPUsError],
+  memoryMiB: [elements.createMemory, elements.createMemoryError],
+  ports: [elements.createPorts, elements.createPortsError],
+  environment: [elements.createEnvironment, elements.createEnvironmentError],
+  arguments: [elements.createArguments, elements.createArgumentsError]
+};
+
+function clearCreateErrors() {
+  for (const [input, error] of Object.values(createFieldTargets)) {
+    input.removeAttribute("aria-invalid");
+    error.textContent = "";
+  }
+}
+
+function renderCreateErrors(fieldErrors) {
+  for (const [field, message] of Object.entries(fieldErrors)) {
+    const target = createFieldTargets[field];
+    if (!target) continue;
+    target[0].setAttribute("aria-invalid", "true");
+    target[1].textContent = message;
+  }
+}
+
+function parsePortLines(value) {
+  const mappings = [];
+  for (const line of value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean)) {
+    const match = /^(\d{1,5}):(\d{1,5})(?:\/(tcp|udp))?$/.exec(line);
+    if (!match) throw new Error("端口格式必须为 主机端口:容器端口[/tcp|udp]");
+    const hostPort = Number(match[1]);
+    const containerPort = Number(match[2]);
+    if (hostPort < 1 || hostPort > 65535 || containerPort < 1 || containerPort > 65535) {
+      throw new Error("端口必须在 1...65535 之间");
+    }
+    mappings.push({ hostPort, containerPort, protocol: match[3] || "tcp" });
+  }
+  if (new Set(mappings.map((mapping) => mapping.hostPort)).size !== mappings.length) {
+    throw new Error("主机端口不能重复");
+  }
+  return mappings;
+}
+
+function parseEnvironmentLines(value) {
+  const entries = [];
+  for (const line of value.split(/\r?\n/).filter((item) => item.length > 0)) {
+    const separator = line.indexOf("=");
+    if (separator < 1) throw new Error("环境变量格式必须为 KEY=value");
+    const name = line.slice(0, separator).trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) throw new Error("环境变量名称格式无效");
+    entries.push({ name, value: line.slice(separator + 1) });
+  }
+  if (new Set(entries.map((entry) => entry.name)).size !== entries.length) {
+    throw new Error("环境变量名称不能重复");
+  }
+  return entries;
+}
+
+function buildCreateRequest() {
+  const errors = {};
+  const name = elements.createName.value.trim();
+  const image = elements.createImage.value.trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(name)) errors.name = "容器名称格式无效";
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,511}$/.test(image)) errors.image = "镜像引用格式无效";
+  const cpus = elements.createCPUs.value === "" ? null : Number(elements.createCPUs.value);
+  if (cpus !== null && (!Number.isFinite(cpus) || cpus <= 0 || cpus > 1024)) {
+    errors.cpus = "CPU 必须大于 0 且不超过 1024";
+  }
+  const memoryMiB = elements.createMemory.value === "" ? null : Number(elements.createMemory.value);
+  if (memoryMiB !== null && (!Number.isInteger(memoryMiB) || memoryMiB < 1 || memoryMiB > 1048576)) {
+    errors.memoryMiB = "内存必须为 1...1048576 MiB 的整数";
+  }
+  let ports = [];
+  let environment = [];
+  try { ports = parsePortLines(elements.createPorts.value); } catch (error) { errors.ports = error.message; }
+  try { environment = parseEnvironmentLines(elements.createEnvironment.value); } catch (error) { errors.environment = error.message; }
+  const argumentsList = elements.createArguments.value.split(/\r?\n/).filter((item) => item.length > 0);
+  if (argumentsList.length > 64 || argumentsList.some((item) => item.length > 4096)) {
+    errors.arguments = "进程参数数量或内容无效";
+  }
+  if (Object.keys(errors).length) {
+    renderCreateErrors(errors);
+    return null;
+  }
+  const request = {
+    name, image, ports, environment, arguments: argumentsList,
+    startAfterCreate: elements.createStartAfter.checked
+  };
+  if (cpus !== null) request.cpus = cpus;
+  if (memoryMiB !== null) request.memoryMiB = memoryMiB;
+  return request;
+}
+
+async function createContainer(event) {
+  event.preventDefault();
+  if (state.createSubmitting) return;
+  clearCreateErrors();
+  const body = buildCreateRequest();
+  if (!body) {
+    elements.createFormStatus.textContent = "请修正标出的字段。";
+    return;
+  }
+  state.createSubmitting = true;
+  elements.submitCreateContainerButton.disabled = true;
+  elements.createFormStatus.textContent = "正在提交创建操作…";
+  try {
+    const operation = await fetchJSON(ENDPOINTS.containers, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": crypto.randomUUID()
+      },
+      body: JSON.stringify(body)
+    });
+    elements.createEnvironment.value = "";
+    elements.createContainerDialog.close();
+    showOperationStatus("容器创建已排队", false, elements.imageOperationStatus);
+    await pollOperation(operation.id, elements.imageOperationStatus);
+    elements.createContainerForm.reset();
+  } catch (error) {
+    const errors = Object.fromEntries((error.problem?.fieldErrors || []).map((item) => [item.field, item.message]));
+    renderCreateErrors(errors);
+    elements.createFormStatus.textContent = formatProblem(error);
+    showOperationStatus(formatProblem(error), true, elements.imageOperationStatus);
+  } finally {
+    state.createSubmitting = false;
+    elements.submitCreateContainerButton.disabled = false;
+  }
 }
 
 function formatProblem(error) {
   const code = error.problem?.code;
   if (code === "OPERATION_IN_PROGRESS") return "该容器已有操作进行中，请等待完成。";
-  if (code === "STATE_CONFLICT") return "容器状态已变化，请刷新后重试。";
+  if (code === "STATE_CONFLICT") return "目标状态已变化，请刷新后重试。";
   if (code === "CLI_TIMEOUT") return "CLI 执行超时，页面将保留当前状态。";
   return code ? `${error.message}（${code}）` : error.message;
 }
@@ -526,6 +808,12 @@ elements.followLogsButton.addEventListener("click", () => {
   if (state.eventSource) stopFollowingLogs("已停止跟随");
   else startFollowingLogs();
 });
+elements.openPullImageButton.addEventListener("click", openPullImageDialog);
+elements.cancelPullImageButton.addEventListener("click", () => elements.pullImageDialog.close());
+elements.pullImageForm.addEventListener("submit", submitImagePull);
+elements.openCreateContainerButton.addEventListener("click", openCreateContainerDialog);
+elements.cancelCreateContainerButton.addEventListener("click", () => elements.createContainerDialog.close());
+elements.createContainerForm.addEventListener("submit", createContainer);
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") refreshDashboard();
 });

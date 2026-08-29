@@ -1,0 +1,55 @@
+[
+  {
+    "configuration": {
+      "descriptor": {
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "mediaType": "application/vnd.oci.image.index.v1+json",
+        "size": 999
+      },
+      "name": "docker.io/library/postgres:latest"
+    },
+    "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "variants": [
+      {
+        "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "platform": {
+          "architecture": "arm64",
+          "os": "linux",
+          "variant": "v8"
+        },
+        "size": 160975113,
+        "unknownFutureField": true
+      },
+      {
+        "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "platform": {
+          "architecture": "unknown",
+          "os": "unknown"
+        },
+        "size": 6010479
+      }
+    ],
+    "unknownTopLevelField": "ignored"
+  },
+  {
+    "configuration": {
+      "descriptor": {
+        "digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "mediaType": "application/vnd.oci.image.manifest.v1+json",
+        "size": 777
+      },
+      "name": "example.invalid/demo:1"
+    },
+    "id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "variants": [
+      {
+        "digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "platform": {
+          "architecture": "amd64",
+          "os": "linux"
+        },
+        "size": 1048576
+      }
+    ]
+  }
+]

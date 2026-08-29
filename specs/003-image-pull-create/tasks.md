@@ -12,8 +12,8 @@
 
 **Purpose**: 固定 Apple Container CLI 1.3.1 的镜像与资源变更契约。
 
-- [ ] T001 [P] Add sanitized image list and inspect fixtures in Tests/ContainerGUITests/Fixtures/CLI/1.3.1/resources/images-list.json and Tests/ContainerGUITests/Fixtures/CLI/1.3.1/resources/image-inspect.json
-- [ ] T002 [P] Add pull/create success, nonzero, timeout and readback fixture cases in Tests/ContainerGUITests/Fixtures/CLI/1.3.1/resources/mutation-cases.json
+- [X] T001 [P] Add sanitized image list and inspect fixtures in Tests/ContainerGUITests/Fixtures/CLI/1.3.1/resources/images-list.json and Tests/ContainerGUITests/Fixtures/CLI/1.3.1/resources/image-inspect.json
+- [X] T002 [P] Add pull/create success, nonzero, timeout and readback fixture cases in Tests/ContainerGUITests/Fixtures/CLI/1.3.1/resources/mutation-cases.json
 
 ---
 
@@ -21,11 +21,11 @@
 
 **Purpose**: 建立两个故事共享的校验模型、操作目标和安全摘要边界。
 
-- [ ] T003 [P] Add failing validation and secret-redaction tests for shared request models in Tests/ContainerGUITests/Unit/ImageAndCreationCLITests.swift
-- [ ] T004 [P] Add failing image-target locking and readback tests in Tests/ContainerGUITests/Unit/OperationCoordinatorTests.swift
-- [ ] T005 Implement ImagePlatform, ImageSummary, ImagePullRequest, PortMapping, EnvironmentEntry and ContainerCreateRequest validation in Sources/ContainerGUI/Domain/ImageModels.swift and Sources/ContainerGUI/Domain/ContainerCreationModels.swift
-- [ ] T006 Extend operation kinds, image targets and observed-image readback without changing existing encodings in Sources/ContainerGUI/Domain/OperationModels.swift
-- [ ] T007 Add image-read and resource-mutation protocols plus separate pull timeout configuration in Sources/ContainerGUI/CLI/ContainerCLIClient.swift and Sources/ContainerGUI/App/AppConfiguration.swift
+- [X] T003 [P] Add failing validation and secret-redaction tests for shared request models in Tests/ContainerGUITests/Unit/ImageAndCreationCLITests.swift
+- [X] T004 [P] Add failing image-target locking and readback tests in Tests/ContainerGUITests/Unit/OperationCoordinatorTests.swift
+- [X] T005 Implement ImagePlatform, ImageSummary, ImagePullRequest, PortMapping, EnvironmentEntry and ContainerCreateRequest validation in Sources/ContainerGUI/Domain/ImageModels.swift and Sources/ContainerGUI/Domain/ContainerCreationModels.swift
+- [X] T006 Extend operation kinds, image targets and observed-image readback without changing existing encodings in Sources/ContainerGUI/Domain/OperationModels.swift
+- [X] T007 Add image-read and resource-mutation protocols plus separate pull timeout configuration in Sources/ContainerGUI/CLI/ContainerCLIClient.swift and Sources/ContainerGUI/App/AppConfiguration.swift
 
 **Checkpoint**: 共享模型可独立编码、校验和测试，环境变量值不会进入安全摘要。
 
@@ -39,18 +39,18 @@
 
 ### Tests for User Story 1
 
-- [ ] T008 [P] [US1] Add failing image JSON parser and fixed pull-command tests in Tests/ContainerGUITests/Unit/ImageAndCreationCLITests.swift
-- [ ] T009 [P] [US1] Add failing GET /api/v1/images and POST /api/v1/images/pull contract tests in Tests/ContainerGUITests/Contract/ResourceMutationAPITests.swift
-- [ ] T010 [P] [US1] Add failing accessible image table, pull dialog and operation-status asset tests in Tests/ContainerGUITests/Browser/ResourceMutationAssetTests.swift
+- [X] T008 [P] [US1] Add failing image JSON parser and fixed pull-command tests in Tests/ContainerGUITests/Unit/ImageAndCreationCLITests.swift
+- [X] T009 [P] [US1] Add failing GET /api/v1/images and POST /api/v1/images/pull contract tests in Tests/ContainerGUITests/Contract/ResourceMutationAPITests.swift
+- [X] T010 [P] [US1] Add failing accessible image table, pull dialog and operation-status asset tests in Tests/ContainerGUITests/Browser/ResourceMutationAssetTests.swift
 
 ### Implementation for User Story 1
 
-- [ ] T011 [US1] Parse CLI 1.3.1 image list and inspect JSON with unknown-field tolerance and required-field rejection in Sources/ContainerGUI/CLI/CLIModels.swift
-- [ ] T012 [US1] Implement listImages, inspectImage and pullImage using fixed argument arrays and authoritative readback in Sources/ContainerGUI/CLI/ContainerCLIClient.swift
-- [ ] T013 [US1] Implement idempotent pull orchestration, image locking and safe request summaries in Sources/ContainerGUI/Operations/ResourceMutationServices.swift
-- [ ] T014 [US1] Register image list and pull routes with existing safety middleware and operation polling in Sources/ContainerGUI/Web/ResourceMutationRoutes.swift and Sources/ContainerGUI/App/AppFactory.swift
-- [ ] T015 [US1] Add the image table, pull dialog, field errors and polling UI in Sources/ContainerGUI/Resources/Public/index.html, Sources/ContainerGUI/Resources/Public/app.css and Sources/ContainerGUI/Resources/Public/app.js
-- [ ] T016 [US1] Run focused unit, contract and browser tests and record the independent story result in specs/003-image-pull-create/verification-us1.md
+- [X] T011 [US1] Parse CLI 1.3.1 image list and inspect JSON with unknown-field tolerance and required-field rejection in Sources/ContainerGUI/CLI/CLIModels.swift
+- [X] T012 [US1] Implement listImages, inspectImage and pullImage using fixed argument arrays and authoritative readback in Sources/ContainerGUI/CLI/ContainerCLIClient.swift
+- [X] T013 [US1] Implement idempotent pull orchestration, image locking and safe request summaries in Sources/ContainerGUI/Operations/ResourceMutationServices.swift
+- [X] T014 [US1] Register image list and pull routes with existing safety middleware and operation polling in Sources/ContainerGUI/Web/ResourceMutationRoutes.swift and Sources/ContainerGUI/App/AppFactory.swift
+- [X] T015 [US1] Add the image table, pull dialog, field errors and polling UI in Sources/ContainerGUI/Resources/Public/index.html, Sources/ContainerGUI/Resources/Public/app.css and Sources/ContainerGUI/Resources/Public/app.js
+- [X] T016 [US1] Run focused unit, contract and browser tests and record the independent story result in specs/003-image-pull-create/verification-us1.md
 
 **Checkpoint**: US1 可独立显示和拉取镜像，任何成功状态都有镜像回读。
 
@@ -64,17 +64,17 @@
 
 ### Tests for User Story 2
 
-- [ ] T017 [P] [US2] Add failing fixed create-command, option-order and invalid-input no-execution tests in Tests/ContainerGUITests/Unit/ImageAndCreationCLITests.swift
-- [ ] T018 [P] [US2] Add failing POST /api/v1/containers idempotency, conflict, redaction, readback and optional-start contract tests in Tests/ContainerGUITests/Contract/ResourceMutationAPITests.swift
-- [ ] T019 [P] [US2] Add failing accessible create dialog, local-image suggestions, loopback-port and secret-field asset tests in Tests/ContainerGUITests/Browser/ResourceMutationAssetTests.swift
+- [X] T017 [P] [US2] Add failing fixed create-command, option-order and invalid-input no-execution tests in Tests/ContainerGUITests/Unit/ImageAndCreationCLITests.swift
+- [X] T018 [P] [US2] Add failing POST /api/v1/containers idempotency, conflict, redaction, readback and optional-start contract tests in Tests/ContainerGUITests/Contract/ResourceMutationAPITests.swift
+- [X] T019 [P] [US2] Add failing accessible create dialog, local-image suggestions, loopback-port and secret-field asset tests in Tests/ContainerGUITests/Browser/ResourceMutationAssetTests.swift
 
 ### Implementation for User Story 2
 
-- [ ] T020 [US2] Implement the fixed create argument builder and post-create container readback in Sources/ContainerGUI/CLI/ContainerCLIClient.swift
-- [ ] T021 [US2] Implement create and optional-start orchestration with hashed idempotency fingerprint and secret-free summaries in Sources/ContainerGUI/Operations/ResourceMutationServices.swift
-- [ ] T022 [US2] Decode, validate and register POST /api/v1/containers in Sources/ContainerGUI/Web/ResourceMutationRoutes.swift and Sources/ContainerGUI/App/AppFactory.swift
-- [ ] T023 [US2] Add the create dialog, line-based inputs, validation feedback and final refresh in Sources/ContainerGUI/Resources/Public/index.html, Sources/ContainerGUI/Resources/Public/app.css and Sources/ContainerGUI/Resources/Public/app.js
-- [ ] T024 [US2] Run focused unit, contract and browser tests and record the independent story result in specs/003-image-pull-create/verification-us2.md
+- [X] T020 [US2] Implement the fixed create argument builder and post-create container readback in Sources/ContainerGUI/CLI/ContainerCLIClient.swift
+- [X] T021 [US2] Implement create and optional-start orchestration with hashed idempotency fingerprint and secret-free summaries in Sources/ContainerGUI/Operations/ResourceMutationServices.swift
+- [X] T022 [US2] Decode, validate and register POST /api/v1/containers in Sources/ContainerGUI/Web/ResourceMutationRoutes.swift and Sources/ContainerGUI/App/AppFactory.swift
+- [X] T023 [US2] Add the create dialog, line-based inputs, validation feedback and final refresh in Sources/ContainerGUI/Resources/Public/index.html, Sources/ContainerGUI/Resources/Public/app.css and Sources/ContainerGUI/Resources/Public/app.js
+- [X] T024 [US2] Run focused unit, contract and browser tests and record the independent story result in specs/003-image-pull-create/verification-us2.md
 
 **Checkpoint**: US1 与 US2 均可独立运行；创建不会暴露秘密或开放非回环端口。
 
@@ -84,9 +84,9 @@
 
 **Purpose**: 完成兼容性、回归和文档门禁，不执行真实写操作。
 
-- [ ] T025 Extend the opt-in read-only smoke test with image list and inspect checks in Tests/ContainerGUITests/Integration/ReadOnlyCLISmokeTests.swift
-- [ ] T026 Run the full Swift suite, explicit read-only live test, browser form/readback verification and diff checks described in specs/003-image-pull-create/quickstart.md
-- [ ] T027 Mark implementation status and verification evidence in specs/003-image-pull-create/spec.md, specs/003-image-pull-create/tasks.md, specs/003-image-pull-create/verification-us1.md and specs/003-image-pull-create/verification-us2.md
+- [X] T025 Extend the opt-in read-only smoke test with image list and inspect checks in Tests/ContainerGUITests/Integration/ReadOnlyCLISmokeTests.swift
+- [X] T026 Run the full Swift suite, explicit read-only live test, browser form/readback verification and diff checks described in specs/003-image-pull-create/quickstart.md
+- [X] T027 Mark implementation status and verification evidence in specs/003-image-pull-create/spec.md, specs/003-image-pull-create/tasks.md, specs/003-image-pull-create/verification-us1.md and specs/003-image-pull-create/verification-us2.md
 
 ---
 

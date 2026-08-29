@@ -1,0 +1,25 @@
+{
+  "pullSuccess": {
+    "stdout": "",
+    "stderr": "",
+    "exitCode": 0
+  },
+  "createSuccess": {
+    "stdout": "demo-created\n",
+    "stderr": "",
+    "exitCode": 0
+  },
+  "registryFailure": {
+    "stdout": "",
+    "stderr": "registry request failed",
+    "exitCode": 1
+  },
+  "createConflict": {
+    "stdout": "",
+    "stderr": "container already exists",
+    "exitCode": 1
+  },
+  "timeout": {
+    "error": "CLI_TIMEOUT"
+  }
+}

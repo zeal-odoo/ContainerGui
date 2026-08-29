@@ -1,0 +1,32 @@
+[
+  {
+    "configuration": {
+      "descriptor": {
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "mediaType": "application/vnd.oci.image.index.v1+json",
+        "size": 999
+      },
+      "name": "docker.io/library/postgres:latest"
+    },
+    "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "variants": [
+      {
+        "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "platform": {
+          "architecture": "arm64",
+          "os": "linux",
+          "variant": "v8"
+        },
+        "size": 160975113
+      },
+      {
+        "digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "platform": {
+          "architecture": "amd64",
+          "os": "linux"
+        },
+        "size": 162371339
+      }
+    ]
+  }
+]

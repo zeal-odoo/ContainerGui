@@ -108,7 +108,119 @@
         </div>
       </aside>
     </section>
+
+    <section id="imagesSection" class="panel resource-panel" aria-labelledby="imagesTitle">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Images</p>
+          <h2 id="imagesTitle">本机镜像</h2>
+        </div>
+        <div class="panel-actions">
+          <button id="openCreateContainerButton" class="button secondary" type="button">创建容器</button>
+          <button id="openPullImageButton" class="button" type="button">拉取镜像</button>
+        </div>
+      </div>
+      <div id="imageOperationStatus" class="operation-status resource-status" role="status" aria-live="polite" hidden></div>
+      <div id="imageLoadingState" class="state-block compact" role="status">正在读取镜像…</div>
+      <div id="imageEmptyState" class="state-block compact" hidden>
+        <strong>还没有本机镜像</strong>
+        <span>可点击“拉取镜像”准备创建容器所需的镜像。</span>
+      </div>
+      <div id="imageErrorState" class="state-block compact error" role="alert" hidden></div>
+      <div id="imageTableWrap" class="table-wrap" hidden>
+        <table class="resource-table">
+          <thead>
+            <tr><th>名称</th><th>摘要</th><th>平台</th><th>大小</th><th>读取时间</th></tr>
+          </thead>
+          <tbody id="imageTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+    <datalist id="localImageOptions"></datalist>
   </main>
+
+  <dialog id="createContainerDialog" class="wide-dialog" aria-labelledby="createContainerTitle">
+    <form id="createContainerForm" autocomplete="off">
+      <p class="eyebrow">Create container</p>
+      <h2 id="createContainerTitle">创建容器</h2>
+      <p class="form-help">填写常用参数。端口只会绑定到本机 127.0.0.1，默认创建后不启动。</p>
+      <div class="form-grid">
+        <label class="form-field">
+          <span>容器名称</span>
+          <input id="createName" name="name" required maxlength="128" placeholder="demo-postgres" aria-describedby="createNameError">
+          <span id="createNameError" class="field-error" aria-live="polite"></span>
+        </label>
+        <label class="form-field">
+          <span>镜像</span>
+          <input id="createImage" name="image" list="localImageOptions" required maxlength="512" placeholder="postgres:latest" aria-describedby="createImageError">
+          <span id="createImageError" class="field-error" aria-live="polite"></span>
+        </label>
+        <label class="form-field">
+          <span>CPU 数（可选）</span>
+          <input id="createCPUs" name="cpus" type="number" min="0.01" max="1024" step="0.01" placeholder="2" aria-describedby="createCPUsError">
+          <span id="createCPUsError" class="field-error" aria-live="polite"></span>
+        </label>
+        <label class="form-field">
+          <span>内存 MiB（可选）</span>
+          <input id="createMemory" name="memoryMiB" type="number" min="1" max="1048576" step="1" placeholder="2048" aria-describedby="createMemoryError">
+          <span id="createMemoryError" class="field-error" aria-live="polite"></span>
+        </label>
+      </div>
+      <label class="form-field">
+        <span>端口映射（每行一项）</span>
+        <textarea id="createPorts" name="ports" rows="3" placeholder="15432:5432/tcp" aria-describedby="createPortsHelp createPortsError"></textarea>
+        <small id="createPortsHelp">格式为“主机端口:容器端口[/tcp|udp]”，主机地址固定为 127.0.0.1。</small>
+        <span id="createPortsError" class="field-error" aria-live="polite"></span>
+      </label>
+      <label class="form-field">
+        <span>环境变量（每行一项）</span>
+        <textarea id="createEnvironment" name="environment" rows="4" data-sensitive="true" spellcheck="false" placeholder="POSTGRES_PASSWORD=仅用于本次请求" aria-describedby="createEnvironmentHelp createEnvironmentError"></textarea>
+        <small id="createEnvironmentHelp">格式为 KEY=value；值只发送给 CLI，不进入操作摘要或页面回读。</small>
+        <span id="createEnvironmentError" class="field-error" aria-live="polite"></span>
+      </label>
+      <label class="form-field">
+        <span>进程参数（每行一个参数）</span>
+        <textarea id="createArguments" name="arguments" rows="3" spellcheck="false" placeholder="postgres&#10;-c&#10;shared_buffers=256MB" aria-describedby="createArgumentsError"></textarea>
+        <span id="createArgumentsError" class="field-error" aria-live="polite"></span>
+      </label>
+      <label class="checkbox-field">
+        <input id="createStartAfter" name="startAfterCreate" type="checkbox">
+        <span>创建并验证后启动容器</span>
+      </label>
+      <div id="createFormStatus" class="quiet" role="status" aria-live="polite"></div>
+      <div class="dialog-actions">
+        <button id="cancelCreateContainerButton" type="button" class="button secondary">取消</button>
+        <button id="submitCreateContainerButton" type="submit" class="button">创建容器</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="pullImageDialog" aria-labelledby="pullImageTitle">
+    <form id="pullImageForm">
+      <p class="eyebrow">Pull image</p>
+      <h2 id="pullImageTitle">拉取容器镜像</h2>
+      <p class="form-help">镜像会由 Apple container CLI 拉取，并在完成后重新读取详情验证。</p>
+      <label class="form-field">
+        <span>镜像引用</span>
+        <input id="pullImageReference" name="reference" required maxlength="512" autocomplete="off" placeholder="postgres:latest" aria-describedby="pullReferenceError">
+        <span id="pullReferenceError" class="field-error" aria-live="polite"></span>
+      </label>
+      <label class="form-field">
+        <span>平台（可选）</span>
+        <select id="pullImagePlatform" name="platform" aria-describedby="pullPlatformError">
+          <option value="">使用运行时默认平台</option>
+          <option value="linux/arm64">Linux ARM64</option>
+          <option value="linux/amd64">Linux AMD64</option>
+        </select>
+        <span id="pullPlatformError" class="field-error" aria-live="polite"></span>
+      </label>
+      <div id="pullFormStatus" class="quiet" role="status" aria-live="polite"></div>
+      <div class="dialog-actions">
+        <button id="cancelPullImageButton" type="button" class="button secondary">取消</button>
+        <button id="submitPullImageButton" type="submit" class="button">开始拉取</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog id="confirmDialog" aria-labelledby="confirmTitle">
     <form method="dialog">

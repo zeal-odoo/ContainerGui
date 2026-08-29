@@ -26,6 +26,7 @@ enum AppFactory {
             unavailableCompatibility: unavailableCompatibility,
             queryTimeout: configuration.queryTimeout,
             mutationTimeout: configuration.mutationTimeout,
+            imagePullTimeout: configuration.imagePullTimeout,
             maximumOutputBytes: configuration.maximumCommandOutputBytes
         )
         let router = makeRouter(configuration: configuration, reader: reader)
@@ -40,7 +41,11 @@ enum AppFactory {
             operationTTL: configuration.operationTTL
         )
         let controlService = ContainerControlService(controller: reader, coordinator: coordinator)
+        let imageService = ImageMutationService(manager: reader, coordinator: coordinator)
+        let creationService = ContainerCreationService(manager: reader, coordinator: coordinator)
         OperationRoutes.register(on: router, coordinator: coordinator)
+        ResourceMutationRoutes.registerImages(on: router, reader: reader, service: imageService)
+        ResourceMutationRoutes.registerCreation(on: router, service: creationService)
         ContainerControlRoutes.registerControl(on: router, service: controlService)
         ContainerControlRoutes.registerLogs(
             on: router,
