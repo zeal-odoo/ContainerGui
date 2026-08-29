@@ -81,7 +81,7 @@ enum AppFactory {
         )
 
         router.get("/api/v1") { _, _ in
-            ["name": "Container GUI", "version": "0.1.0"]
+            ["name": "Container GUI", "version": AppVersion.current]
         }
         ContainerReadRoutes.register(on: router, reader: reader)
 
