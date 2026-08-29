@@ -409,7 +409,7 @@ async function loadRemoteRepositoryPage(page) {
     state.remoteRepositoryHasMore = Boolean(result.hasNextPage) && result.page < 500;
     renderRemoteRepositories(result.totalCount);
   } catch (error) {
-    elements.remoteRepositoryStatus.hidden = state.remoteRepositories.length !== 0;
+    elements.remoteRepositoryStatus.hidden = true;
     elements.remoteRepositoryError.hidden = false;
     elements.remoteRepositoryError.textContent = formatProblem(error);
   } finally {
@@ -445,7 +445,7 @@ async function loadRemoteTagPage(page) {
     state.remoteTagHasMore = Boolean(result.hasNextPage) && result.page < 500;
     renderRemoteTags();
   } catch (error) {
-    elements.remoteTagStatus.hidden = state.remoteTags.length !== 0;
+    elements.remoteTagStatus.hidden = true;
     elements.remoteTagError.hidden = false;
     elements.remoteTagError.textContent = formatProblem(error);
   } finally {

@@ -94,6 +94,13 @@ final class ResourceMutationAssetTests: XCTestCase {
         XCTAssertFalse(selection.contains("submitImagePull"))
     }
 
+    func testRemoteErrorsReplaceLoadingStates() throws {
+        let script = try asset("app.js")
+
+        XCTAssertTrue(script.contains("elements.remoteRepositoryStatus.hidden = true;\n    elements.remoteRepositoryError.hidden = false;"))
+        XCTAssertTrue(script.contains("elements.remoteTagStatus.hidden = true;\n    elements.remoteTagError.hidden = false;"))
+    }
+
     private func asset(_ name: String) throws -> String {
         try String(contentsOf: AppFactory.publicDirectoryURL.appendingPathComponent(name), encoding: .utf8)
     }
