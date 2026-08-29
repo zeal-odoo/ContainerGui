@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Container GUI Image Browse, Pull and Container Create API
-  version: 2.3.0
-  description: Feature contract for local image reads, remote registry browsing, image pulls, container creation and safe container deletion.
+  version: 2.4.0
+  description: Feature contract for local image reads, remote registry browsing, image pulls, container creation and safe container/image deletion.
 servers:
   - url: http://127.0.0.1:8787/api/v1
 security: []
@@ -53,6 +53,30 @@ paths:
         "503":
           $ref: "#/components/responses/ProblemResponse"
         "504":
+          $ref: "#/components/responses/ProblemResponse"
+
+  /images/delete:
+    post:
+      tags: [Images]
+      operationId: deleteImage
+      summary: Delete one unused local image and verify its absence
+      description: Requires exact confirmation. Referenced images, Apple vminit, bulk deletion and force deletion are rejected.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageDeleteRequest"
+      responses:
+        "202":
+          $ref: "#/components/responses/OperationAccepted"
+        "404":
+          $ref: "#/components/responses/ProblemResponse"
+        "409":
+          $ref: "#/components/responses/ProblemResponse"
+        "422":
           $ref: "#/components/responses/ProblemResponse"
 
   /registry-search/repositories:
@@ -417,6 +441,20 @@ components:
           type: [string, "null"]
           pattern: "^linux/(arm64|amd64)(/[A-Za-z0-9._-]+)?$"
 
+    ImageDeleteRequest:
+      type: object
+      additionalProperties: false
+      required: [reference, confirmationTarget]
+      properties:
+        reference:
+          type: string
+          minLength: 1
+          maxLength: 512
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:/@-]*$"
+        confirmationTarget:
+          type: string
+          description: Must exactly equal reference.
+
     PortMapping:
       type: object
       additionalProperties: false
@@ -544,7 +582,7 @@ components:
           format: uuid
         kind:
           type: string
-          enum: [pullImage, createContainer, deleteContainer]
+          enum: [pullImage, deleteImage, createContainer, deleteContainer]
         target:
           $ref: "#/components/schemas/OperationTarget"
         state:

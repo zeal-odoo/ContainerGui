@@ -65,6 +65,26 @@
 无法解析的输出行被忽略；尚无百分比时 Operation 可以没有 progress，页面使用原生不确定进度条。
 命令退出成功后进入 `verifying`，进度设为 100%，但只有权威镜像回读匹配后 Operation 才能成功。
 
+## ImageDeleteRequest
+
+| Field | Type | Rules |
+|---|---|---|
+| reference | String | 必填；必须匹配本机列表中的规范镜像名称、ID、摘要或等价 Docker Hub 短名 |
+| confirmationTarget | String | 必填；必须与 `reference` 完全一致 |
+
+服务将目标解析为本机列表中的规范名称，并拒绝被任何容器引用的镜像及 Apple
+`ghcr.io/apple/containerization/vminit` 系统镜像。
+
+## ImageDeleteOutcome
+
+| Field | Type | Rules |
+|---|---|---|
+| exitCode | Int32 | 必须为 0 才能进入验证，但不能单独证明成功 |
+| targetAbsent | Bool | 最新完整镜像列表中规范名称不再存在时为 true |
+| observedAt | Date | 删除后完整镜像列表的观测时间 |
+
+`queued -> running(image delete exact name) -> verifying(image list) -> succeeded|failed`
+
 ## PortMapping
 
 | Field | Type | Rules |
@@ -129,6 +149,7 @@
 新增：
 
 - `pullImage`
+- `deleteImage`
 - `createContainer`
 - `deleteContainer`
 
@@ -139,6 +160,7 @@
 ### OperationReadback
 
 新增可选 `observedImage`。镜像拉取成功时必须存在；容器创建沿用 `observedContainer`。
+容器或镜像删除使用 `targetAbsent=true` 表示最新权威列表已确认目标缺失。
 
 ## Safe summaries
 

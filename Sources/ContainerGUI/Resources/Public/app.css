@@ -169,6 +169,7 @@ dialog code { display: block; padding: 12px; background: #edf0f4; border-radius:
 @media (max-width: 1200px) {
   table { min-width: 620px; }
   th:nth-child(2), td:nth-child(2), th:nth-child(6), td:nth-child(6) { display: none; }
+  .resource-table th:last-child, .resource-table td:last-child { display: table-cell; }
 }
 @media (max-width: 900px) {
   .workspace { grid-template-columns: 1fr; }

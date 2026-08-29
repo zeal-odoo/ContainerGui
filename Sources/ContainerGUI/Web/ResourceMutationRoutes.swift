@@ -9,7 +9,7 @@ enum ResourceMutationRoutes {
         on router: Router<BasicRequestContext>,
         reader: Reader,
         service: ImageMutationService<Manager>
-    ) where Reader: ImageReading, Manager: ImageReading, Manager: ResourceMutating {
+    ) where Reader: ImageReading, Manager: ImageReading, Manager: ResourceMutating, Manager: ContainerControlling {
         router.get("/api/v1/images") { _, _ in
             try makeJSONResponse(try await reader.listImages())
         }
@@ -27,6 +27,22 @@ enum ResourceMutationRoutes {
                 )
             }
             let operation = try await service.submitPull(request: body, idempotencyKey: key)
+            return try accepted(operation)
+        }
+        router.post("/api/v1/images/delete") { request, context in
+            let key = try idempotencyKey(request)
+            let body: ImageDeleteRequest
+            do {
+                body = try await request.decode(as: ImageDeleteRequest.self, context: context)
+            } catch let problem as ProblemDetail {
+                throw problem
+            } catch {
+                throw ProblemDetail(
+                    code: .validationFailed,
+                    fieldErrors: ["body": "请求内容格式无效"]
+                )
+            }
+            let operation = try await service.submitDelete(request: body, idempotencyKey: key)
             return try accepted(operation)
         }
     }

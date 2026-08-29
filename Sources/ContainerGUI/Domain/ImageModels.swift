@@ -104,6 +104,52 @@ struct ImagePullOutcome: Equatable, Sendable {
     let matchedExpectation: Bool
 }
 
+struct ImageDeleteRequest: Codable, Equatable, Sendable {
+    let reference: String
+    let confirmationTarget: String
+
+    func validated() throws -> Self {
+        guard isValidImageReference(reference) else {
+            throw ProblemDetail(
+                code: .validationFailed,
+                fieldErrors: ["reference": "镜像引用格式无效"]
+            )
+        }
+        guard confirmationTarget == reference else {
+            throw ProblemDetail(code: .confirmationMismatch)
+        }
+        return self
+    }
+
+    var safeRequestSummary: [String: JSONValue] {
+        ["reference": .string(reference)]
+    }
+}
+
+struct ImageDeleteOutcome: Equatable, Sendable {
+    let exitCode: Int32
+    let targetAbsent: Bool
+    let observedAt: Date
+}
+
+func imageMatchesReference(_ image: ImageSummary, reference: String) -> Bool {
+    if image.name == reference || image.id == reference || image.digest == reference {
+        return true
+    }
+    if let digestSeparator = reference.lastIndex(of: "@"),
+       String(reference[reference.index(after: digestSeparator)...]) == image.digest {
+        return true
+    }
+    return normalizedImageReference(image.name) == normalizedImageReference(reference)
+}
+
+func isProtectedSystemImage(_ image: ImageSummary) -> Bool {
+    let prefix = "ghcr.io/apple/containerization/vminit"
+    return image.name == prefix
+        || image.name.hasPrefix(prefix + ":")
+        || image.name.hasPrefix(prefix + "@")
+}
+
 func isValidImageReference(_ value: String) -> Bool {
     guard (1...512).contains(value.count) else { return false }
     return value.range(
@@ -117,4 +163,14 @@ private func isValidImagePlatform(_ value: String) -> Bool {
         of: #"^linux/(arm64|amd64)(/[A-Za-z0-9._-]+)?$"#,
         options: .regularExpression
     ) != nil
+}
+
+private func normalizedImageReference(_ value: String) -> String {
+    guard !value.hasPrefix("sha256:") else { return value }
+    guard value.contains("/") else { return "docker.io/library/\(value)" }
+    let firstComponent = value.split(separator: "/", maxSplits: 1).first.map(String.init) ?? value
+    if firstComponent.contains(".") || firstComponent.contains(":") || firstComponent == "localhost" {
+        return value
+    }
+    return "docker.io/\(value)"
 }

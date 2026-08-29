@@ -7,6 +7,7 @@ const ENDPOINTS = {
   metrics: "/api/v1/containers/metrics",
   images: "/api/v1/images",
   imagePull: "/api/v1/images/pull",
+  imageDelete: "/api/v1/images/delete",
   registryRepositories: "/api/v1/registry-search/repositories",
   registryTags: "/api/v1/registry-search/tags",
   operations: "/api/v1/operations/"
@@ -44,7 +45,7 @@ const state = {
   containers: [], selectedID: null, selectedDetail: null, detailController: null,
   refreshing: false, submitting: false, eventSource: null,
   reconnectAttempts: 0, reconnectTimer: null, metricsByID: new Map(), metricsStatus: "loading",
-  images: [], imageSubmitting: false, createSubmitting: false,
+  images: [], imagesLoaded: false, containersLoaded: false, imageSubmitting: false, createSubmitting: false,
   remoteRepositories: [], remoteRepositoryPage: 0, remoteRepositoryHasMore: false,
   remoteSearchParameters: null, selectedRemoteRepository: null,
   remoteTags: [], remoteTagPage: 0, remoteTagHasMore: false,
@@ -216,6 +217,7 @@ function showListError(error) {
 
 function renderImages(snapshot) {
   state.images = snapshot.items;
+  state.imagesLoaded = true;
   elements.imageTableBody.replaceChildren();
   elements.localImageOptions.replaceChildren();
   for (const image of snapshot.items) {
@@ -243,13 +245,61 @@ function renderImages(snapshot) {
     sizeCell.textContent = formatBytes(image.sizeBytes);
     const timeCell = document.createElement("td");
     timeCell.textContent = formatTime(image.observedAt);
-    row.append(nameCell, digestCell, platformsCell, sizeCell, timeCell);
+    const actionCell = document.createElement("td");
+    const blockReason = imageDeletionBlockReason(image);
+    if (blockReason) {
+      const status = document.createElement("span");
+      status.className = "quiet";
+      status.textContent = blockReason;
+      actionCell.append(status);
+    } else {
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "button danger small";
+      deleteButton.textContent = "删除镜像";
+      deleteButton.setAttribute("aria-label", `删除镜像 ${image.name}`);
+      deleteButton.disabled = state.imageSubmitting;
+      deleteButton.addEventListener("click", () => deleteImage(image));
+      actionCell.append(deleteButton);
+    }
+    row.append(nameCell, digestCell, platformsCell, sizeCell, timeCell, actionCell);
     elements.imageTableBody.append(row);
   }
   elements.imageLoadingState.hidden = true;
   elements.imageErrorState.hidden = true;
   elements.imageEmptyState.hidden = snapshot.items.length !== 0;
   elements.imageTableWrap.hidden = snapshot.items.length === 0;
+}
+
+function imageDeletionBlockReason(image) {
+  if (!state.containersLoaded) return "正在核对";
+  if (isProtectedSystemImage(image.name)) return "系统镜像";
+  return state.containers.some((container) => imageReferenceMatches(image, container.imageReference))
+    ? "正在使用" : null;
+}
+
+function isProtectedSystemImage(reference) {
+  return reference === "ghcr.io/apple/containerization/vminit"
+    || reference.startsWith("ghcr.io/apple/containerization/vminit:")
+    || reference.startsWith("ghcr.io/apple/containerization/vminit@");
+}
+
+function imageReferenceMatches(image, reference) {
+  if (!reference) return false;
+  if ([image.name, image.id, image.digest].includes(reference)) return true;
+  const digestSeparator = reference.lastIndexOf("@");
+  if (digestSeparator >= 0 && reference.slice(digestSeparator + 1) === image.digest) return true;
+  return normalizedImageReference(image.name) === normalizedImageReference(reference);
+}
+
+function normalizedImageReference(reference) {
+  if (reference.startsWith("sha256:")) return reference;
+  if (!reference.includes("/")) return `docker.io/library/${reference}`;
+  const firstComponent = reference.split("/", 1)[0];
+  if (firstComponent.includes(".") || firstComponent.includes(":") || firstComponent === "localhost") {
+    return reference;
+  }
+  return `docker.io/${reference}`;
 }
 
 function showImageError(error) {
@@ -263,8 +313,10 @@ function showImageError(error) {
 async function loadImages() {
   try {
     renderImages(await fetchJSON(ENDPOINTS.images));
+    return true;
   } catch (error) {
     showImageError(error);
+    return false;
   }
 }
 
@@ -511,6 +563,7 @@ function selectRemoteTag(tag) {
 async function refreshDashboard({ announce = false } = {}) {
   if (state.refreshing) return;
   state.metricsStatus = "loading";
+  state.containersLoaded = false;
   setBusy(true);
   if (state.containers.length === 0) elements.loadingState.hidden = false;
   const metricsResultPromise = Promise.allSettled([
@@ -529,13 +582,16 @@ async function refreshDashboard({ announce = false } = {}) {
   }
   if (listResult.status === "fulfilled") {
     state.containers = listResult.value.items;
+    state.containersLoaded = true;
     updateStatistics(listResult.value);
     renderContainers();
     if (state.selectedID && state.containers.some((item) => item.id === state.selectedID)) {
       loadDetail(state.selectedID, { quiet: true });
     }
     if (announce) showToast("状态已从 CLI 刷新");
-  } else showListError(listResult.reason);
+  } else {
+    showListError(listResult.reason);
+  }
   const metricsResult = await metricsResultPromise;
   if (metricsResult.status === "fulfilled") {
     state.metricsByID = new Map(
@@ -548,7 +604,8 @@ async function refreshDashboard({ announce = false } = {}) {
   }
   if (listResult.status === "fulfilled") renderContainers();
   if (state.selectedDetail) renderFacts(state.selectedDetail.summary);
-  await imagesPromise;
+  const imagesAvailable = await imagesPromise;
+  if (imagesAvailable) renderImages({ items: state.images });
   setBusy(false);
   document.documentElement.dataset.containerGui = "ready";
 }
@@ -678,6 +735,41 @@ async function deleteContainer(summary) {
   );
   if (confirmed) {
     await submitContainerOperation("delete", summary.id, { confirmationTarget: summary.id });
+  }
+}
+
+async function deleteImage(image) {
+  const confirmed = await requestConfirmation(
+    "删除镜像",
+    "删除后无法恢复；只会删除当前精确镜像，不会使用 --all 或 --force。",
+    image.name,
+    "确认删除镜像",
+    true
+  );
+  if (confirmed) await submitImageDelete(image);
+}
+
+async function submitImageDelete(image) {
+  if (state.imageSubmitting) return;
+  setImagesExpanded(true);
+  state.imageSubmitting = true;
+  if (state.imagesLoaded) renderImages({ items: state.images });
+  showOperationStatus("正在提交镜像删除…", false, elements.imageOperationStatus);
+  try {
+    const operation = await fetchJSON(ENDPOINTS.imageDelete, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": crypto.randomUUID()
+      },
+      body: JSON.stringify({ reference: image.name, confirmationTarget: image.name })
+    });
+    await pollOperation(operation.id, elements.imageOperationStatus);
+  } catch (error) {
+    showOperationStatus(formatProblem(error), true, elements.imageOperationStatus);
+  } finally {
+    state.imageSubmitting = false;
+    if (state.imagesLoaded) renderImages({ items: state.images });
   }
 }
 

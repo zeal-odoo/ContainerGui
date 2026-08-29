@@ -37,6 +37,8 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun swift test
 - 现有容器读取、指标、启停和日志测试保持通过。
 - 删除测试必须证明只接受停止/已创建目标、精确确认、固定 `delete <id>` 参数，以及目标缺失回读；
   不得出现 `--all` 或 `--force`。
+- 镜像删除测试必须证明被容器引用及 Apple `vminit` 镜像在执行前被拒绝，固定命令为
+  `image delete <name>`，且成功必须包含目标缺失回读；不得出现 `--all` 或 `--force`。
 - Docker Hub 搜索、仓库规范化、标签分页和下一页判断使用固定 JSON 夹具。
 - 非 Docker Hub 平台值、超长响应、无效页码和上游错误都不会变成不受控请求。
 - 选择远程标签只回填拉取表单，不会自动提交写请求。
@@ -89,6 +91,8 @@ xcrun swift run ContainerGUI
 13. 不提交任何真实拉取或创建操作。
 14. 停止或已创建容器的详情显示“删除容器”；运行中容器不显示删除入口。浏览器验证只检查可见状态，
     不确认删除对话框中的最终按钮，也不发送真实删除请求。
+15. 未被容器引用的普通镜像显示“删除镜像”；被引用镜像显示“正在使用”，Apple `vminit` 显示“系统镜像”。
+    打开普通镜像的确认对话框后核对精确名称并取消，不点击最终确认，不发送真实镜像删除请求。
 
 ## Mutation acceptance with explicit authorization only
 

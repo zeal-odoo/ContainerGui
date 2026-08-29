@@ -53,6 +53,30 @@ final class ResourceMutationAssetTests: XCTestCase {
         XCTAssertTrue(try functionBody("createContainer", in: script).contains("setImagesExpanded(true)"))
     }
 
+    func testLocalImagesOfferOnlySafeExactDeleteActions() throws {
+        let html = try asset("index.html")
+        let script = try asset("app.js")
+
+        XCTAssertTrue(html.contains("<th>操作</th>"))
+        XCTAssertTrue(script.contains("imageDelete: \"/api/v1/images/delete\""))
+        let render = try functionBody("renderImages", in: script)
+        XCTAssertTrue(render.contains("删除镜像"))
+        XCTAssertTrue(render.contains("imageDeletionBlockReason"))
+        let deletion = try functionBody("deleteImage", in: script)
+        XCTAssertTrue(deletion.contains("requestConfirmation"))
+        XCTAssertTrue(deletion.contains("image.name"))
+        XCTAssertTrue(deletion.contains("不会使用 --all 或 --force"))
+        let submission = try functionBody("submitImageDelete", in: script)
+        XCTAssertTrue(submission.contains("ENDPOINTS.imageDelete"))
+        XCTAssertTrue(submission.contains("confirmationTarget: image.name"))
+        XCTAssertTrue(submission.contains("Idempotency-Key"))
+        XCTAssertTrue(script.contains("正在使用"))
+        XCTAssertTrue(script.contains("系统镜像"))
+        let referenceMatch = try functionBody("imageReferenceMatches", in: script)
+        XCTAssertTrue(referenceMatch.contains("lastIndexOf(\"@\")"))
+        XCTAssertTrue(referenceMatch.contains("image.digest"))
+    }
+
     func testPullDialogOffersFullAddressAndDockerHubWithoutGHCR() throws {
         let html = try asset("index.html")
         let script = try asset("app.js")

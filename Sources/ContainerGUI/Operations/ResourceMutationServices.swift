@@ -2,7 +2,7 @@ import CryptoKit
 import Foundation
 
 final class ImageMutationService<Manager>: Sendable
-where Manager: ImageReading, Manager: ResourceMutating {
+where Manager: ImageReading, Manager: ResourceMutating, Manager: ContainerControlling {
     private let manager: Manager
     private let coordinator: OperationCoordinator
 
@@ -26,6 +26,39 @@ where Manager: ImageReading, Manager: ResourceMutating {
             safeRequestSummary: request.safeRequestSummary
         )
         Task { await execute(operation: operation, request: request) }
+        return operation
+    }
+
+    func submitDelete(request: ImageDeleteRequest, idempotencyKey: String) async throws -> Operation {
+        let request = try request.validated()
+        let fingerprint = "deleteImage:\(request.reference)"
+        if let existing = try await coordinator.existing(
+            idempotencyKey: idempotencyKey,
+            fingerprint: fingerprint
+        ) { return existing }
+        let images = try await manager.listImages()
+        guard let target = images.items.first(where: {
+            imageMatchesReference($0, reference: request.reference)
+        }) else {
+            throw ProblemDetail(code: .targetNotFound, message: "未找到指定镜像。")
+        }
+        guard !isProtectedSystemImage(target) else {
+            throw ProblemDetail(code: .stateConflict, message: "Apple container 系统镜像不能删除。")
+        }
+        let containers = try await manager.listContainers()
+        guard !containers.items.contains(where: { container in
+            container.imageReference.map { imageMatchesReference(target, reference: $0) } == true
+        }) else {
+            throw ProblemDetail(code: .stateConflict, message: "镜像仍被容器引用，请先删除相关容器。")
+        }
+        let operation = try await coordinator.create(
+            idempotencyKey: idempotencyKey,
+            fingerprint: fingerprint,
+            kind: .deleteImage,
+            target: .image(reference: target.name),
+            safeRequestSummary: ["reference": .string(target.name)]
+        )
+        Task { await executeDelete(operation: operation) }
         return operation
     }
 
@@ -65,6 +98,36 @@ where Manager: ImageReading, Manager: ResourceMutating {
             observedImage: value,
             observedAt: outcome.observedImage.observedAt
         )
+    }
+
+    private func executeDelete(operation: Operation) async {
+        do {
+            try await coordinator.markRunning(operation.id)
+            let outcome = try await manager.deleteImage(reference: operation.target.id)
+            try await coordinator.markVerifying(operation.id, exitCode: outcome.exitCode)
+            let readback = OperationReadback(
+                expectationMatched: outcome.targetAbsent,
+                targetAbsent: outcome.targetAbsent,
+                observedAt: outcome.observedAt
+            )
+            if outcome.targetAbsent {
+                _ = try await coordinator.succeed(operation.id, readback: readback)
+            } else {
+                _ = try await coordinator.fail(
+                    operation.id,
+                    problem: ProblemDetail(code: .stateConflict, operationID: operation.id),
+                    readback: readback
+                )
+            }
+        } catch {
+            _ = try? await coordinator.fail(
+                operation.id,
+                problem: ProblemDetail(
+                    code: error.containerGUIProblem.code,
+                    operationID: operation.id
+                )
+            )
+        }
     }
 }
 

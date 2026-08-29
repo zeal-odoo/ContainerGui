@@ -184,6 +184,18 @@
 
 ---
 
+## Phase 13: Safe Image Deletion (Priority: P1)
+
+**Goal**: 允许删除未被容器引用的单个本机镜像，同时保护 Apple 系统镜像并以缺失回读验收。
+
+- [X] T064 [US1] Add failing CLI, API, browser asset and version tests for exact confirmed image deletion.
+- [X] T065 [US1] Implement fixed `image delete <name>` execution, reference guards and authoritative absence readback.
+- [X] T066 [US1] Add per-image delete actions, exact destructive confirmation and protected/in-use row states.
+- [X] T067 [US1] Update the spec, plan, data model, research, OpenAPI, quickstart and bilingual README.
+- [X] T068 [US1] Run full tests, read-only live checks, restart and browser-verify without deleting a real image, then commit.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -195,6 +207,7 @@
 - Phase 6 depends on US1 and adds deterministic registry shortcuts.
 - Phase 7 depends on Phase 6 and adds read-only remote discovery without changing mutation semantics.
 - Phase 12 depends on the existing container detail and Operation slices; it remains independently testable with fake controllers.
+- Phase 13 depends on the existing image list and Operation slices; it remains independently testable with fake managers.
 
 ### User Story Dependencies
 
@@ -242,6 +255,6 @@ T035: Tests/ContainerGUITests/Browser/ResourceMutationAssetTests.swift
 
 ### Safety Rules
 
-- Never run real `container image pull`, `container create` or `container start` during automated validation.
+- Never run real `container image pull`, `container image delete`, `container create` or `container start` during automated validation.
 - Use only fixed CLI 1.3.1 fixtures for write paths.
 - Real mutation acceptance remains a separate user-authorized step after implementation.

@@ -171,6 +171,125 @@ final class ImageAndCreationCLITests: XCTestCase {
         XCTAssertEqual(updates.map(\.percentComplete), [19, 50, 100])
     }
 
+    func testDeleteImageUsesExactReferenceWithoutBroadFlagsAndRequiresAbsenceReadback() async throws {
+        let executor = ResourceScriptedCommandExecutor(steps: [
+            .success(resourceVersionResult()),
+            .success(CommandResult(
+                stdout: try fixture("images-list.json"),
+                stderr: Data(),
+                exitCode: 0,
+                duration: .zero
+            )),
+            .success(resourceContainerListResult()),
+            .success(resourceEmptySuccess()),
+            .success(CommandResult(stdout: Data("[]".utf8), stderr: Data(), exitCode: 0, duration: .zero)),
+        ])
+
+        let outcome = try await resourceClient(executor).deleteImage(reference: "example.invalid/demo:1")
+
+        XCTAssertEqual(outcome.exitCode, 0)
+        XCTAssertTrue(outcome.targetAbsent)
+        let requests = await executor.requests
+        let mutation = try XCTUnwrap(requests.first(where: { $0.arguments.prefix(2) == ["image", "delete"] }))
+        XCTAssertEqual(mutation.arguments, ["image", "delete", "example.invalid/demo:1"])
+        XCTAssertFalse(mutation.arguments.contains("--all"))
+        XCTAssertFalse(mutation.arguments.contains("--force"))
+    }
+
+    func testDeleteImageRejectsContainerReferenceBeforeMutation() async throws {
+        let executor = ResourceScriptedCommandExecutor(steps: [
+            .success(resourceVersionResult()),
+            .success(CommandResult(
+                stdout: try fixture("images-list.json"),
+                stderr: Data(),
+                exitCode: 0,
+                duration: .zero
+            )),
+            .success(resourceContainerListResult(
+                id: "demo",
+                state: "stopped",
+                imageReference: "postgres:latest"
+            )),
+        ])
+
+        do {
+            _ = try await resourceClient(executor).deleteImage(reference: "docker.io/library/postgres:latest")
+            XCTFail("Expected state conflict")
+        } catch let problem as ProblemDetail {
+            XCTAssertEqual(problem.code, .stateConflict)
+        }
+
+        let requests = await executor.requests
+        XCTAssertFalse(requests.contains(where: { $0.arguments.prefix(2) == ["image", "delete"] }))
+    }
+
+    func testDeleteImageRejectsContainerDigestReferenceBeforeMutation() async throws {
+        let digest = "sha256:" + String(repeating: "a", count: 64)
+        let executor = ResourceScriptedCommandExecutor(steps: [
+            .success(resourceVersionResult()),
+            .success(CommandResult(
+                stdout: try fixture("images-list.json"),
+                stderr: Data(),
+                exitCode: 0,
+                duration: .zero
+            )),
+            .success(resourceContainerListResult(
+                id: "demo",
+                imageReference: "docker.io/library/postgres@\(digest)"
+            )),
+        ])
+
+        do {
+            _ = try await resourceClient(executor).deleteImage(reference: "docker.io/library/postgres:latest")
+            XCTFail("Expected state conflict")
+        } catch let problem as ProblemDetail {
+            XCTAssertEqual(problem.code, .stateConflict)
+        }
+
+        let requests = await executor.requests
+        XCTAssertFalse(requests.contains(where: { $0.arguments.prefix(2) == ["image", "delete"] }))
+    }
+
+    func testDeleteImageRejectsAppleSystemImageBeforeMutation() async throws {
+        let executor = ResourceScriptedCommandExecutor(steps: [
+            .success(resourceVersionResult()),
+            .success(resourceImageListResult(reference: "ghcr.io/apple/containerization/vminit:0.33.3")),
+        ])
+
+        do {
+            _ = try await resourceClient(executor).deleteImage(
+                reference: "ghcr.io/apple/containerization/vminit:0.33.3"
+            )
+            XCTFail("Expected state conflict")
+        } catch let problem as ProblemDetail {
+            XCTAssertEqual(problem.code, .stateConflict)
+        }
+
+        let requests = await executor.requests
+        XCTAssertFalse(requests.contains(where: { $0.arguments.prefix(2) == ["image", "delete"] }))
+    }
+
+    func testDeleteImageExitZeroWithoutAbsenceReadbackIsNotSuccess() async throws {
+        let list = CommandResult(
+            stdout: try fixture("images-list.json"),
+            stderr: Data(),
+            exitCode: 0,
+            duration: .zero
+        )
+        let executor = ResourceScriptedCommandExecutor(steps: [
+            .success(resourceVersionResult()),
+            .success(list),
+            .success(resourceContainerListResult()),
+            .success(resourceEmptySuccess()),
+            .success(list),
+        ])
+
+        let outcome = try await resourceClient(executor).deleteImage(reference: "example.invalid/demo:1")
+
+        XCTAssertEqual(outcome.exitCode, 0)
+        XCTAssertFalse(outcome.targetAbsent)
+    }
+
     func testCreateUsesOnlyFixedOptionsBeforeImageAndReadsBackTarget() async throws {
         let executor = ResourceScriptedCommandExecutor(steps: [
             .success(resourceVersionResult()),
@@ -333,9 +452,23 @@ private func resourceEmptySuccess() -> CommandResult {
     CommandResult(stdout: Data(), stderr: Data(), exitCode: 0, duration: .zero)
 }
 
-private func resourceContainerListResult(id: String, state: String) -> CommandResult {
+private func resourceContainerListResult(
+    id: String? = nil,
+    state: String = "stopped",
+    imageReference: String = "postgres:latest"
+) -> CommandResult {
+    guard let id else {
+        return CommandResult(stdout: Data("[]".utf8), stderr: Data(), exitCode: 0, duration: .zero)
+    }
     let json = """
-    [{"id":"\(id)","configuration":{"id":"\(id)","image":{"reference":"postgres:latest"}},"status":{"state":"\(state)","networks":[]}}]
+    [{"id":"\(id)","configuration":{"id":"\(id)","image":{"reference":"\(imageReference)"}},"status":{"state":"\(state)","networks":[]}}]
+    """
+    return CommandResult(stdout: Data(json.utf8), stderr: Data(), exitCode: 0, duration: .zero)
+}
+
+private func resourceImageListResult(reference: String) -> CommandResult {
+    let json = """
+    [{"configuration":{"descriptor":{"digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"name":"\(reference)"},"id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","variants":[{"platform":{"architecture":"arm64","os":"linux"},"size":1024}]}]
     """
     return CommandResult(stdout: Data(json.utf8), stderr: Data(), exitCode: 0, duration: .zero)
 }

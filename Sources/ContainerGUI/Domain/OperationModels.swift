@@ -7,6 +7,7 @@ enum OperationKind: String, Codable, Sendable {
     case deleteContainer
     case startSystem
     case pullImage
+    case deleteImage
     case createContainer
 }
 

@@ -48,6 +48,7 @@ protocol ResourceMutating: Sendable {
         _ request: ImagePullRequest,
         progress: @escaping @Sendable (ImagePullProgress) async -> Void
     ) async throws -> ImagePullOutcome
+    func deleteImage(reference: String) async throws -> ImageDeleteOutcome
     func createContainer(_ request: ContainerCreateRequest) async throws -> ContainerCreateOutcome
 }
 
@@ -240,6 +241,33 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
             exitCode: exitCode,
             observedImage: observed,
             matchedExpectation: platformMatched
+        )
+    }
+
+    func deleteImage(reference: String) async throws -> ImageDeleteOutcome {
+        _ = try ImageDeleteRequest(reference: reference, confirmationTarget: reference).validated()
+        let currentImages = try await listImages()
+        guard let target = currentImages.items.first(where: { imageMatchesReference($0, reference: reference) }) else {
+            throw ProblemDetail(code: .targetNotFound, message: "未找到指定镜像。")
+        }
+        guard !isProtectedSystemImage(target) else {
+            throw ProblemDetail(code: .stateConflict, message: "Apple container 系统镜像不能删除。")
+        }
+        let containers = try await listContainers()
+        guard !containers.items.contains(where: { container in
+            container.imageReference.map { imageMatchesReference(target, reference: $0) } == true
+        }) else {
+            throw ProblemDetail(code: .stateConflict, message: "镜像仍被容器引用，请先删除相关容器。")
+        }
+
+        let result = try await execute(["image", "delete", target.name], timeout: mutationTimeout)
+        guard result.exitCode == 0 else { throw ContainerCLIError.nonZeroExit(result.exitCode) }
+        let readback = try await listImages()
+        let targetAbsent = !readback.items.contains { imageMatchesReference($0, reference: target.name) }
+        return ImageDeleteOutcome(
+            exitCode: result.exitCode,
+            targetAbsent: targetAbsent,
+            observedAt: readback.observedAt
         )
     }
 

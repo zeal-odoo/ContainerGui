@@ -96,6 +96,113 @@ final class ResourceMutationAPITests: XCTestCase {
         XCTAssertEqual(pullCount, 0)
     }
 
+    func testImageDeleteRequiresExactConfirmationAndVerifiedAbsence() async throws {
+        let manager = StubImageManager()
+        let app = makeImageApplication(manager: manager)
+        let expectedOrigin = origin
+        let headerName = idempotencyName
+        let key = UUID().uuidString
+        let body = ByteBuffer(string: #"{"reference":"docker.io/library/postgres:latest","confirmationTarget":"docker.io/library/postgres:latest"}"#)
+
+        try await app.test(.router) { client in
+            let headers: HTTPFields = [
+                .origin: expectedOrigin,
+                .contentType: "application/json",
+                headerName: key,
+            ]
+            let operation: ContainerGUI.Operation = try await client.execute(
+                uri: "/api/v1/images/delete",
+                method: .post,
+                headers: headers,
+                body: body
+            ) { response in
+                XCTAssertEqual(response.status, .accepted)
+                let operation = try JSONDecoder.containerGUI.decode(ContainerGUI.Operation.self, from: response.body)
+                XCTAssertEqual(operation.kind, .deleteImage)
+                XCTAssertEqual(operation.target, .image(reference: "docker.io/library/postgres:latest"))
+                return operation
+            }
+            try await Task.sleep(for: .milliseconds(80))
+            try await client.execute(uri: "/api/v1/operations/\(operation.id.uuidString)", method: .get) { response in
+                let completed = try JSONDecoder.containerGUI.decode(ContainerGUI.Operation.self, from: response.body)
+                XCTAssertEqual(completed.state, .succeeded)
+                XCTAssertEqual(completed.readback?.targetAbsent, true)
+            }
+            try await client.execute(
+                uri: "/api/v1/images/delete",
+                method: .post,
+                headers: headers,
+                body: ByteBuffer(string: #"{"reference":"docker.io/library/postgres:latest","confirmationTarget":"docker.io/library/postgres:latest"}"#)
+            ) { response in
+                XCTAssertEqual(response.status, .accepted)
+                let replay = try JSONDecoder.containerGUI.decode(ContainerGUI.Operation.self, from: response.body)
+                XCTAssertEqual(replay.id, operation.id)
+                XCTAssertEqual(replay.state, .succeeded)
+            }
+        }
+        let deleteCount = await manager.deleteImageCount
+        XCTAssertEqual(deleteCount, 1)
+    }
+
+    func testImageDeleteRejectsConfirmationMismatchAndReferencedImageBeforeMutation() async throws {
+        let expectedOrigin = origin
+        let headerName = idempotencyName
+
+        for (manager, confirmation, expectedCode) in [
+            (StubImageManager(), "wrong", ProblemCode.confirmationMismatch),
+            (StubImageManager(mode: .existingContainer), "docker.io/library/postgres:latest", .stateConflict),
+        ] {
+            let app = makeImageApplication(manager: manager)
+            try await app.test(.router) { client in
+                let headers: HTTPFields = [
+                    .origin: expectedOrigin,
+                    .contentType: "application/json",
+                    headerName: UUID().uuidString,
+                ]
+                try await client.execute(
+                    uri: "/api/v1/images/delete",
+                    method: .post,
+                    headers: headers,
+                    body: ByteBuffer(string: #"{"reference":"docker.io/library/postgres:latest","confirmationTarget":"\#(confirmation)"}"#)
+                ) { response in
+                    XCTAssertEqual(response.status, expectedCode == .confirmationMismatch ? .unprocessableContent : .conflict)
+                    let problem = try JSONDecoder.containerGUI.decode(ProblemDetail.self, from: response.body)
+                    XCTAssertEqual(problem.code, expectedCode)
+                }
+            }
+            let deleteCount = await manager.deleteImageCount
+            XCTAssertEqual(deleteCount, 0)
+        }
+    }
+
+    func testImageDeleteRejectsAppleSystemImageBeforeMutation() async throws {
+        let manager = StubImageManager(mode: .protectedImage)
+        let app = makeImageApplication(manager: manager)
+        let expectedOrigin = origin
+        let headerName = idempotencyName
+        let reference = "ghcr.io/apple/containerization/vminit:0.33.3"
+
+        try await app.test(.router) { client in
+            let headers: HTTPFields = [
+                .origin: expectedOrigin,
+                .contentType: "application/json",
+                headerName: UUID().uuidString,
+            ]
+            try await client.execute(
+                uri: "/api/v1/images/delete",
+                method: .post,
+                headers: headers,
+                body: ByteBuffer(string: #"{"reference":"\#(reference)","confirmationTarget":"\#(reference)"}"#)
+            ) { response in
+                XCTAssertEqual(response.status, .conflict)
+                let problem = try JSONDecoder.containerGUI.decode(ProblemDetail.self, from: response.body)
+                XCTAssertEqual(problem.code, .stateConflict)
+            }
+        }
+        let deleteCount = await manager.deleteImageCount
+        XCTAssertEqual(deleteCount, 0)
+    }
+
     func testCreateReplayRedactionOptionalStartAndReadback() async throws {
         let manager = StubImageManager()
         let app = makeImageApplication(manager: manager)
@@ -262,11 +369,13 @@ private actor StubImageManager: ImageReading, ResourceMutating, ContainerControl
         case success
         case existingContainer
         case missingCreateReadback
+        case protectedImage
     }
 
     private(set) var pullCount = 0
     private(set) var createCount = 0
     private(set) var optionalStartCount = 0
+    private(set) var deleteImageCount = 0
     private let mode: Mode
     private let observedAt = Date(timeIntervalSince1970: 1_787_987_200)
 
@@ -275,7 +384,10 @@ private actor StubImageManager: ImageReading, ResourceMutating, ContainerControl
     }
 
     func listImages() async throws -> ImageList {
-        ImageList(items: [image()], observedAt: observedAt)
+        let items = deleteImageCount > 0
+            ? []
+            : [mode == .protectedImage ? protectedImage() : image()]
+        return ImageList(items: items, observedAt: observedAt)
     }
 
     func inspectImage(reference _: String) async throws -> ImageSummary {
@@ -298,6 +410,11 @@ private actor StubImageManager: ImageReading, ResourceMutating, ContainerControl
             observedImage: image(),
             matchedExpectation: request.platform == nil || request.platform == "linux/arm64"
         )
+    }
+
+    func deleteImage(reference _: String) async throws -> ImageDeleteOutcome {
+        deleteImageCount += 1
+        return ImageDeleteOutcome(exitCode: 0, targetAbsent: true, observedAt: observedAt)
     }
 
     func listContainers() async throws -> ContainerList {
@@ -338,6 +455,17 @@ private actor StubImageManager: ImageReading, ResourceMutating, ContainerControl
             id: String(repeating: "a", count: 64),
             name: "docker.io/library/postgres:latest",
             digest: "sha256:" + String(repeating: "a", count: 64),
+            platforms: [ImagePlatform(os: "linux", architecture: "arm64")],
+            sizeBytes: 1_024,
+            observedAt: observedAt
+        )
+    }
+
+    private func protectedImage() -> ImageSummary {
+        ImageSummary(
+            id: String(repeating: "b", count: 64),
+            name: "ghcr.io/apple/containerization/vminit:0.33.3",
+            digest: "sha256:" + String(repeating: "b", count: 64),
             platforms: [ImagePlatform(os: "linux", architecture: "arm64")],
             sizeBytes: 1_024,
             observedAt: observedAt
