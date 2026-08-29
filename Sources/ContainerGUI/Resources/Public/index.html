@@ -201,12 +201,22 @@
       <h2 id="pullImageTitle">拉取容器镜像</h2>
       <p class="form-help">镜像会由 Apple container CLI 拉取，并在完成后重新读取详情验证。</p>
       <label class="form-field">
+        <span>镜像仓库</span>
+        <select id="pullImageRegistry" name="registry" aria-describedby="pullRegistryHelp pullRegistryError">
+          <option value="">完整地址 / 自动识别</option>
+          <option value="dockerHub">Docker Hub</option>
+          <option value="ghcr">GitHub Container Registry (GHCR)</option>
+        </select>
+        <small id="pullRegistryHelp">Docker Hub 可输入 postgres:latest；GHCR 请输入 owner/repository:tag。</small>
+        <span id="pullRegistryError" class="field-error" aria-live="polite"></span>
+      </label>
+      <label class="form-field">
         <span>镜像引用</span>
-        <input id="pullImageReference" name="reference" required maxlength="512" autocomplete="off" placeholder="postgres:latest" aria-describedby="pullReferenceError">
+        <input id="pullImageReference" name="reference" required maxlength="512" autocomplete="off" placeholder="postgres:latest 或 ghcr.io/owner/image:tag" aria-describedby="pullReferenceError">
         <span id="pullReferenceError" class="field-error" aria-live="polite"></span>
       </label>
       <label class="form-field">
-        <span>平台（可选）</span>
+        <span>目标架构（可选）</span>
         <select id="pullImagePlatform" name="platform" aria-describedby="pullPlatformError">
           <option value="">使用运行时默认平台</option>
           <option value="linux/arm64">Linux ARM64</option>

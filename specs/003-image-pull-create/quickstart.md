@@ -55,11 +55,13 @@ xcrun swift run ContainerGUI
 打开 `http://127.0.0.1:8788/`，确认：
 
 1. 镜像区域显示本机镜像名称、摘要、平台和大小。
-2. “拉取镜像”对话框包含镜像引用和可选平台，键盘可完整操作。
-3. “创建容器”对话框包含名称、镜像、CPU、内存、端口、环境变量、进程参数和创建后启动。
-4. 本地镜像名称可用于创建表单建议。
-5. 无效输入显示逐字段中文错误，未发出写请求。
-6. 不提交任何真实拉取或创建操作。
+2. “拉取镜像”对话框包含完整地址、Docker Hub、GHCR 三种仓库输入方式，以及可选目标架构。
+3. Docker Hub 的 `postgres:latest` 提交为 `docker.io/library/postgres:latest`；GHCR 的
+   `owner/image:tag` 提交为 `ghcr.io/owner/image:tag`。
+4. “创建容器”对话框包含名称、镜像、CPU、内存、端口、环境变量、进程参数和创建后启动。
+5. 本地镜像名称可用于创建表单建议。
+6. 无效输入显示逐字段中文错误，未发出写请求。
+7. 不提交任何真实拉取或创建操作。
 
 ## Mutation acceptance with explicit authorization only
 

@@ -21,8 +21,8 @@ const elements = Object.fromEntries([
   "confirmTarget", "confirmActionButton", "toast", "imagesSection", "openPullImageButton",
   "imageOperationStatus", "imageLoadingState",
   "imageEmptyState", "imageErrorState", "imageTableWrap", "imageTableBody", "pullImageDialog",
-  "pullImageForm", "pullImageReference", "pullImagePlatform", "pullReferenceError",
-  "pullPlatformError", "pullFormStatus", "cancelPullImageButton", "submitPullImageButton",
+  "pullImageForm", "pullImageRegistry", "pullImageReference", "pullImagePlatform", "pullRegistryError",
+  "pullReferenceError", "pullPlatformError", "pullFormStatus", "cancelPullImageButton", "submitPullImageButton",
   "openCreateContainerButton", "localImageOptions", "createContainerDialog", "createContainerForm",
   "createName", "createImage", "createCPUs", "createMemory", "createPorts", "createEnvironment",
   "createArguments", "createStartAfter", "createNameError", "createImageError", "createCPUsError",
@@ -467,19 +467,23 @@ function showOperationStatus(message, isError = false, target = elements.operati
 function openPullImageDialog() {
   clearPullImageErrors();
   elements.pullFormStatus.textContent = "";
+  updatePullRegistryHint();
   elements.pullImageDialog.showModal();
   elements.pullImageReference.focus();
 }
 
 function clearPullImageErrors() {
+  elements.pullRegistryError.textContent = "";
   elements.pullReferenceError.textContent = "";
   elements.pullPlatformError.textContent = "";
+  elements.pullImageRegistry.removeAttribute("aria-invalid");
   elements.pullImageReference.removeAttribute("aria-invalid");
   elements.pullImagePlatform.removeAttribute("aria-invalid");
 }
 
 function renderPullImageErrors(problem) {
   const targets = {
+    registry: [elements.pullImageRegistry, elements.pullRegistryError],
     reference: [elements.pullImageReference, elements.pullReferenceError],
     platform: [elements.pullImagePlatform, elements.pullPlatformError]
   };
@@ -491,13 +495,51 @@ function renderPullImageErrors(problem) {
   }
 }
 
-function validateImagePull(reference, platform) {
+function isRegistryQualified(reference) {
+  const slash = reference.indexOf("/");
+  if (slash < 1) return false;
+  const firstSegment = reference.slice(0, slash);
+  return firstSegment === "localhost" || firstSegment.includes(".") || firstSegment.includes(":");
+}
+
+function resolveImageReference(reference, registry) {
+  if (!registry) return reference;
+  const host = registry === "dockerHub" ? "docker.io/" : registry === "ghcr" ? "ghcr.io/" : null;
+  if (!host) return null;
+  if (reference.startsWith(host)) return reference;
+  if (isRegistryQualified(reference)) return null;
+  if (registry === "dockerHub" && !reference.includes("/")) {
+    return `docker.io/library/${reference}`;
+  }
+  return `${host}${reference}`;
+}
+
+function updatePullRegistryHint() {
+  const placeholders = {
+    dockerHub: "postgres:latest 或 owner/image:tag",
+    ghcr: "owner/repository:tag"
+  };
+  elements.pullImageReference.placeholder = placeholders[elements.pullImageRegistry.value]
+    || "postgres:latest 或 ghcr.io/owner/image:tag";
+}
+
+function validateImagePull(reference, platform, registry) {
   const errors = [];
   if (!/^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,511}$/.test(reference)) {
     errors.push({ field: "reference", message: "镜像引用格式无效" });
   }
+  if (registry && !["dockerHub", "ghcr"].includes(registry)) {
+    errors.push({ field: "registry", message: "镜像仓库无效" });
+  } else if (reference && resolveImageReference(reference, registry) === null) {
+    errors.push({ field: "registry", message: "镜像地址与所选仓库不一致" });
+  } else if (registry === "ghcr") {
+    const repository = reference.startsWith("ghcr.io/") ? reference.slice("ghcr.io/".length) : reference;
+    if (!repository.includes("/")) {
+      errors.push({ field: "reference", message: "GHCR 镜像必须包含 owner/repository" });
+    }
+  }
   if (platform && !/^linux\/(arm64|amd64)(\/[A-Za-z0-9._-]+)?$/.test(platform)) {
-    errors.push({ field: "platform", message: "平台必须为 Linux ARM64 或 AMD64" });
+    errors.push({ field: "platform", message: "目标架构必须为 Linux ARM64 或 AMD64" });
   }
   return errors;
 }
@@ -506,15 +548,19 @@ async function submitImagePull(event) {
   event.preventDefault();
   if (state.imageSubmitting) return;
   clearPullImageErrors();
+  const registry = elements.pullImageRegistry.value;
   const platform = elements.pullImagePlatform.value;
-  const body = { reference: elements.pullImageReference.value.trim() };
+  const reference = elements.pullImageReference.value.trim();
+  const body = { reference };
   if (platform) body.platform = platform;
-  const fieldErrors = validateImagePull(body.reference, platform);
+  const fieldErrors = validateImagePull(reference, platform, registry);
   if (fieldErrors.length) {
     renderPullImageErrors({ fieldErrors });
     elements.pullFormStatus.textContent = "请修正标出的字段。";
     return;
   }
+  const resolvedReference = resolveImageReference(reference, registry);
+  body.reference = resolvedReference;
   state.imageSubmitting = true;
   elements.submitPullImageButton.disabled = true;
   elements.pullFormStatus.textContent = "正在提交拉取操作…";
@@ -810,6 +856,7 @@ elements.followLogsButton.addEventListener("click", () => {
 });
 elements.openPullImageButton.addEventListener("click", openPullImageDialog);
 elements.cancelPullImageButton.addEventListener("click", () => elements.pullImageDialog.close());
+elements.pullImageRegistry.addEventListener("change", updatePullRegistryHint);
 elements.pullImageForm.addEventListener("submit", submitImagePull);
 elements.openCreateContainerButton.addEventListener("click", openCreateContainerDialog);
 elements.cancelCreateContainerButton.addEventListener("click", () => elements.createContainerDialog.close());

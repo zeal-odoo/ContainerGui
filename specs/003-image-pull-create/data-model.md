@@ -39,6 +39,11 @@
 | reference | String | 1...512；匹配受控镜像引用字符集；无空白、控制符或前导 `-` |
 | platform | String? | 空或 `linux/arm64`、`linux/amd64`，可带安全 variant |
 
+浏览器中的仓库快捷选择不是 API 字段。选择 Docker Hub 时，短官方镜像补全为
+`docker.io/library/<image>`，带命名空间的镜像补全为 `docker.io/<namespace>/<image>`；选择 GHCR 时，
+要求输入 `owner/repository` 并补全为 `ghcr.io/<owner>/<repository>`。未选择快捷仓库时，引用原样提交。
+若输入已含与所选项不同的仓库主机，页面在发出请求前拒绝。
+
 ### State transition
 
 `queued -> running -> verifying -> succeeded|failed`
@@ -109,7 +114,7 @@
 ### Pull image
 
 ```json
-{"reference":"postgres:latest","platform":"linux/arm64"}
+{"reference":"docker.io/library/postgres:latest","platform":"linux/arm64"}
 ```
 
 ### Create container

@@ -37,6 +37,7 @@ open http://127.0.0.1:8787
 - 设置 `CONTAINER_GUI_LIVE_READONLY=1` 后，可运行真实 CLI 只读兼容性测试。
 - 真实拉取、创建、启动或停止必须由用户在页面明确提交；自动化验证不会执行这些写操作。
 - 当前 MVP 包含容器列表、CPU/内存指标、详情、安全启停、操作回读、日志、镜像列表与拉取，以及受控容器创建。
+- 拉取表单提供 Docker Hub、GitHub Container Registry（GHCR）快捷选择，并保留完整镜像地址输入。
 - 创建表单只支持名称、镜像、CPU、内存、回环端口、环境变量、进程参数和可选启动；不接受任意 CLI 或 shell 文本。
 
 设计与验收入口见 [基础功能规格](specs/001-container-web-gui/spec.md)、

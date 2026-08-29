@@ -191,6 +191,7 @@ components:
           minLength: 1
           maxLength: 512
           pattern: "^[A-Za-z0-9][A-Za-z0-9._:/@-]*$"
+          description: Complete image reference after any Docker Hub or GHCR browser shortcut is resolved.
         platform:
           type: [string, "null"]
           pattern: "^linux/(arm64|amd64)(/[A-Za-z0-9._-]+)?$"

@@ -90,6 +90,17 @@
 
 ---
 
+## Phase 6: Registry Shortcuts
+
+**Purpose**: 在不改变固定 CLI 命令边界的前提下，为镜像拉取提供 Docker Hub 与 GHCR 快捷选择。
+
+- [X] T028 [US1] Add failing browser asset tests for Docker Hub/GHCR choices, architecture wording and resolved-reference submission in Tests/ContainerGUITests/Browser/ResourceMutationAssetTests.swift
+- [X] T029 [US1] Add registry selection, deterministic Docker Hub/GHCR reference resolution and field feedback in Sources/ContainerGUI/Resources/Public/index.html and Sources/ContainerGUI/Resources/Public/app.js
+- [X] T030 [US1] Update registry shortcut rules and verification steps in specs/003-image-pull-create/spec.md, specs/003-image-pull-create/research.md, specs/003-image-pull-create/data-model.md, specs/003-image-pull-create/contracts/openapi.yaml and specs/003-image-pull-create/quickstart.md
+- [X] T031 [US1] Run focused, full, explicit read-only CLI, browser resolver and diff validation, and record both the result and the live-pull boundary incident in specs/003-image-pull-create/verification-us1.md
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

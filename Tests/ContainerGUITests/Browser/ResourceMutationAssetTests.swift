@@ -22,6 +22,21 @@ final class ResourceMutationAssetTests: XCTestCase {
         XCTAssertTrue(script.contains("Idempotency-Key"))
     }
 
+    func testPullDialogOffersDockerHubAndGHCRRegistryShortcuts() throws {
+        let html = try asset("index.html")
+        let script = try asset("app.js")
+
+        XCTAssertTrue(html.contains("id=\"pullImageRegistry\""))
+        XCTAssertTrue(html.contains("name=\"registry\""))
+        XCTAssertTrue(html.contains("<option value=\"dockerHub\">Docker Hub</option>"))
+        XCTAssertTrue(html.contains("<option value=\"ghcr\">GitHub Container Registry (GHCR)</option>"))
+        XCTAssertTrue(html.contains("目标架构（可选）"))
+        XCTAssertTrue(script.contains("resolveImageReference"))
+        XCTAssertTrue(script.contains("docker.io/library/"))
+        XCTAssertTrue(script.contains("ghcr.io/"))
+        XCTAssertTrue(script.contains("body.reference = resolvedReference"))
+    }
+
     func testCreateDialogUsesLocalImagesLoopbackPortsAndSensitiveInputs() throws {
         let html = try asset("index.html")
         let script = try asset("app.js")
