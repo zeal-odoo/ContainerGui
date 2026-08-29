@@ -27,6 +27,23 @@ final class ResourceMutationAssetTests: XCTestCase {
         XCTAssertTrue(script.contains("Idempotency-Key"))
     }
 
+    func testLocalImagesCanBeCollapsedAccessibly() throws {
+        let html = try asset("index.html")
+        let script = try asset("app.js")
+
+        XCTAssertTrue(html.contains("id=\"toggleImagesButton\""))
+        XCTAssertTrue(html.contains("aria-expanded=\"true\""))
+        XCTAssertTrue(html.contains("aria-controls=\"imageSectionBody\""))
+        XCTAssertTrue(html.contains("id=\"imageSectionBody\""))
+        let toggle = try functionBody("setImagesExpanded", in: script)
+        XCTAssertTrue(toggle.contains("elements.imageSectionBody.hidden = !isExpanded"))
+        XCTAssertTrue(toggle.contains("setAttribute(\"aria-expanded\", String(isExpanded))"))
+        XCTAssertTrue(toggle.contains("isExpanded ? \"收起镜像\" : \"展开镜像\""))
+        XCTAssertTrue(script.contains("toggleImagesButton.addEventListener(\"click\""))
+        XCTAssertTrue(try functionBody("submitImagePull", in: script).contains("setImagesExpanded(true)"))
+        XCTAssertTrue(try functionBody("createContainer", in: script).contains("setImagesExpanded(true)"))
+    }
+
     func testPullDialogOffersFullAddressAndDockerHubWithoutGHCR() throws {
         let html = try asset("index.html")
         let script = try asset("app.js")

@@ -139,6 +139,17 @@
 
 ---
 
+## Phase 9: Collapsible Local Images (Priority: P2)
+
+**Goal**: 允许用户折叠本机镜像内容以缩短页面，同时保留操作入口和后台刷新。
+
+- [X] T047 [US1] Add failing browser asset and version tests for an accessible local-image disclosure control.
+- [X] T048 [US1] Add the default-expanded local-image body and synchronized collapse button behavior.
+- [X] T049 [US1] Auto-expand on pull/create submission so operation state remains visible.
+- [X] T050 [US1] Update documentation, run the full suite, restart, verify the live browser and commit.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

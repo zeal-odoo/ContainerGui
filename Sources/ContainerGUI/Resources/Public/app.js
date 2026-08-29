@@ -21,7 +21,8 @@ const elements = Object.fromEntries([
   "detailPanel", "detailPlaceholder", "detailContent", "detailTitle", "detailFacts",
   "containerActions", "operationStatus", "closeDetailButton", "loadLogsButton", "followLogsButton",
   "logStatus", "logOutput", "rawDetail", "confirmDialog", "confirmTitle", "confirmMessage",
-  "confirmTarget", "confirmActionButton", "toast", "imagesSection", "openPullImageButton",
+  "confirmTarget", "confirmActionButton", "toast", "imagesSection", "toggleImagesButton",
+  "imageSectionBody", "openPullImageButton",
   "imageOperationStatus", "imagePullProgress", "imagePullProgressLabel", "imagePullProgressValue",
   "imagePullProgressBar", "imageLoadingState",
   "imageEmptyState", "imageErrorState", "imageTableWrap", "imageTableBody", "pullImageDialog",
@@ -265,6 +266,13 @@ async function loadImages() {
   } catch (error) {
     showImageError(error);
   }
+}
+
+function setImagesExpanded(expanded) {
+  const isExpanded = Boolean(expanded);
+  elements.imageSectionBody.hidden = !isExpanded;
+  elements.toggleImagesButton.setAttribute("aria-expanded", String(isExpanded));
+  elements.toggleImagesButton.textContent = isExpanded ? "收起镜像" : "展开镜像";
 }
 
 function appendUniqueBy(current, incoming, key) {
@@ -837,6 +845,7 @@ async function submitImagePull(event) {
   }
   const resolvedReference = resolveImageReference(reference, registry);
   body.reference = resolvedReference;
+  setImagesExpanded(true);
   state.imageSubmitting = true;
   elements.submitPullImageButton.disabled = true;
   elements.pullFormStatus.textContent = "正在提交拉取操作…";
@@ -973,6 +982,7 @@ async function createContainer(event) {
     elements.createFormStatus.textContent = "请修正标出的字段。";
     return;
   }
+  setImagesExpanded(true);
   state.createSubmitting = true;
   elements.submitCreateContainerButton.disabled = true;
   elements.createFormStatus.textContent = "正在提交创建操作…";
@@ -1132,6 +1142,9 @@ elements.loadLogsButton.addEventListener("click", loadRecentLogs);
 elements.followLogsButton.addEventListener("click", () => {
   if (state.eventSource) stopFollowingLogs("已停止跟随");
   else startFollowingLogs();
+});
+elements.toggleImagesButton.addEventListener("click", () => {
+  setImagesExpanded(elements.toggleImagesButton.getAttribute("aria-expanded") !== "true");
 });
 elements.openPullImageButton.addEventListener("click", openPullImageDialog);
 elements.cancelPullImageButton.addEventListener("click", () => elements.pullImageDialog.close());
