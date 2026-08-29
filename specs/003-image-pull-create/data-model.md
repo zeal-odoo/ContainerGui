@@ -133,3 +133,89 @@
 ```
 
 环境变量值永远不进入安全摘要。
+
+## RemoteRegistry
+
+远程镜像来源枚举：
+
+- `dockerHub`
+- `ghcr`
+
+## GHCRNamespaceType
+
+GHCR 枚举范围：`user` 或 `organization`。只有 GHCR 请求使用。
+
+## RemoteRepositorySummary
+
+| Field | Type | Rules |
+|---|---|---|
+| registry | RemoteRegistry | 必填 |
+| repository | String | 注册表内规范路径；Docker 官方镜像包含 `library/` |
+| reference | String | 不含标签的完整 `docker.io/...` 或 `ghcr.io/...` 引用 |
+| name | String | 用于显示的仓库或 package 名称 |
+| namespace | String | Docker 命名空间或 GHCR owner |
+| description | String? | 可选；净化为纯文本，最多 2048 字符 |
+| isOfficial | Bool? | Docker Hub 可用；GHCR 为 null |
+| starCount | Int? | 上游可用时返回，非负 |
+| pullCount | Int? | 上游可用时返回，非负 |
+| updatedAt | Date? | 上游可用时返回 |
+
+## RemoteTagSummary
+
+| Field | Type | Rules |
+|---|---|---|
+| name | String | 确切标签；1...256；不允许空白、控制符、`/` 或前导 `-` |
+| reference | String | `RemoteRepositorySummary.reference + ":" + name` |
+| digest | String? | 上游可用时为 `sha256:` 摘要 |
+| sizeBytes | UInt64? | 上游可用时为非负值 |
+| updatedAt | Date? | 上游可用时返回 |
+
+## RemoteRepositoryPage
+
+| Field | Type | Rules |
+|---|---|---|
+| items | [RemoteRepositorySummary] | 最多 20 项 |
+| page | Int | 1...500 |
+| pageSize | Int | 固定 20 |
+| totalCount | Int? | Docker Hub 可用；GHCR 可为空 |
+| hasNextPage | Bool | 由计数或受信 Link header 推导；客户端自行构造下一页 URL |
+| observedAt | Date | 本次远程读取时间 |
+
+## RemoteTagPage
+
+字段与 `RemoteRepositoryPage` 相同，但 `items` 为 `[RemoteTagSummary]`。
+
+## Remote query validation
+
+### Docker Hub repository search
+
+| Field | Rules |
+|---|---|
+| registry | 必须为 `dockerHub` |
+| query | 去除首尾空白后 1...128；不得包含控制符 |
+| page | 可选，默认 1，范围 1...500 |
+
+### GHCR package browse
+
+| Field | Rules |
+|---|---|
+| registry | 必须为 `ghcr` |
+| ownerType | `user` 或 `organization` |
+| owner | 1...39；GitHub login 允许的字母、数字和单短横线结构 |
+| page | 可选，默认 1，范围 1...500 |
+
+### Tag browse
+
+Docker Hub 要求规范的 `<namespace>/<repository>`；GHCR 额外要求 `ownerType`、`owner` 和 package 路径。
+所有值只参与固定路径模板和百分号编码，调用方不能传入主机、scheme 或完整 URL。
+
+## Remote error mapping
+
+| Code | HTTP | Retryable | Meaning |
+|---|---:|---|---|
+| REGISTRY_AUTHENTICATION_REQUIRED | 503 | false | GHCR Token 未配置或无效；响应不包含 Token |
+| REGISTRY_RATE_LIMITED | 429 | true | 上游限流；保留安全的重试提示 |
+| REGISTRY_UNAVAILABLE | 502 | true | 上游超时、不可达或返回无效 JSON |
+
+远程对象只保存在请求和浏览器当前状态中，不写入数据库。选择标签只产生完整镜像引用并回填已有
+`ImagePullRequest` 表单；不会创建 Operation，也不会调用 Apple Container CLI。

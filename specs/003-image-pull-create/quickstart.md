@@ -1,8 +1,10 @@
-# Quickstart: 拉取镜像与创建容器
+# Quickstart: 镜像浏览、拉取与创建容器
 
 ## Safety boundary
 
 - 自动化验证不得真实拉取镜像、创建容器或启动容器。
+- 远程注册表自动化只允许 GET，并使用固定夹具完成默认测试。
+- GHCR Token 只通过 `CONTAINER_GUI_GITHUB_TOKEN` 环境变量提供，不粘贴到页面、不写入仓库。
 - 真实写操作只在用户单独明确授权、目标和参数均已展示后执行。
 - 本指南的默认完成门禁是模拟命令测试、HTTP 契约测试、浏览器可见表单和真实只读镜像回读。
 
@@ -31,6 +33,10 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun swift test
 - 环境变量值不出现在 Operation、ProblemDetail 或浏览器状态中。
 - 拉取后缺少镜像、创建后缺少容器、可选启动后未运行均不能显示成功。
 - 现有容器读取、指标、启停和日志测试保持通过。
+- Docker Hub 搜索、仓库规范化、标签分页和下一页判断使用固定 JSON 夹具。
+- GHCR 用户/组织 URL、API 版本、Bearer header、package/tag 解析和缺少 Token 错误均有测试。
+- 任意远程主机、超长响应、无效页码和上游错误都不会变成不受控请求或泄露 Token。
+- 选择远程标签只回填拉取表单，不会自动提交写请求。
 
 ## Read-only live verification
 
@@ -41,6 +47,22 @@ xcrun swift test --filter ReadOnlyCLISmokeTests
 ```
 
 该测试可增加镜像列表/详情读取，但不得调用 pull、create 或 start。
+
+Docker Hub 的真实只读探测是可选门禁：
+
+```bash
+CONTAINER_GUI_LIVE_REGISTRY_READONLY=1 \
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+xcrun swift test --filter RegistryReadOnlySmokeTests
+```
+
+GHCR 若需要真实只读验证，在本机 shell 单独设置 Token；不要把值写入命令历史、截图、日志或 Git：
+
+```bash
+export CONTAINER_GUI_GITHUB_TOKEN='在本机安全输入的只读 Token'
+```
+
+未设置 Token 时，Docker Hub 搜索仍可用，GHCR 页面应显示安全的“未配置凭据”状态。
 
 ## Local browser verification
 
@@ -55,13 +77,17 @@ xcrun swift run ContainerGUI
 打开 `http://127.0.0.1:8788/`，确认：
 
 1. 镜像区域显示本机镜像名称、摘要、平台和大小。
-2. “拉取镜像”对话框包含完整地址、Docker Hub、GHCR 三种仓库输入方式，以及可选目标架构。
-3. Docker Hub 的 `postgres:latest` 提交为 `docker.io/library/postgres:latest`；GHCR 的
+2. 本机镜像不分页，当前列表中的全部镜像直接展示。
+3. 远程区域初始不请求注册表；输入 `postgres` 并点击搜索后分页展示 Docker Hub 仓库。
+4. 选择 Docker Hub 仓库后分页展示确切标签；点击标签只打开并回填拉取对话框。
+5. 切换 GHCR 后可选择用户或组织并输入 owner；未配置 Token 时给出不含秘密的说明。
+6. “拉取镜像”对话框包含完整地址、Docker Hub、GHCR 三种仓库输入方式，以及可选目标架构。
+7. Docker Hub 的 `postgres:latest` 提交为 `docker.io/library/postgres:latest`；GHCR 的
    `owner/image:tag` 提交为 `ghcr.io/owner/image:tag`。
-4. “创建容器”对话框包含名称、镜像、CPU、内存、端口、环境变量、进程参数和创建后启动。
-5. 本地镜像名称可用于创建表单建议。
-6. 无效输入显示逐字段中文错误，未发出写请求。
-7. 不提交任何真实拉取或创建操作。
+8. “创建容器”对话框包含名称、镜像、CPU、内存、端口、环境变量、进程参数和创建后启动。
+9. 本地镜像名称可用于创建表单建议。
+10. 无效输入显示逐字段中文错误，未发出写请求。
+11. 不提交任何真实拉取或创建操作。
 
 ## Mutation acceptance with explicit authorization only
 

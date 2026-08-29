@@ -116,3 +116,64 @@ Docker Hub 官方短名称解析到 `docker.io/library/`，命名空间镜像解
 - 把仓库作为新的后端 CLI 参数：`container image pull` 没有独立仓库参数，会重复表达目标。
 - 自动尝试多个仓库：结果不确定，也可能把认证错误误判为镜像不存在。
 - 在页面保存仓库凭据：超出本功能安全边界。
+
+## Decision 9: Docker Hub 使用官方 JSON 端点分页搜索
+
+**Decision**: 用户提交非空关键词后，请求
+`https://hub.docker.com/v2/search/repositories/?query=<query>&page_size=20&page=<page>`；打开结果时请求
+`/v2/namespaces/<namespace>/repositories/<repository>/tags?page_size=20&page=<page>`。官方短名称统一显示为
+`docker.io/library/<name>`。服务自行计算下一页参数，不跟随上游返回的任意 URL。
+
+**Rationale**: Docker Hub 当前端点提供总数、仓库摘要和分页标签，能满足“搜索全部匹配结果”而无需
+抓取 HTML。固定主机、固定路径模板和页大小可防止服务成为任意 URL 代理。
+
+**Alternatives considered**:
+
+- 只在本机镜像列表中过滤：无法发现远程镜像。
+- 抓取 Docker Hub 页面：结构不稳定且增加浏览器自动化依赖。
+- 一次下载所有页：热门关键词可能有数万结果，会拖慢页面并放大限流风险。
+
+## Decision 10: GHCR 使用用户或组织范围的 GitHub Packages API
+
+**Decision**: GHCR 不做无范围的全站关键词搜索。用户明确选择 `user` 或 `organization` 并输入
+owner；服务通过 `/users/<owner>/packages` 或 `/orgs/<owner>/packages` 分页读取公开 container 包，
+再通过对应 package versions 端点读取标签。只接受环境变量 `CONTAINER_GUI_GITHUB_TOKEN`，以 Bearer
+header 发送，并固定 `X-GitHub-Api-Version: 2026-03-10`；Token 不进入响应、日志、Git 或浏览器。
+
+**Rationale**: GitHub Packages REST API 的可枚举边界是用户或组织，官方 GitHub 搜索语法可用于网页
+搜索但没有等价的公共全站包搜索 REST 契约。明确范围能提供稳定分页和可测试行为。
+
+**Alternatives considered**:
+
+- 模拟 GitHub 网页的 package 搜索：不是稳定 API，容易受页面和登录状态影响。
+- 要求用户在页面粘贴 Token：秘密会进入浏览器状态和请求日志，拒绝。
+- 将 Token 写入配置文件：增加凭据生命周期和权限管理，首版不需要。
+
+## Decision 11: 远程读取采用可注入的固定允许列表 HTTP 适配器
+
+**Decision**: 使用 Foundation `URLSession` 实现 `RegistryHTTPTransport`，业务客户端只构造
+`hub.docker.com` 和 `api.github.com` 的 HTTPS 请求。超时 5 秒、响应最大 2 MiB、页码 1...500、固定
+每页 20 项。测试使用净化后的版本化 JSON 夹具和内存 transport，不进行真实写操作。
+
+**Rationale**: 项目已有 Swift 单服务，Foundation 足以完成简单 GET；协议注入让 URL、header、分页、
+错误和秘密保护都能在离线测试中验证。
+
+**Alternatives considered**:
+
+- 新增 HTTP 客户端依赖：本功能只有少量 GET，无需扩大依赖面。
+- 服务接受完整上游 URL：会引入 SSRF 风险。
+- 增加数据库缓存：单用户轻量工具首版没有必要，页面保留当前查询结果即可。
+
+## Decision 12: 标签选择只回填，不自动拉取
+
+**Decision**: 页面首次直接展示全部本机镜像；远程请求仅在用户点击搜索后发生。仓库和标签各自分页，
+点击某个确切标签后将完整 `docker.io/...:<tag>` 或 `ghcr.io/...:<tag>` 引用回填到现有拉取对话框，
+仍需用户再次确认并提交拉取。
+
+**Rationale**: 远程结果与本机状态保持清晰分离；显式标签避免隐含 `latest`，二次确认维持写操作边界。
+
+**Alternatives considered**:
+
+- 选中仓库即拉取 `latest`：标签可能不存在，也属于未经确认的真实写操作。
+- 搜索时同时加载每个仓库全部标签：会产生大量请求并容易触发限流。
+- 对本机镜像分页：本机规模为数十项，增加交互但没有实际收益。

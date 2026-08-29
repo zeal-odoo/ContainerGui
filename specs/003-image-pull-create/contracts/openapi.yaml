@@ -1,13 +1,14 @@
 openapi: 3.1.0
 info:
-  title: Container GUI Image Pull and Container Create API
-  version: 0.3.0
-  description: Feature contract for local-only image reads, image pulls and container creation.
+  title: Container GUI Image Browse, Pull and Container Create API
+  version: 0.4.0
+  description: Feature contract for local image reads, remote registry browsing, image pulls and container creation.
 servers:
   - url: http://127.0.0.1:8787/api/v1
 security: []
 tags:
   - name: Images
+  - name: RegistrySearch
   - name: Containers
   - name: Operations
 
@@ -52,6 +53,119 @@ paths:
         "503":
           $ref: "#/components/responses/ProblemResponse"
         "504":
+          $ref: "#/components/responses/ProblemResponse"
+
+  /registry-search/repositories:
+    get:
+      tags: [RegistrySearch]
+      operationId: searchRemoteRepositories
+      summary: Search Docker Hub or browse public GHCR packages in an explicit owner scope
+      parameters:
+        - name: registry
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/RemoteRegistry"
+        - name: query
+          in: query
+          required: false
+          description: Required for Docker Hub and ignored for GHCR.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+        - name: ownerType
+          in: query
+          required: false
+          description: Required for GHCR.
+          schema:
+            $ref: "#/components/schemas/GHCRNamespaceType"
+        - name: owner
+          in: query
+          required: false
+          description: Required for GHCR.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 39
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 1
+      responses:
+        "200":
+          description: One page of remote repositories
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RemoteRepositoryPage"
+        "422":
+          $ref: "#/components/responses/ProblemResponse"
+        "429":
+          $ref: "#/components/responses/ProblemResponse"
+        "502":
+          $ref: "#/components/responses/ProblemResponse"
+        "503":
+          $ref: "#/components/responses/ProblemResponse"
+
+  /registry-search/tags:
+    get:
+      tags: [RegistrySearch]
+      operationId: listRemoteTags
+      summary: List exact tags for a selected remote repository
+      parameters:
+        - name: registry
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/RemoteRegistry"
+        - name: repository
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 255
+        - name: ownerType
+          in: query
+          required: false
+          description: Required for GHCR.
+          schema:
+            $ref: "#/components/schemas/GHCRNamespaceType"
+        - name: owner
+          in: query
+          required: false
+          description: Required for GHCR.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 39
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 1
+      responses:
+        "200":
+          description: One page of exact image tags
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RemoteTagPage"
+        "422":
+          $ref: "#/components/responses/ProblemResponse"
+        "429":
+          $ref: "#/components/responses/ProblemResponse"
+        "502":
+          $ref: "#/components/responses/ProblemResponse"
+        "503":
           $ref: "#/components/responses/ProblemResponse"
 
   /containers:
@@ -130,6 +244,119 @@ components:
             $ref: "#/components/schemas/ProblemDetail"
 
   schemas:
+    RemoteRegistry:
+      type: string
+      enum: [dockerHub, ghcr]
+
+    GHCRNamespaceType:
+      type: string
+      enum: [user, organization]
+
+    RemoteRepositorySummary:
+      type: object
+      additionalProperties: false
+      required: [registry, repository, reference, name, namespace]
+      properties:
+        registry:
+          $ref: "#/components/schemas/RemoteRegistry"
+        repository:
+          type: string
+        reference:
+          type: string
+          pattern: "^(docker\\.io|ghcr\\.io)/[A-Za-z0-9][A-Za-z0-9._/-]*$"
+        name:
+          type: string
+        namespace:
+          type: string
+        description:
+          type: [string, "null"]
+          maxLength: 2048
+        isOfficial:
+          type: [boolean, "null"]
+        starCount:
+          type: [integer, "null"]
+          minimum: 0
+        pullCount:
+          type: [integer, "null"]
+          minimum: 0
+        updatedAt:
+          type: [string, "null"]
+          format: date-time
+
+    RemoteTagSummary:
+      type: object
+      additionalProperties: false
+      required: [name, reference]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 256
+        reference:
+          type: string
+          pattern: "^(docker\\.io|ghcr\\.io)/[A-Za-z0-9][A-Za-z0-9._/-]*:[A-Za-z0-9][A-Za-z0-9._-]*$"
+        digest:
+          type: [string, "null"]
+          pattern: "^sha256:[0-9a-f]{64}$"
+        sizeBytes:
+          type: [integer, "null"]
+          minimum: 0
+        updatedAt:
+          type: [string, "null"]
+          format: date-time
+
+    RemoteRepositoryPage:
+      type: object
+      additionalProperties: false
+      required: [items, page, pageSize, hasNextPage, observedAt]
+      properties:
+        items:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/RemoteRepositorySummary"
+        page:
+          type: integer
+          minimum: 1
+          maximum: 500
+        pageSize:
+          type: integer
+          const: 20
+        totalCount:
+          type: [integer, "null"]
+          minimum: 0
+        hasNextPage:
+          type: boolean
+        observedAt:
+          type: string
+          format: date-time
+
+    RemoteTagPage:
+      type: object
+      additionalProperties: false
+      required: [items, page, pageSize, hasNextPage, observedAt]
+      properties:
+        items:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/RemoteTagSummary"
+        page:
+          type: integer
+          minimum: 1
+          maximum: 500
+        pageSize:
+          type: integer
+          const: 20
+        totalCount:
+          type: [integer, "null"]
+          minimum: 0
+        hasNextPage:
+          type: boolean
+        observedAt:
+          type: string
+          format: date-time
+
     ImagePlatform:
       type: object
       additionalProperties: false
