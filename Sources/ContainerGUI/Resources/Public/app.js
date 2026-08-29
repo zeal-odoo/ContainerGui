@@ -16,11 +16,13 @@ const REFRESH_INTERVAL_MS = 5000;
 const LOG_DISPLAY_LIMIT = 512 * 1024;
 const KEEP_ALIVE_ARGUMENTS = ["/bin/bash", "-lc", "exec sleep infinity"];
 const DIALOG_EXIT_DURATION_MS = 180;
+const DETAIL_ENTER_DURATION_MS = 420;
 const PANE_EXIT_DURATION_MS = 160;
 const DISCLOSURE_DURATION_MS = 280;
 const TOAST_EXIT_DURATION_MS = 160;
 const dialogCloseTimers = new WeakMap();
 let detailCloseTimer = null;
+let detailRevealTimer = null;
 let imagesCollapseTimer = null;
 let toastVisibilityTimer = null;
 let toastExitTimer = null;
@@ -117,13 +119,24 @@ function revealDetailContent() {
     window.clearTimeout(detailCloseTimer);
     detailCloseTimer = null;
   }
+  if (detailRevealTimer !== null) {
+    window.clearTimeout(detailRevealTimer);
+    detailRevealTimer = null;
+  }
+  elements.detailPanel.classList.remove("is-detail-transitioning");
   elements.detailContent.classList.remove("is-closing", "is-revealing");
   elements.detailPlaceholder.classList.remove("is-revealing");
   elements.detailPlaceholder.hidden = true;
   elements.detailContent.hidden = false;
   if (!prefersReducedMotion()) {
-    void elements.detailContent.offsetWidth;
+    void elements.detailPanel.offsetWidth;
+    elements.detailPanel.classList.add("is-detail-transitioning");
     elements.detailContent.classList.add("is-revealing");
+    detailRevealTimer = window.setTimeout(() => {
+      detailRevealTimer = null;
+      elements.detailPanel.classList.remove("is-detail-transitioning");
+      elements.detailContent.classList.remove("is-revealing");
+    }, DETAIL_ENTER_DURATION_MS);
   }
 }
 
@@ -736,8 +749,9 @@ async function loadDetail(id, { quiet = false } = {}) {
   state.detailController?.abort();
   const controller = new AbortController();
   state.detailController = controller;
+  const shouldReveal = elements.detailContent.hidden || state.selectedID !== id;
   state.selectedID = id;
-  revealDetailContent();
+  if (shouldReveal) revealDetailContent();
   if (!quiet) elements.detailTitle.textContent = "正在读取…";
   elements.detailPanel.setAttribute("aria-busy", "true");
   try {
@@ -891,6 +905,11 @@ function closeDetail() {
   state.selectedDetail = null;
   state.selectedSSHStatus = null;
   elements.sshConnectionPanel.hidden = true;
+  if (detailRevealTimer !== null) {
+    window.clearTimeout(detailRevealTimer);
+    detailRevealTimer = null;
+  }
+  elements.detailPanel.classList.remove("is-detail-transitioning");
   const finish = () => {
     detailCloseTimer = null;
     elements.detailContent.classList.remove("is-closing", "is-revealing");

@@ -38,3 +38,4 @@ specs/010-material-3-motion/
 3. 拦截 dialog `cancel` 和确认表单 `submit`，让所有关闭入口统一。
 4. 详情内容用进入/退出 class；镜像区域用 grid row + inner wrapper 连续折叠；toast 使用显示/隐藏 class。
 5. 版本递增为 2.12.0，回归并重启 GUI 服务验收。
+6. 后续精调将详情支持面板改为 420ms 定向进入与轻微回稳，正文区块错峰显现；只在首次打开或切换容器时播放，并将版本递增为 2.12.1。

@@ -49,6 +49,22 @@ final class Material3MotionAssetTests: XCTestCase {
         XCTAssertTrue(script.contains("function showToast("))
     }
 
+    func testContainerDetailUsesStagedSupportingPaneMotion() throws {
+        let style = try asset("app.css")
+        let script = try asset("app.js")
+
+        XCTAssertTrue(style.contains("--md-sys-motion-duration-detail-enter: 420ms"))
+        XCTAssertTrue(style.contains(".detail-panel.is-detail-transitioning"))
+        XCTAssertTrue(style.contains("@keyframes md-detail-surface-enter"))
+        XCTAssertTrue(style.contains("@keyframes md-detail-section-enter"))
+        XCTAssertTrue(style.contains("#detailContent.is-revealing > *"))
+        XCTAssertTrue(script.contains("const DETAIL_ENTER_DURATION_MS = 420"))
+        XCTAssertTrue(script.contains("elements.detailPanel.classList.add(\"is-detail-transitioning\")"))
+        XCTAssertTrue(script.contains("detailRevealTimer = window.setTimeout"))
+        XCTAssertTrue(script.contains("const shouldReveal = elements.detailContent.hidden || state.selectedID !== id"))
+        XCTAssertTrue(script.contains("if (shouldReveal) revealDetailContent()"))
+    }
+
     private func asset(_ name: String) throws -> String {
         try String(
             contentsOf: AppFactory.publicDirectoryURL.appendingPathComponent(name),
