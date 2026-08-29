@@ -15,7 +15,7 @@ const REFRESH_INTERVAL_MS = 5000;
 const LOG_DISPLAY_LIMIT = 512 * 1024;
 
 const elements = Object.fromEntries([
-  "appVersionBadge", "versionBadge", "refreshButton", "healthCard", "healthLabel", "healthDetail",
+  "appVersionBadge", "versionBadge", "healthCard", "healthLabel", "healthDetail",
   "totalCount", "runningCount", "stoppedCount", "observedAt", "searchInput",
   "loadingState", "emptyState", "errorState", "tableWrap", "containerRows",
   "detailPanel", "detailPlaceholder", "detailContent", "detailTitle", "detailFacts",
@@ -83,8 +83,6 @@ async function loadApplicationVersion() {
 
 function setBusy(busy) {
   state.refreshing = busy;
-  elements.refreshButton.disabled = busy;
-  elements.refreshButton.textContent = busy ? "正在刷新…" : "手动刷新";
 }
 
 function renderHealth(health) {
@@ -1092,7 +1090,6 @@ function showToast(message) {
   window.setTimeout(() => { elements.toast.hidden = true; }, 2200);
 }
 
-elements.refreshButton.addEventListener("click", () => refreshDashboard({ announce: true }));
 elements.searchInput.addEventListener("input", renderContainers);
 elements.closeDetailButton.addEventListener("click", closeDetail);
 elements.loadLogsButton.addEventListener("click", loadRecentLogs);

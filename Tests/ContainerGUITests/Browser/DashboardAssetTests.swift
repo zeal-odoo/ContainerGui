@@ -10,7 +10,8 @@ final class DashboardAssetTests: XCTestCase {
         XCTAssertTrue(html.contains("lang=\"zh-Hans\""))
         XCTAssertTrue(html.contains("<main"))
         XCTAssertTrue(html.contains("容器概览"))
-        XCTAssertTrue(html.contains("手动刷新"))
+        XCTAssertFalse(html.contains("手动刷新"))
+        XCTAssertFalse(html.contains("id=\"refreshButton\""))
         XCTAssertTrue(html.contains("aria-live=\"polite\""))
         XCTAssertTrue(html.contains("id=\"loadingState\""))
         XCTAssertTrue(html.contains("id=\"emptyState\""))
@@ -25,6 +26,8 @@ final class DashboardAssetTests: XCTestCase {
         XCTAssertTrue(script.contains("/api/v1/containers"))
         XCTAssertTrue(script.contains("setInterval"))
         XCTAssertTrue(script.contains("5000"))
+        XCTAssertTrue(script.contains("visibilitychange"))
+        XCTAssertFalse(script.contains("refreshButton"))
         XCTAssertTrue(script.contains("AbortController"))
         XCTAssertTrue(script.contains("textContent"))
     }
