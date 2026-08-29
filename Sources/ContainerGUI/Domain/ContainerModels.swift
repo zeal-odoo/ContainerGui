@@ -51,6 +51,7 @@ struct ContainerSummary: Codable, Equatable, Sendable {
     let id: String
     let displayName: String
     let imageReference: String?
+    let cpuCount: Int?
     let state: ContainerState
     let rawState: String?
     let ipv4Address: String?
@@ -63,6 +64,7 @@ struct ContainerSummary: Codable, Equatable, Sendable {
         id: String,
         displayName: String,
         imageReference: String?,
+        cpuCount: Int? = nil,
         state: ContainerState,
         rawState: String?,
         ipv4Address: String?,
@@ -74,6 +76,7 @@ struct ContainerSummary: Codable, Equatable, Sendable {
         self.id = id
         self.displayName = displayName
         self.imageReference = imageReference
+        self.cpuCount = cpuCount
         self.state = state
         self.rawState = rawState
         self.ipv4Address = ipv4Address

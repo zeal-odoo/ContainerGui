@@ -4,7 +4,8 @@
     "configuration": {
       "id": "demo-running",
       "creationDate": "2026-08-20T10:00:00Z",
-      "image": {"reference": "docker.io/library/nginx:alpine"}
+      "image": {"reference": "docker.io/library/nginx:alpine"},
+      "resources": {"cpus": 3}
     },
     "status": {
       "state": "running",
@@ -22,7 +23,8 @@
     "configuration": {
       "id": "demo-stopped",
       "creationDate": "2026-08-19T09:30:00Z",
-      "image": {"reference": "docker.io/library/redis:alpine"}
+      "image": {"reference": "docker.io/library/redis:alpine"},
+      "resources": {"cpus": 1}
     },
     "status": {"state": "stopped", "networks": []}
   }

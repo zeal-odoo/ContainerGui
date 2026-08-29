@@ -26,6 +26,14 @@ final class ContainerMetricsAssetTests: XCTestCase {
         XCTAssertTrue(script.contains("5000"))
     }
 
+    func testCPUPercentageUsesTheContainersTotalAllocatedCapacity() throws {
+        let script = try asset("app.js")
+
+        XCTAssertTrue(script.contains("normalizeCPUPercent(metric.cpuPercent, cpuCount)"))
+        XCTAssertTrue(script.contains("detail: `100% = ${cpuCount} 核`"))
+        XCTAssertFalse(script.contains("detail: \"100% = 1 核\""))
+    }
+
     func testMetricPresentationHasPrimaryAndSecondaryText() throws {
         let style = try asset("app.css")
 

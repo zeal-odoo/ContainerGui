@@ -225,13 +225,25 @@ enum CLIOutputParser {
         let configuration = object["configuration"]?.objectValue ?? [:]
         let status = object["status"]?.objectValue ?? [:]
         let image = configuration["image"]?.objectValue
+        let resources = configuration["resources"]?.objectValue
         let labels = configuration["labels"]?.objectValue ?? [:]
         let rawState = status["state"]?.stringValue
         let network = status["networks"]?.arrayValue?.first?.objectValue
+        let cpuCount: Int? = {
+            guard case .number(let value) = resources?["cpus"],
+                  value.isFinite,
+                  value.rounded() == value,
+                  value >= 1,
+                  value <= 1_024 else {
+                return nil
+            }
+            return Int(value)
+        }()
         return ContainerSummary(
             id: id,
             displayName: configuration["id"]?.stringValue ?? id,
             imageReference: image?["reference"]?.stringValue,
+            cpuCount: cpuCount,
             state: ContainerState.normalize(rawState),
             rawState: rawState,
             ipv4Address: network?["ipv4Address"]?.stringValue,

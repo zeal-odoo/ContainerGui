@@ -48,6 +48,7 @@ final class ContainerCLIReadTests: XCTestCase {
         XCTAssertEqual(mixed.items.map(\.id), ["demo-running", "demo-stopped"])
         XCTAssertEqual(mixed.items.map(\.state), [.running, .stopped])
         XCTAssertEqual(mixed.items.first?.imageReference, "docker.io/library/nginx:alpine")
+        XCTAssertEqual(mixed.items.first?.cpuCount, 3)
         XCTAssertEqual(mixed.items.first?.ipv4Address, "192.0.2.10/24")
         XCTAssertEqual(mixed.observedAt, observedAt)
         XCTAssertTrue(empty.items.isEmpty)

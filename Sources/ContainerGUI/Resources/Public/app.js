@@ -167,6 +167,11 @@ function metricFor(container) {
   return state.metricsByID.get(container.id) || null;
 }
 
+function normalizeCPUPercent(cpuPercent, cpuCount) {
+  const allocatedCPUCount = Number.isInteger(cpuCount) && cpuCount > 0 ? cpuCount : 1;
+  return Math.min(Math.max(cpuPercent / allocatedCPUCount, 0), 100);
+}
+
 function cpuDisplay(container) {
   if (container.state !== "running") return { value: "未运行", detail: "" };
   const metric = metricFor(container);
@@ -176,7 +181,11 @@ function cpuDisplay(container) {
   if (metric.cpuState !== "ready" || !Number.isFinite(metric.cpuPercent)) {
     return { value: "采样中", detail: "等待下一样本" };
   }
-  return { value: formatPercent(metric.cpuPercent), detail: "100% = 1 核" };
+  const cpuCount = Number.isInteger(container.cpuCount) && container.cpuCount > 0 ? container.cpuCount : 1;
+  return {
+    value: formatPercent(normalizeCPUPercent(metric.cpuPercent, cpuCount)),
+    detail: `100% = ${cpuCount} 核`
+  };
 }
 
 function memoryDisplay(container) {
