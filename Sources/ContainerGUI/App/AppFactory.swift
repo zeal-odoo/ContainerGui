@@ -46,6 +46,16 @@ enum AppFactory {
         OperationRoutes.register(on: router, coordinator: coordinator)
         ResourceMutationRoutes.registerImages(on: router, reader: reader, service: imageService)
         ResourceMutationRoutes.registerCreation(on: router, service: creationService)
+        RegistrySearchRoutes.register(
+            on: router,
+            searcher: RegistrySearchClient(
+                transport: FoundationRegistryHTTPTransport(
+                    timeoutSeconds: configuration.registryTimeoutSeconds
+                ),
+                githubToken: configuration.githubToken,
+                maximumResponseBytes: configuration.maximumRegistryResponseBytes
+            )
+        )
         ContainerControlRoutes.registerControl(on: router, service: controlService)
         ContainerControlRoutes.registerLogs(
             on: router,

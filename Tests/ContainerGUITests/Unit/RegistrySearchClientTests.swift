@@ -33,7 +33,8 @@ final class RegistrySearchClientTests: XCTestCase {
         let request = try XCTUnwrap(recordedRequests.first)
         XCTAssertEqual(request.url.scheme, "https")
         XCTAssertEqual(request.url.host, "hub.docker.com")
-        XCTAssertEqual(request.url.path, "/v2/search/repositories/")
+        XCTAssertEqual(request.url.path, "/v2/search/repositories")
+        XCTAssertTrue(request.url.absoluteString.contains("/v2/search/repositories/?"))
         let query = URLComponents(url: request.url, resolvingAgainstBaseURL: false)?.queryItems
         XCTAssertEqual(query?.first(where: { $0.name == "query" })?.value, "postgres")
         XCTAssertEqual(query?.first(where: { $0.name == "page_size" })?.value, "20")
@@ -168,11 +169,12 @@ final class RegistrySearchClientTests: XCTestCase {
         let transport = RecordingRegistryTransport(responses: [
             RegistryHTTPResponse(statusCode: 200, headers: [:], body: Data(repeating: 0, count: 65)),
         ])
+        let timestamp = observedAt
         let client = RegistrySearchClient(
             transport: transport,
             githubToken: nil,
             maximumResponseBytes: 64,
-            now: { self.observedAt }
+            now: { timestamp }
         )
 
         do {
@@ -205,11 +207,12 @@ final class RegistrySearchClientTests: XCTestCase {
         transport: RecordingRegistryTransport,
         githubToken: String? = nil
     ) -> RegistrySearchClient<RecordingRegistryTransport> {
-        RegistrySearchClient(
+        let timestamp = observedAt
+        return RegistrySearchClient(
             transport: transport,
             githubToken: githubToken,
             maximumResponseBytes: 2 * 1024 * 1024,
-            now: { self.observedAt }
+            now: { timestamp }
         )
     }
 
