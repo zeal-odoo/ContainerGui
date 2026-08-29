@@ -1,6 +1,7 @@
 "use strict";
 
 const ENDPOINTS = {
+  appInfo: "/api/v1",
   health: "/api/v1/system/health",
   containers: "/api/v1/containers",
   metrics: "/api/v1/containers/metrics",
@@ -14,7 +15,7 @@ const REFRESH_INTERVAL_MS = 5000;
 const LOG_DISPLAY_LIMIT = 512 * 1024;
 
 const elements = Object.fromEntries([
-  "versionBadge", "refreshButton", "healthCard", "healthLabel", "healthDetail",
+  "appVersionBadge", "versionBadge", "refreshButton", "healthCard", "healthLabel", "healthDetail",
   "totalCount", "runningCount", "stoppedCount", "observedAt", "searchInput",
   "loadingState", "emptyState", "errorState", "tableWrap", "containerRows",
   "detailPanel", "detailPlaceholder", "detailContent", "detailTitle", "detailFacts",
@@ -70,6 +71,15 @@ async function fetchJSON(path, options = {}) {
     throw error;
   }
   return payload;
+}
+
+async function loadApplicationVersion() {
+  try {
+    const appInfo = await fetchJSON(ENDPOINTS.appInfo);
+    elements.appVersionBadge.textContent = appInfo.version ? `GUI v${appInfo.version}` : "GUI 版本未知";
+  } catch {
+    elements.appVersionBadge.textContent = "GUI 版本未知";
+  }
 }
 
 function setBusy(busy) {
@@ -1144,4 +1154,5 @@ window.setInterval(() => {
   if (document.visibilityState === "visible") refreshDashboard();
 }, REFRESH_INTERVAL_MS);
 updateRemoteRegistryFields();
+loadApplicationVersion();
 refreshDashboard();

@@ -29,6 +29,17 @@ final class DashboardAssetTests: XCTestCase {
         XCTAssertTrue(script.contains("textContent"))
     }
 
+    func testDashboardShowsApplicationVersionFromRootAPI() throws {
+        let html = try asset("index.html")
+        let script = try asset("app.js")
+
+        XCTAssertTrue(html.contains("id=\"appVersionBadge\""))
+        XCTAssertTrue(script.contains("appVersionBadge"))
+        XCTAssertTrue(script.contains("appInfo: \"/api/v1\""))
+        XCTAssertTrue(script.contains("`GUI v${appInfo.version}`"))
+        XCTAssertTrue(script.contains("GUI 版本未知"))
+    }
+
     private func asset(_ name: String) throws -> String {
         let url = AppFactory.publicDirectoryURL.appendingPathComponent(name)
         return try String(contentsOf: url, encoding: .utf8)
