@@ -1,0 +1,12 @@
+.DS_Store
+.build/
+.swiftpm/
+.playwright-cli/
+DerivedData/
+Packages/
+.env
+.env.*
+*.tmp
+*.swp
+.vscode/
+.idea/

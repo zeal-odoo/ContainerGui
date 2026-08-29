@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Container GUI</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23111a27'/%3E%3Cpath d='M17 18h30v28H17z' fill='none' stroke='white' stroke-width='5'/%3E%3Cpath d='M17 29h30M29 18v28' stroke='white' stroke-width='4'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#main" aria-label="Container GUI 首页">
+      <span class="brand-mark" aria-hidden="true">▣</span>
+      <span>Container GUI</span>
+    </a>
+    <div class="topbar-actions">
+      <span id="versionBadge" class="quiet">正在检查 CLI…</span>
+      <button id="refreshButton" class="button secondary" type="button">手动刷新</button>
+    </div>
+  </header>
+
+  <main id="main" class="page" tabindex="-1">
+    <section class="hero" aria-labelledby="pageTitle">
+      <div>
+        <p class="eyebrow">本机容器控制台</p>
+        <h1 id="pageTitle">容器运行状态</h1>
+        <p class="lede">所有状态直接读取 Apple container CLI，不保存影子副本。</p>
+      </div>
+      <div id="healthCard" class="health-card" aria-live="polite" aria-busy="true">
+        <span class="status-dot unknown" aria-hidden="true"></span>
+        <div>
+          <strong id="healthLabel">正在连接</strong>
+          <span id="healthDetail">等待系统状态</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="stats" aria-label="容器统计">
+      <article><span>全部</span><strong id="totalCount">—</strong></article>
+      <article><span>运行中</span><strong id="runningCount">—</strong></article>
+      <article><span>已停止</span><strong id="stoppedCount">—</strong></article>
+      <article><span>最后刷新</span><strong id="observedAt">—</strong></article>
+    </section>
+
+    <section class="workspace" aria-label="容器管理区域">
+      <div class="panel list-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Containers</p>
+            <h2>容器概览</h2>
+          </div>
+          <label class="search">
+            <span class="sr-only">筛选容器</span>
+            <input id="searchInput" type="search" placeholder="搜索名称、镜像或 ID">
+          </label>
+        </div>
+
+        <div id="loadingState" class="state-block" role="status">正在读取容器…</div>
+        <div id="emptyState" class="state-block" hidden>
+          <strong>还没有容器</strong>
+          <span>可继续使用官方 CLI 创建容器，然后在这里刷新。</span>
+        </div>
+        <div id="errorState" class="state-block error" role="alert" hidden></div>
+
+        <div class="table-wrap" id="tableWrap" hidden>
+          <table>
+            <thead>
+              <tr><th>名称</th><th>镜像</th><th>状态</th><th>地址</th><th><span class="sr-only">操作</span></th></tr>
+            </thead>
+            <tbody id="containerRows"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <aside id="detailPanel" class="panel detail-panel" aria-labelledby="detailTitle">
+        <div class="detail-placeholder" id="detailPlaceholder">
+          <span aria-hidden="true">⌁</span>
+          <strong>选择一个容器</strong>
+          <p>查看权威详情、受控操作和日志。</p>
+        </div>
+        <div id="detailContent" hidden>
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Container detail</p>
+              <h2 id="detailTitle">容器详情</h2>
+            </div>
+            <button id="closeDetailButton" class="icon-button" type="button" aria-label="关闭详情">×</button>
+          </div>
+          <dl id="detailFacts" class="facts"></dl>
+          <div class="action-row" id="containerActions"></div>
+          <div id="operationStatus" class="operation-status" role="status" aria-live="polite" hidden></div>
+          <section class="logs" aria-labelledby="logsTitle">
+            <div class="subhead">
+              <h3 id="logsTitle">日志</h3>
+              <div>
+                <button id="loadLogsButton" class="button secondary small" type="button">最近日志</button>
+                <button id="followLogsButton" class="button secondary small" type="button">实时跟随</button>
+              </div>
+            </div>
+            <div id="logStatus" class="quiet" aria-live="polite">尚未读取</div>
+            <pre id="logOutput" tabindex="0" aria-label="容器日志输出"></pre>
+          </section>
+          <details class="raw-detail">
+            <summary>原始详情（已脱敏）</summary>
+            <pre id="rawDetail" tabindex="0"></pre>
+          </details>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <dialog id="confirmDialog" aria-labelledby="confirmTitle">
+    <form method="dialog">
+      <p class="eyebrow">确认操作</p>
+      <h2 id="confirmTitle">确认目标</h2>
+      <p id="confirmMessage"></p>
+      <code id="confirmTarget"></code>
+      <div class="dialog-actions">
+        <button value="cancel" class="button secondary">取消</button>
+        <button id="confirmActionButton" value="confirm" class="button danger">确认</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>

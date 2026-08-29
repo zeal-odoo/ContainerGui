@@ -1,0 +1,29 @@
+[
+  {
+    "id": "demo-running",
+    "configuration": {
+      "id": "demo-running",
+      "creationDate": "2026-08-20T10:00:00Z",
+      "image": {"reference": "docker.io/library/nginx:alpine"}
+    },
+    "status": {
+      "state": "running",
+      "networks": [
+        {
+          "network": "default",
+          "ipv4Address": "192.0.2.10/24",
+          "ipv6Address": "2001:db8::10/64"
+        }
+      ]
+    }
+  },
+  {
+    "id": "demo-stopped",
+    "configuration": {
+      "id": "demo-stopped",
+      "creationDate": "2026-08-19T09:30:00Z",
+      "image": {"reference": "docker.io/library/redis:alpine"}
+    },
+    "status": {"state": "stopped", "networks": []}
+  }
+]

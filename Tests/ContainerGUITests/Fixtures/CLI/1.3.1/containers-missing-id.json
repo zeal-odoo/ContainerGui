@@ -1,0 +1,6 @@
+[
+  {
+    "configuration": {"image": {"reference": "example.invalid/missing:1"}},
+    "status": {"state": "running"}
+  }
+]

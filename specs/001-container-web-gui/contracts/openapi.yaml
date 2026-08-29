@@ -1,0 +1,744 @@
+openapi: 3.1.0
+info:
+  title: Apple Container Web GUI Local API
+  version: 0.1.0
+  description: |
+    Versioned local-only API between the packaged browser UI and the Swift service.
+    The service listens on 127.0.0.1 only. Mutation requests require a matching
+    same-origin Origin header, application/json, and an Idempotency-Key.
+servers:
+  - url: http://127.0.0.1:8787/api/v1
+    description: Default local service
+security: []
+tags:
+  - name: System
+  - name: Containers
+  - name: Operations
+
+paths:
+  /system/health:
+    get:
+      tags: [System]
+      operationId: getSystemHealth
+      summary: Read CLI installation and service health
+      responses:
+        "200":
+          description: Current health snapshot, including recognized unhealthy states
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemHealth"
+        "500":
+          $ref: "#/components/responses/ProblemResponse"
+
+  /system/start:
+    post:
+      tags: [System]
+      operationId: startSystem
+      summary: Start container system services
+      description: |
+        The default request disables automatic kernel installation. A request that enables
+        installation must include confirmationTarget equal to "system:install-kernel".
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartSystemRequest"
+      responses:
+        "202":
+          $ref: "#/components/responses/OperationAccepted"
+        "400":
+          $ref: "#/components/responses/ProblemResponse"
+        "409":
+          $ref: "#/components/responses/ProblemResponse"
+        "422":
+          $ref: "#/components/responses/ProblemResponse"
+        "503":
+          $ref: "#/components/responses/ProblemResponse"
+
+  /containers:
+    get:
+      tags: [Containers]
+      operationId: listContainers
+      summary: List running and stopped containers
+      responses:
+        "200":
+          description: Authoritative container snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContainerList"
+        "503":
+          $ref: "#/components/responses/ProblemResponse"
+        "504":
+          $ref: "#/components/responses/ProblemResponse"
+
+  /containers/run/preview:
+    post:
+      tags: [Containers]
+      operationId: previewRunContainer
+      summary: Validate and normalize a run request without executing it
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunConfiguration"
+      responses:
+        "200":
+          description: Secret-free normalized preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunPreview"
+        "400":
+          $ref: "#/components/responses/ProblemResponse"
+        "422":
+          $ref: "#/components/responses/ProblemResponse"
+
+  /containers/run:
+    post:
+      tags: [Containers]
+      operationId: runContainer
+      summary: Run a container from a validated configuration
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunConfiguration"
+      responses:
+        "202":
+          $ref: "#/components/responses/OperationAccepted"
+        "400":
+          $ref: "#/components/responses/ProblemResponse"
+        "409":
+          $ref: "#/components/responses/ProblemResponse"
+        "422":
+          $ref: "#/components/responses/ProblemResponse"
+        "503":
+          $ref: "#/components/responses/ProblemResponse"
+
+  /containers/{containerId}:
+    parameters:
+      - $ref: "#/components/parameters/ContainerId"
+    get:
+      tags: [Containers]
+      operationId: getContainer
+      summary: Inspect one container
+      responses:
+        "200":
+          description: Normalized and redacted raw detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContainerDetail"
+        "404":
+          $ref: "#/components/responses/ProblemResponse"
+        "503":
+          $ref: "#/components/responses/ProblemResponse"
+
+  /containers/{containerId}/start:
+    parameters:
+      - $ref: "#/components/parameters/ContainerId"
+    post:
+      tags: [Containers]
+      operationId: startContainer
+      summary: Start a stopped container and verify its state
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+      responses:
+        "202":
+          $ref: "#/components/responses/OperationAccepted"
+        "404":
+          $ref: "#/components/responses/ProblemResponse"
+        "409":
+          $ref: "#/components/responses/ProblemResponse"
+        "503":
+          $ref: "#/components/responses/ProblemResponse"
+
+  /containers/{containerId}/stop:
+    parameters:
+      - $ref: "#/components/parameters/ContainerId"
+    post:
+      tags: [Containers]
+      operationId: stopContainer
+      summary: Gracefully stop a running container and verify its state
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmedTargetRequest"
+      responses:
+        "202":
+          $ref: "#/components/responses/OperationAccepted"
+        "404":
+          $ref: "#/components/responses/ProblemResponse"
+        "409":
+          $ref: "#/components/responses/ProblemResponse"
+        "422":
+          $ref: "#/components/responses/ProblemResponse"
+        "503":
+          $ref: "#/components/responses/ProblemResponse"
+
+  /containers/{containerId}/delete:
+    parameters:
+      - $ref: "#/components/parameters/ContainerId"
+    post:
+      tags: [Containers]
+      operationId: deleteContainer
+      summary: Delete a stopped container and verify its absence
+      description: Force deletion is not available in this API.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmedTargetRequest"
+      responses:
+        "202":
+          $ref: "#/components/responses/OperationAccepted"
+        "404":
+          $ref: "#/components/responses/ProblemResponse"
+        "409":
+          $ref: "#/components/responses/ProblemResponse"
+        "422":
+          $ref: "#/components/responses/ProblemResponse"
+        "503":
+          $ref: "#/components/responses/ProblemResponse"
+
+  /containers/{containerId}/logs:
+    parameters:
+      - $ref: "#/components/parameters/ContainerId"
+      - $ref: "#/components/parameters/TailLines"
+    get:
+      tags: [Containers]
+      operationId: getContainerLogs
+      summary: Fetch recent container logs
+      responses:
+        "200":
+          description: Bounded recent logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecentLogs"
+        "404":
+          $ref: "#/components/responses/ProblemResponse"
+        "413":
+          $ref: "#/components/responses/ProblemResponse"
+        "503":
+          $ref: "#/components/responses/ProblemResponse"
+
+  /containers/{containerId}/logs/stream:
+    parameters:
+      - $ref: "#/components/parameters/ContainerId"
+      - $ref: "#/components/parameters/TailLines"
+    get:
+      tags: [Containers]
+      operationId: streamContainerLogs
+      summary: Follow container logs with Server-Sent Events
+      description: |
+        Event types are log, warning and end. Each log event contains UTF-8 text with invalid
+        input replaced. Keepalive comments are emitted every 15 seconds. Disconnect cancels the
+        underlying follow process.
+      responses:
+        "200":
+          description: Event stream
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                const: no-cache
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "404":
+          $ref: "#/components/responses/ProblemResponse"
+        "429":
+          $ref: "#/components/responses/ProblemResponse"
+        "503":
+          $ref: "#/components/responses/ProblemResponse"
+
+  /operations/{operationId}:
+    get:
+      tags: [Operations]
+      operationId: getOperation
+      summary: Read mutation progress and final readback
+      parameters:
+        - name: operationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Current operation state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Operation"
+        "404":
+          $ref: "#/components/responses/ProblemResponse"
+
+components:
+  parameters:
+    ContainerId:
+      name: containerId
+      in: path
+      required: true
+      description: Full container identifier returned by the most recent authoritative list.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 256
+        pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    TailLines:
+      name: tail
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        maximum: 10000
+        default: 200
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Unique client-generated UUID. Reuse with a different request returns 409.
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    OperationAccepted:
+      description: Operation accepted or an existing idempotent operation returned
+      headers:
+        Location:
+          required: true
+          schema:
+            type: string
+            example: /api/v1/operations/cc1ec1a7-e27b-4b42-a812-65dcde3a58ae
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Operation"
+    ProblemResponse:
+      description: Structured failure
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+
+  schemas:
+    CLIInstallation:
+      type: object
+      additionalProperties: false
+      required: [versionText, compatibility, checkedAt]
+      properties:
+        versionText:
+          type: string
+          maxLength: 1024
+        semanticVersion:
+          type: [string, "null"]
+          pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        compatibility:
+          type: string
+          enum: [supported, unsupported, unrecognized, missing, notExecutable]
+        checkedAt:
+          type: string
+          format: date-time
+
+    SystemHealth:
+      type: object
+      additionalProperties: false
+      required: [tool, serviceState, observedAt]
+      properties:
+        tool:
+          $ref: "#/components/schemas/CLIInstallation"
+        serviceState:
+          type: string
+          enum: [healthy, stopped, unregistered, degraded, unavailable, unknown]
+        apiServerVersion:
+          type: [string, "null"]
+        apiServerBuild:
+          type: [string, "null"]
+        apiServerCommit:
+          type: [string, "null"]
+        diagnosticCode:
+          type: [string, "null"]
+        diagnosticMessage:
+          type: [string, "null"]
+        observedAt:
+          type: string
+          format: date-time
+
+    ContainerSummary:
+      type: object
+      additionalProperties: false
+      required: [id, displayName, state, observedAt]
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+        imageReference:
+          type: [string, "null"]
+        state:
+          type: string
+          enum: [running, stopped, created, stopping, error, unknown]
+        rawState:
+          type: [string, "null"]
+        ipv4Address:
+          type: [string, "null"]
+        ipv6Address:
+          type: [string, "null"]
+        createdAt:
+          type: [string, "null"]
+          format: date-time
+        observedAt:
+          type: string
+          format: date-time
+
+    ContainerList:
+      type: object
+      additionalProperties: false
+      required: [items, observedAt]
+      properties:
+        items:
+          type: array
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/ContainerSummary"
+        observedAt:
+          type: string
+          format: date-time
+
+    ContainerDetail:
+      type: object
+      additionalProperties: false
+      required: [summary, configuration, status, raw, observedAt]
+      properties:
+        summary:
+          $ref: "#/components/schemas/ContainerSummary"
+        configuration:
+          type: object
+          additionalProperties: true
+        status:
+          type: object
+          additionalProperties: true
+        raw:
+          description: Recursively redacted source-equivalent JSON.
+        observedAt:
+          type: string
+          format: date-time
+
+    ConfirmedTargetRequest:
+      type: object
+      additionalProperties: false
+      required: [confirmationTarget]
+      properties:
+        confirmationTarget:
+          type: string
+          description: Must exactly equal the current full container ID.
+
+    StartSystemRequest:
+      type: object
+      additionalProperties: false
+      required: [installKernel]
+      properties:
+        installKernel:
+          type: boolean
+          default: false
+        confirmationTarget:
+          type: [string, "null"]
+          description: Required as system:install-kernel when installKernel is true.
+
+    PortMapping:
+      type: object
+      additionalProperties: false
+      required: [hostPort, containerPort]
+      properties:
+        hostIP:
+          type: string
+          default: 127.0.0.1
+        hostPort:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        containerPort:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        protocol:
+          type: string
+          enum: [tcp, udp]
+          default: tcp
+
+    EnvironmentEntry:
+      type: object
+      additionalProperties: false
+      required: [name, value]
+      properties:
+        name:
+          type: string
+          pattern: "^[A-Za-z_][A-Za-z0-9_]*$"
+        value:
+          type: string
+          maxLength: 16384
+          writeOnly: true
+
+    Mount:
+      type: object
+      additionalProperties: false
+      required: [source, target]
+      properties:
+        source:
+          type: string
+        target:
+          type: string
+        readOnly:
+          type: boolean
+          default: true
+
+    RunConfiguration:
+      type: object
+      additionalProperties: false
+      required: [image]
+      properties:
+        image:
+          type: string
+          minLength: 1
+          maxLength: 512
+        name:
+          type: [string, "null"]
+          minLength: 1
+          maxLength: 128
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+        ports:
+          type: array
+          maxItems: 32
+          default: []
+          items:
+            $ref: "#/components/schemas/PortMapping"
+        environment:
+          type: array
+          maxItems: 128
+          default: []
+          items:
+            $ref: "#/components/schemas/EnvironmentEntry"
+        mounts:
+          type: array
+          maxItems: 32
+          default: []
+          items:
+            $ref: "#/components/schemas/Mount"
+        cpus:
+          type: [number, "null"]
+          exclusiveMinimum: 0
+        memoryBytes:
+          type: [integer, "null"]
+          minimum: 1048576
+
+    RunPreview:
+      type: object
+      additionalProperties: false
+      required: [image, ports, environmentNames, mounts, warnings]
+      properties:
+        image:
+          type: string
+        name:
+          type: [string, "null"]
+        ports:
+          type: array
+          items:
+            $ref: "#/components/schemas/PortMapping"
+        environmentNames:
+          type: array
+          items:
+            type: string
+        mounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Mount"
+        cpus:
+          type: [number, "null"]
+        memoryBytes:
+          type: [integer, "null"]
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warning"
+
+    Warning:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+    OperationTarget:
+      type: object
+      additionalProperties: false
+      required: [kind, id]
+      properties:
+        kind:
+          type: string
+          enum: [container, system]
+        id:
+          type: string
+
+    OperationReadback:
+      type: object
+      additionalProperties: false
+      required: [matchedExpectation, observedAt]
+      properties:
+        matchedExpectation:
+          type: boolean
+        observedContainer:
+          oneOf:
+            - $ref: "#/components/schemas/ContainerSummary"
+            - type: "null"
+        observedSystemState:
+          type: [string, "null"]
+        targetAbsent:
+          type: [boolean, "null"]
+        observedAt:
+          type: string
+          format: date-time
+
+    Operation:
+      type: object
+      additionalProperties: false
+      required: [id, kind, target, state, requestedAt, safeRequestSummary]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [startContainer, stopContainer, runContainer, deleteContainer, startSystem]
+        target:
+          $ref: "#/components/schemas/OperationTarget"
+        state:
+          type: string
+          enum: [queued, running, verifying, succeeded, failed, cancelled]
+        requestedAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: [string, "null"]
+          format: date-time
+        finishedAt:
+          type: [string, "null"]
+          format: date-time
+        safeRequestSummary:
+          type: object
+          additionalProperties: true
+        exitCode:
+          type: [integer, "null"]
+        error:
+          oneOf:
+            - $ref: "#/components/schemas/ProblemDetail"
+            - type: "null"
+        readback:
+          oneOf:
+            - $ref: "#/components/schemas/OperationReadback"
+            - type: "null"
+
+    RecentLogs:
+      type: object
+      additionalProperties: false
+      required: [containerId, text, truncated, observedAt]
+      properties:
+        containerId:
+          type: string
+        text:
+          type: string
+        truncated:
+          type: boolean
+        observedAt:
+          type: string
+          format: date-time
+
+    FieldError:
+      type: object
+      additionalProperties: false
+      required: [field, message]
+      properties:
+        field:
+          type: string
+        message:
+          type: string
+
+    ProblemDetail:
+      type: object
+      additionalProperties: false
+      required: [type, title, status, code, message, retryable, diagnosticId]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+          enum:
+            - CLI_NOT_FOUND
+            - CLI_NOT_EXECUTABLE
+            - CLI_VERSION_UNSUPPORTED
+            - SERVICE_UNAVAILABLE
+            - CLI_TIMEOUT
+            - CLI_EXIT_NONZERO
+            - CLI_OUTPUT_INVALID
+            - TARGET_NOT_FOUND
+            - STATE_CONFLICT
+            - OPERATION_IN_PROGRESS
+            - IDEMPOTENCY_CONFLICT
+            - CONFIRMATION_MISMATCH
+            - VALIDATION_FAILED
+            - ORIGIN_REJECTED
+            - REQUEST_TOO_LARGE
+            - LOG_SESSION_LIMIT
+            - OUTPUT_LIMIT_EXCEEDED
+            - INTERNAL_ERROR
+        message:
+          type: string
+        retryable:
+          type: boolean
+        operationId:
+          type: [string, "null"]
+          format: uuid
+        fieldErrors:
+          type: array
+          items:
+            $ref: "#/components/schemas/FieldError"
+        diagnosticId:
+          type: string
+          format: uuid

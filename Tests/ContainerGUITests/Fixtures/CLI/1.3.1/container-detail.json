@@ -1,0 +1,19 @@
+[
+  {
+    "id": "demo-running",
+    "configuration": {
+      "id": "demo-running",
+      "creationDate": "2026-08-20T10:00:00Z",
+      "image": {"reference": "docker.io/library/nginx:alpine"},
+      "labels": {"purpose": "fixture"},
+      "environment": {
+        "PUBLIC_MODE": "demo",
+        "PASSWORD": "fixture-secret-must-not-leak"
+      }
+    },
+    "status": {
+      "state": "running",
+      "networks": [{"ipv4Address": "192.0.2.10/24"}]
+    }
+  }
+]

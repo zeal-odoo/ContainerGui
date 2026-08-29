@@ -1,0 +1,19 @@
+{
+  "start": {
+    "initialState": "stopped",
+    "exitCode": 0,
+    "finalState": "running"
+  },
+  "stop": {
+    "initialState": "running",
+    "exitCode": 0,
+    "finalState": "stopped",
+    "graceSeconds": 10
+  },
+  "nonzero": {"exitCode": 7, "stderr": "sanitized fixture failure"},
+  "timeout": {"error": "CLI_TIMEOUT"},
+  "unchanged": {"initialState": "stopped", "exitCode": 0, "finalState": "stopped"},
+  "externalState": {"initialState": "running", "exitCode": 1, "finalState": "stopped"},
+  "disconnect": {"expected": "child-cancelled"},
+  "backpressure": {"bufferedChunks": 64, "expectedEvent": "warning"}
+}

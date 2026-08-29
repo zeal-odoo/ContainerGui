@@ -1,0 +1,15 @@
+[
+  {
+    "id": "future-container",
+    "configuration": {
+      "id": "future-container",
+      "image": {"reference": "example.invalid/future:1"},
+      "futureConfiguration": {"mode": "new"}
+    },
+    "status": {
+      "state": "teleporting",
+      "futureStatus": 42
+    },
+    "futureTopLevel": true
+  }
+]
