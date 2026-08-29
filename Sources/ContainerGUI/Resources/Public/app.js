@@ -6,6 +6,8 @@ const ENDPOINTS = {
   metrics: "/api/v1/containers/metrics",
   images: "/api/v1/images",
   imagePull: "/api/v1/images/pull",
+  registryRepositories: "/api/v1/registry-search/repositories",
+  registryTags: "/api/v1/registry-search/tags",
   operations: "/api/v1/operations/"
 };
 const REFRESH_INTERVAL_MS = 5000;
@@ -27,14 +29,24 @@ const elements = Object.fromEntries([
   "createName", "createImage", "createCPUs", "createMemory", "createPorts", "createEnvironment",
   "createArguments", "createStartAfter", "createNameError", "createImageError", "createCPUsError",
   "createMemoryError", "createPortsError", "createEnvironmentError", "createArgumentsError",
-  "createFormStatus", "cancelCreateContainerButton", "submitCreateContainerButton"
+  "createFormStatus", "cancelCreateContainerButton", "submitCreateContainerButton",
+  "remoteRegistrySection", "remoteRegistryForm", "remoteRegistryProvider", "dockerHubSearchFields",
+  "ghcrSearchFields", "remoteSearchQuery", "ghcrOwnerType", "ghcrOwner",
+  "searchRemoteRepositoriesButton", "remoteRepositoryCount", "remoteRepositoryStatus",
+  "remoteRepositoryError", "remoteRepositoryResults", "loadMoreRepositoriesButton",
+  "remoteTagPanel", "remoteTagCount", "remoteTagStatus", "remoteTagError", "remoteTagResults",
+  "loadMoreTagsButton"
 ].map((id) => [id, document.getElementById(id)]));
 
 const state = {
   containers: [], selectedID: null, selectedDetail: null, detailController: null,
   refreshing: false, submitting: false, eventSource: null,
   reconnectAttempts: 0, reconnectTimer: null, metricsByID: new Map(), metricsStatus: "loading",
-  images: [], imageSubmitting: false, createSubmitting: false
+  images: [], imageSubmitting: false, createSubmitting: false,
+  remoteRepositories: [], remoteRepositoryPage: 0, remoteRepositoryHasMore: false,
+  remoteSearchParameters: null, selectedRemoteRepository: null,
+  remoteTags: [], remoteTagPage: 0, remoteTagHasMore: false,
+  remoteRepositoryLoading: false, remoteTagLoading: false
 };
 
 const stateLabels = {
@@ -245,6 +257,263 @@ async function loadImages() {
   } catch (error) {
     showImageError(error);
   }
+}
+
+function appendUniqueBy(current, incoming, key) {
+  const seen = new Set(current.map((item) => item[key]));
+  return current.concat(incoming.filter((item) => {
+    if (seen.has(item[key])) return false;
+    seen.add(item[key]);
+    return true;
+  }));
+}
+
+function resetRemoteTags(message = "选择一个仓库查看可用标签。") {
+  state.selectedRemoteRepository = null;
+  state.remoteTags = [];
+  state.remoteTagPage = 0;
+  state.remoteTagHasMore = false;
+  elements.remoteTagResults.replaceChildren();
+  elements.remoteTagError.hidden = true;
+  elements.remoteTagStatus.hidden = false;
+  elements.remoteTagStatus.textContent = message;
+  elements.remoteTagCount.textContent = "尚未选择仓库";
+  elements.loadMoreTagsButton.hidden = true;
+}
+
+function resetRemoteRepositories(message = "输入条件后点击“搜索镜像”。") {
+  state.remoteRepositories = [];
+  state.remoteRepositoryPage = 0;
+  state.remoteRepositoryHasMore = false;
+  state.remoteSearchParameters = null;
+  elements.remoteRepositoryResults.replaceChildren();
+  elements.remoteRepositoryError.hidden = true;
+  elements.remoteRepositoryStatus.hidden = false;
+  elements.remoteRepositoryStatus.textContent = message;
+  elements.remoteRepositoryCount.textContent = "尚未搜索";
+  elements.loadMoreRepositoriesButton.hidden = true;
+  resetRemoteTags();
+}
+
+function renderRemoteRepositories(totalCount = null) {
+  elements.remoteRepositoryResults.replaceChildren();
+  for (const repository of state.remoteRepositories) {
+    const card = document.createElement("article");
+    card.className = `remote-result${state.selectedRemoteRepository?.reference === repository.reference ? " selected" : ""}`;
+    const header = document.createElement("div");
+    header.className = "remote-result-head";
+    const title = document.createElement("div");
+    title.className = "remote-result-title";
+    const name = document.createElement("strong");
+    name.textContent = repository.name;
+    const reference = document.createElement("code");
+    reference.textContent = repository.reference;
+    title.append(name, reference);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "button secondary small";
+    button.textContent = "查看标签";
+    button.setAttribute("aria-label", `查看 ${repository.reference} 的标签`);
+    button.addEventListener("click", () => openRemoteRepository(repository));
+    header.append(title, button);
+    card.append(header);
+    if (repository.description) {
+      const description = document.createElement("p");
+      description.textContent = repository.description;
+      card.append(description);
+    }
+    const metadata = document.createElement("div");
+    metadata.className = "remote-result-meta";
+    const values = [
+      repository.isOfficial ? "官方镜像" : null,
+      Number.isFinite(repository.starCount) ? `★ ${repository.starCount.toLocaleString()}` : null,
+      Number.isFinite(repository.pullCount) ? `拉取 ${repository.pullCount.toLocaleString()}` : null,
+      repository.updatedAt ? `更新 ${formatTime(repository.updatedAt)}` : null
+    ].filter(Boolean);
+    for (const value of values) {
+      const item = document.createElement("span");
+      item.textContent = value;
+      metadata.append(item);
+    }
+    if (values.length) card.append(metadata);
+    elements.remoteRepositoryResults.append(card);
+  }
+  const count = state.remoteRepositories.length;
+  elements.remoteRepositoryStatus.hidden = count !== 0;
+  if (count === 0) elements.remoteRepositoryStatus.textContent = "没有找到匹配的远程镜像。";
+  elements.remoteRepositoryCount.textContent = Number.isFinite(totalCount)
+    ? `已显示 ${count} / ${totalCount}` : `已显示 ${count}`;
+  elements.loadMoreRepositoriesButton.hidden = !state.remoteRepositoryHasMore;
+  elements.loadMoreRepositoriesButton.disabled = state.remoteRepositoryLoading;
+}
+
+function renderRemoteTags() {
+  elements.remoteTagResults.replaceChildren();
+  for (const tag of state.remoteTags) {
+    const card = document.createElement("article");
+    card.className = "remote-result";
+    const header = document.createElement("div");
+    header.className = "remote-result-head";
+    const title = document.createElement("div");
+    title.className = "remote-result-title";
+    const name = document.createElement("strong");
+    name.textContent = tag.name;
+    const reference = document.createElement("code");
+    reference.textContent = tag.reference;
+    title.append(name, reference);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "button small";
+    button.textContent = "选择标签";
+    button.setAttribute("aria-label", `选择镜像标签 ${tag.name}`);
+    button.addEventListener("click", () => selectRemoteTag(tag));
+    header.append(title, button);
+    card.append(header);
+    const metadata = document.createElement("div");
+    metadata.className = "remote-result-meta";
+    for (const value of [
+      tag.digest ? `摘要 ${tag.digest}` : null,
+      Number.isFinite(tag.sizeBytes) ? formatBytes(tag.sizeBytes) : null,
+      tag.updatedAt ? `更新 ${formatTime(tag.updatedAt)}` : null
+    ].filter(Boolean)) {
+      const item = document.createElement("span");
+      item.textContent = value;
+      metadata.append(item);
+    }
+    if (metadata.childElementCount) card.append(metadata);
+    elements.remoteTagResults.append(card);
+  }
+  const count = state.remoteTags.length;
+  elements.remoteTagStatus.hidden = count !== 0;
+  if (count === 0) elements.remoteTagStatus.textContent = "该仓库当前没有可选择的标签。";
+  elements.remoteTagCount.textContent = `已显示 ${count} 个标签`;
+  elements.loadMoreTagsButton.hidden = !state.remoteTagHasMore;
+  elements.loadMoreTagsButton.disabled = state.remoteTagLoading;
+}
+
+async function loadRemoteRepositoryPage(page) {
+  if (!state.remoteSearchParameters || state.remoteRepositoryLoading) return;
+  state.remoteRepositoryLoading = true;
+  elements.searchRemoteRepositoriesButton.disabled = true;
+  elements.loadMoreRepositoriesButton.disabled = true;
+  elements.remoteRepositoryError.hidden = true;
+  if (page === 1) {
+    elements.remoteRepositoryStatus.hidden = false;
+    elements.remoteRepositoryStatus.textContent = "正在搜索远程镜像…";
+  }
+  try {
+    const parameters = new URLSearchParams({ ...state.remoteSearchParameters, page: String(page) });
+    const result = await fetchJSON(`${ENDPOINTS.registryRepositories}?${parameters}`);
+    state.remoteRepositories = appendUniqueBy(state.remoteRepositories, result.items || [], "reference");
+    state.remoteRepositoryPage = result.page;
+    state.remoteRepositoryHasMore = Boolean(result.hasNextPage) && result.page < 500;
+    renderRemoteRepositories(result.totalCount);
+  } catch (error) {
+    elements.remoteRepositoryStatus.hidden = state.remoteRepositories.length !== 0;
+    elements.remoteRepositoryError.hidden = false;
+    elements.remoteRepositoryError.textContent = formatProblem(error);
+  } finally {
+    state.remoteRepositoryLoading = false;
+    elements.searchRemoteRepositoriesButton.disabled = false;
+    elements.loadMoreRepositoriesButton.disabled = false;
+  }
+}
+
+async function loadRemoteTagPage(page) {
+  const repository = state.selectedRemoteRepository;
+  if (!repository || state.remoteTagLoading) return;
+  state.remoteTagLoading = true;
+  elements.loadMoreTagsButton.disabled = true;
+  elements.remoteTagError.hidden = true;
+  if (page === 1) {
+    elements.remoteTagStatus.hidden = false;
+    elements.remoteTagStatus.textContent = "正在读取镜像标签…";
+  }
+  try {
+    const parameters = new URLSearchParams({
+      registry: repository.registry,
+      repository: repository.repository,
+      page: String(page)
+    });
+    if (repository.registry === "ghcr") {
+      parameters.set("ownerType", state.remoteSearchParameters.ownerType);
+      parameters.set("owner", state.remoteSearchParameters.owner);
+    }
+    const result = await fetchJSON(`${ENDPOINTS.registryTags}?${parameters}`);
+    state.remoteTags = appendUniqueBy(state.remoteTags, result.items || [], "reference");
+    state.remoteTagPage = result.page;
+    state.remoteTagHasMore = Boolean(result.hasNextPage) && result.page < 500;
+    renderRemoteTags();
+  } catch (error) {
+    elements.remoteTagStatus.hidden = state.remoteTags.length !== 0;
+    elements.remoteTagError.hidden = false;
+    elements.remoteTagError.textContent = formatProblem(error);
+  } finally {
+    state.remoteTagLoading = false;
+    elements.loadMoreTagsButton.disabled = false;
+  }
+}
+
+async function searchRemoteRepositories(event) {
+  event.preventDefault();
+  if (state.remoteRepositoryLoading) return;
+  const registry = elements.remoteRegistryProvider.value;
+  const parameters = { registry };
+  if (registry === "dockerHub") {
+    const query = elements.remoteSearchQuery.value.trim();
+    if (!query) {
+      elements.remoteRepositoryStatus.textContent = "请输入 Docker Hub 搜索关键词。";
+      elements.remoteSearchQuery.focus();
+      return;
+    }
+    parameters.query = query;
+  } else {
+    const owner = elements.ghcrOwner.value.trim();
+    if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/.test(owner) || owner.includes("--")) {
+      elements.remoteRepositoryStatus.textContent = "请输入有效的 GitHub 用户或组织名称。";
+      elements.ghcrOwner.focus();
+      return;
+    }
+    parameters.ownerType = elements.ghcrOwnerType.value;
+    parameters.owner = owner;
+  }
+  resetRemoteRepositories("正在搜索远程镜像…");
+  state.remoteSearchParameters = parameters;
+  await loadRemoteRepositoryPage(1);
+}
+
+function loadMoreRemoteRepositories() {
+  if (state.remoteRepositoryHasMore) loadRemoteRepositoryPage(state.remoteRepositoryPage + 1);
+}
+
+function openRemoteRepository(repository) {
+  resetRemoteTags("正在读取镜像标签…");
+  state.selectedRemoteRepository = repository;
+  renderRemoteRepositories();
+  loadRemoteTagPage(1);
+}
+
+function loadMoreRemoteTags() {
+  if (state.remoteTagHasMore) loadRemoteTagPage(state.remoteTagPage + 1);
+}
+
+function selectRemoteTag(tag) {
+  elements.pullImageRegistry.value = state.selectedRemoteRepository.registry;
+  elements.pullImageReference.value = tag.reference;
+  clearPullImageErrors();
+  updatePullRegistryHint();
+  elements.pullFormStatus.textContent = `已选择标签 ${tag.name}；确认后再开始拉取。`;
+  elements.pullImageDialog.showModal();
+  elements.pullImageReference.focus();
+}
+
+function updateRemoteRegistryFields() {
+  const isGHCR = elements.remoteRegistryProvider.value === "ghcr";
+  elements.dockerHubSearchFields.hidden = isGHCR;
+  elements.ghcrSearchFields.hidden = !isGHCR;
+  elements.remoteSearchQuery.required = !isGHCR;
+  elements.ghcrOwner.required = isGHCR;
+  resetRemoteRepositories();
 }
 
 async function refreshDashboard({ announce = false } = {}) {
@@ -729,6 +998,9 @@ function formatProblem(error) {
   if (code === "OPERATION_IN_PROGRESS") return "该容器已有操作进行中，请等待完成。";
   if (code === "STATE_CONFLICT") return "目标状态已变化，请刷新后重试。";
   if (code === "CLI_TIMEOUT") return "CLI 执行超时，页面将保留当前状态。";
+  if (code === "REGISTRY_AUTHENTICATION_REQUIRED") return "GHCR 只读凭据未配置或无效，请在服务环境中设置后重试。";
+  if (code === "REGISTRY_RATE_LIMITED") return "镜像平台请求过于频繁，请稍后重试。";
+  if (code === "REGISTRY_UNAVAILABLE") return "镜像平台当前不可用，本机镜像不受影响。";
   return code ? `${error.message}（${code}）` : error.message;
 }
 
@@ -858,6 +1130,10 @@ elements.openPullImageButton.addEventListener("click", openPullImageDialog);
 elements.cancelPullImageButton.addEventListener("click", () => elements.pullImageDialog.close());
 elements.pullImageRegistry.addEventListener("change", updatePullRegistryHint);
 elements.pullImageForm.addEventListener("submit", submitImagePull);
+elements.remoteRegistryForm.addEventListener("submit", searchRemoteRepositories);
+elements.remoteRegistryProvider.addEventListener("change", updateRemoteRegistryFields);
+elements.loadMoreRepositoriesButton.addEventListener("click", loadMoreRemoteRepositories);
+elements.loadMoreTagsButton.addEventListener("click", loadMoreRemoteTags);
 elements.openCreateContainerButton.addEventListener("click", openCreateContainerDialog);
 elements.cancelCreateContainerButton.addEventListener("click", () => elements.createContainerDialog.close());
 elements.createContainerForm.addEventListener("submit", createContainer);
@@ -867,4 +1143,5 @@ document.addEventListener("visibilitychange", () => {
 window.setInterval(() => {
   if (document.visibilityState === "visible") refreshDashboard();
 }, REFRESH_INTERVAL_MS);
+updateRemoteRegistryFields();
 refreshDashboard();

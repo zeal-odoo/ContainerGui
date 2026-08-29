@@ -136,6 +136,70 @@
         </table>
       </div>
     </section>
+
+    <section id="remoteRegistrySection" class="panel resource-panel" aria-labelledby="remoteRegistryTitle">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">Remote registries</p>
+          <h2 id="remoteRegistryTitle">搜索远程镜像</h2>
+        </div>
+        <span class="quiet">只读浏览，不会自动拉取</span>
+      </div>
+      <form id="remoteRegistryForm" class="remote-search-form" autocomplete="off">
+        <label class="form-field compact-field">
+          <span>镜像平台</span>
+          <select id="remoteRegistryProvider" name="registry">
+            <option value="dockerHub">Docker Hub</option>
+            <option value="ghcr">GitHub Container Registry (GHCR)</option>
+          </select>
+        </label>
+        <div id="dockerHubSearchFields" class="remote-search-fields">
+          <label class="form-field compact-field">
+            <span>搜索关键词</span>
+            <input id="remoteSearchQuery" name="query" maxlength="128" required placeholder="例如 postgres">
+          </label>
+        </div>
+        <div id="ghcrSearchFields" class="remote-search-fields ghcr-fields" hidden>
+          <label class="form-field compact-field">
+            <span>范围</span>
+            <select id="ghcrOwnerType" name="ownerType">
+              <option value="organization">组织</option>
+              <option value="user">用户</option>
+            </select>
+          </label>
+          <label class="form-field compact-field">
+            <span>用户或组织</span>
+            <input id="ghcrOwner" name="owner" maxlength="39" placeholder="例如 apple">
+          </label>
+        </div>
+        <button id="searchRemoteRepositoriesButton" class="button remote-search-button" type="submit">搜索镜像</button>
+      </form>
+      <p class="remote-search-help">Docker Hub 按关键词搜索公开仓库；GHCR 按用户或组织分页读取，凭据只从服务环境变量读取。</p>
+
+      <div class="remote-browser">
+        <section class="remote-column" aria-labelledby="remoteRepositoriesTitle">
+          <div class="subhead remote-subhead">
+            <h3 id="remoteRepositoriesTitle">仓库结果</h3>
+            <span id="remoteRepositoryCount" class="quiet">尚未搜索</span>
+          </div>
+          <div id="remoteRepositoryStatus" class="state-block compact remote-state" role="status">输入条件后点击“搜索镜像”。</div>
+          <div id="remoteRepositoryError" class="state-block compact remote-state error" role="alert" hidden></div>
+          <div id="remoteRepositoryResults" class="remote-results" aria-live="polite"></div>
+          <button id="loadMoreRepositoriesButton" class="button secondary load-more" type="button" hidden>加载更多仓库</button>
+        </section>
+
+        <section id="remoteTagPanel" class="remote-column" aria-labelledby="remoteTagsTitle">
+          <div class="subhead remote-subhead">
+            <h3 id="remoteTagsTitle">镜像标签</h3>
+            <span id="remoteTagCount" class="quiet">尚未选择仓库</span>
+          </div>
+          <div id="remoteTagStatus" class="state-block compact remote-state" role="status">选择一个仓库查看可用标签。</div>
+          <div id="remoteTagError" class="state-block compact remote-state error" role="alert" hidden></div>
+          <div id="remoteTagResults" class="remote-results" aria-live="polite"></div>
+          <button id="loadMoreTagsButton" class="button secondary load-more" type="button" hidden>加载更多标签</button>
+        </section>
+      </div>
+    </section>
     <datalist id="localImageOptions"></datalist>
   </main>
 
