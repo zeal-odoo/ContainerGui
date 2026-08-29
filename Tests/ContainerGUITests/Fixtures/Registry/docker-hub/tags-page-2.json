@@ -1,0 +1,13 @@
+{
+  "count": 3,
+  "next": null,
+  "previous": "https://hub.docker.com/v2/namespaces/library/repositories/postgres/tags?page=1&page_size=2",
+  "results": [
+    {
+      "name": "16.10",
+      "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "full_size": 155000000,
+      "last_updated": "2026-08-26T12:00:00Z"
+    }
+  ]
+}

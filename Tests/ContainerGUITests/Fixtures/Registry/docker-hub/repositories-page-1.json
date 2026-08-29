@@ -1,0 +1,21 @@
+{
+  "count": 3,
+  "next": "https://hub.docker.com/v2/search/repositories/?query=postgres&page=2&page_size=2",
+  "previous": null,
+  "results": [
+    {
+      "repo_name": "postgres",
+      "short_description": "The PostgreSQL object-relational database system.",
+      "star_count": 15342,
+      "pull_count": 1000000000,
+      "is_official": true
+    },
+    {
+      "repo_name": "cimg/postgres",
+      "short_description": "CircleCI PostgreSQL image.",
+      "star_count": 24,
+      "pull_count": 5000000,
+      "is_official": false
+    }
+  ]
+}

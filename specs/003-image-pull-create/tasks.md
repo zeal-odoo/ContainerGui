@@ -109,10 +109,10 @@
 
 ### Tests for Remote Registry Search
 
-- [ ] T032 [P] [US1] Add sanitized multi-page Docker Hub repository/tag and GitHub package/version fixtures in Tests/ContainerGUITests/Fixtures/Registry/docker-hub/ and Tests/ContainerGUITests/Fixtures/Registry/github/
-- [ ] T033 [P] [US1] Add failing URL, header, pagination, parser, size-limit, error-mapping and token-redaction tests in Tests/ContainerGUITests/Unit/RegistrySearchClientTests.swift
-- [ ] T034 [P] [US1] Add failing GET /api/v1/registry-search/repositories and /api/v1/registry-search/tags validation and response tests in Tests/ContainerGUITests/Contract/RegistrySearchAPITests.swift
-- [ ] T035 [P] [US1] Add failing initial-local-list, explicit-search, repository/tag pagination and tag-to-pull-form asset tests in Tests/ContainerGUITests/Browser/ResourceMutationAssetTests.swift
+- [X] T032 [P] [US1] Add sanitized multi-page Docker Hub repository/tag and GitHub package/version fixtures in Tests/ContainerGUITests/Fixtures/Registry/docker-hub/ and Tests/ContainerGUITests/Fixtures/Registry/github/
+- [X] T033 [P] [US1] Add failing URL, header, pagination, parser, size-limit, error-mapping and token-redaction tests in Tests/ContainerGUITests/Unit/RegistrySearchClientTests.swift
+- [X] T034 [P] [US1] Add failing GET /api/v1/registry-search/repositories and /api/v1/registry-search/tags validation and response tests in Tests/ContainerGUITests/Contract/RegistrySearchAPITests.swift
+- [X] T035 [P] [US1] Add failing initial-local-list, explicit-search, repository/tag pagination and tag-to-pull-form asset tests in Tests/ContainerGUITests/Browser/ResourceMutationAssetTests.swift
 
 ### Implementation for Remote Registry Search
 

@@ -1,0 +1,14 @@
+[
+  {
+    "id": 203,
+    "name": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "created_at": "2026-08-10T08:00:00Z",
+    "updated_at": "2026-08-10T08:00:00Z",
+    "metadata": {
+      "package_type": "container",
+      "container": {
+        "tags": ["0.11.0"]
+      }
+    }
+  }
+]

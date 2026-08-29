@@ -1,0 +1,18 @@
+[
+  {
+    "id": 101,
+    "name": "containerization/vminit",
+    "package_type": "container",
+    "visibility": "public",
+    "description": "Minimal init image for Containerization.",
+    "updated_at": "2026-08-27T10:00:00Z"
+  },
+  {
+    "id": 102,
+    "name": "container",
+    "package_type": "container",
+    "visibility": "public",
+    "description": "Apple container release image.",
+    "updated_at": "2026-08-26T09:00:00Z"
+  }
+]

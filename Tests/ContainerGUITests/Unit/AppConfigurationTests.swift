@@ -17,6 +17,9 @@ final class AppConfigurationTests: XCTestCase {
         XCTAssertEqual(configuration.maximumConcurrentMutations, 4)
         XCTAssertEqual(configuration.maximumOperationRecords, 1_000)
         XCTAssertEqual(configuration.maximumLogSessions, 8)
+        XCTAssertEqual(configuration.maximumRegistryResponseBytes, 2 * 1024 * 1024)
+        XCTAssertEqual(configuration.registryTimeoutSeconds, 5)
+        XCTAssertNil(configuration.githubToken)
     }
 
     func testAcceptsPortAndExplicitCLIPath() throws {
@@ -41,5 +44,15 @@ final class AppConfigurationTests: XCTestCase {
 
     func testRejectsEmptyExplicitCLIPath() {
         XCTAssertThrowsError(try AppConfiguration(environment: ["CONTAINER_GUI_CLI_PATH": "   "]))
+    }
+
+    func testReadsGHCRTokenOnlyFromDedicatedEnvironmentVariable() throws {
+        let configuration = try AppConfiguration(environment: [
+            "CONTAINER_GUI_GITHUB_TOKEN": "github-read-only-token",
+            "GITHUB_TOKEN": "must-not-be-used",
+        ])
+
+        XCTAssertEqual(configuration.githubToken, "github-read-only-token")
+        XCTAssertNil(try AppConfiguration(environment: ["CONTAINER_GUI_GITHUB_TOKEN": "  "]).githubToken)
     }
 }

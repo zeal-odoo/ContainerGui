@@ -1,0 +1,14 @@
+{
+  "count": 3,
+  "next": null,
+  "previous": "https://hub.docker.com/v2/search/repositories/?query=postgres&page=1&page_size=2",
+  "results": [
+    {
+      "repo_name": "bitnami/postgresql",
+      "short_description": "PostgreSQL packaged by Bitnami.",
+      "star_count": 300,
+      "pull_count": 90000000,
+      "is_official": false
+    }
+  ]
+}

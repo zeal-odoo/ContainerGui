@@ -59,7 +59,49 @@ final class ResourceMutationAssetTests: XCTestCase {
         XCTAssertTrue(script.contains("/api/v1/containers"))
     }
 
+    func testRemoteRegistrySearchIsExplicitAndKeepsAllLocalImagesVisible() throws {
+        let html = try asset("index.html")
+        let script = try asset("app.js")
+
+        XCTAssertTrue(html.contains("id=\"remoteRegistrySection\""))
+        XCTAssertTrue(html.contains("id=\"remoteRegistryForm\""))
+        XCTAssertTrue(html.contains("id=\"remoteRegistryProvider\""))
+        XCTAssertTrue(html.contains("id=\"dockerHubSearchFields\""))
+        XCTAssertTrue(html.contains("id=\"ghcrSearchFields\""))
+        XCTAssertTrue(html.contains("id=\"remoteRepositoryResults\""))
+        XCTAssertTrue(html.contains("id=\"remoteTagResults\""))
+        XCTAssertTrue(html.contains("id=\"loadMoreRepositoriesButton\""))
+        XCTAssertTrue(html.contains("id=\"loadMoreTagsButton\""))
+        XCTAssertTrue(script.contains("/api/v1/registry-search/repositories"))
+        XCTAssertTrue(script.contains("/api/v1/registry-search/tags"))
+        XCTAssertTrue(script.contains("remoteRegistryForm.addEventListener(\"submit\", searchRemoteRepositories)"))
+        XCTAssertTrue(script.contains("for (const image of snapshot.items)"))
+        XCTAssertFalse(html.contains("id=\"localImagePagination\""))
+    }
+
+    func testRemotePaginationDeduplicatesAndExactTagOnlyFillsPullDialog() throws {
+        let script = try asset("app.js")
+
+        XCTAssertTrue(script.contains("appendUniqueBy"))
+        XCTAssertTrue(script.contains("loadMoreRemoteRepositories"))
+        XCTAssertTrue(script.contains("loadMoreRemoteTags"))
+        XCTAssertTrue(script.contains("openRemoteRepository"))
+        XCTAssertTrue(script.contains("selectRemoteTag"))
+        let selection = try functionBody("selectRemoteTag", in: script)
+        XCTAssertTrue(selection.contains("elements.pullImageReference.value = tag.reference"))
+        XCTAssertTrue(selection.contains("elements.pullImageDialog.showModal()"))
+        XCTAssertFalse(selection.contains("ENDPOINTS.imagePull"))
+        XCTAssertFalse(selection.contains("submitImagePull"))
+    }
+
     private func asset(_ name: String) throws -> String {
         try String(contentsOf: AppFactory.publicDirectoryURL.appendingPathComponent(name), encoding: .utf8)
+    }
+
+    private func functionBody(_ name: String, in script: String) throws -> String {
+        let start = try XCTUnwrap(script.range(of: "function \(name)("))
+        let remaining = script[start.lowerBound...]
+        let end = remaining.dropFirst().range(of: "\nfunction ")?.lowerBound ?? script.endIndex
+        return String(script[start.lowerBound..<end])
     }
 }
