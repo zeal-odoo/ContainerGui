@@ -69,11 +69,12 @@
 
 | Field | Type | Rules |
 |---|---|---|
-| hostPort | Int | 1...65535；同一请求中唯一 |
+| hostPort | Int | 1024...65535；同一请求中唯一；GUI 不使用 root 权限 |
 | containerPort | Int | 1...65535 |
 | protocol | String | `tcp` 或 `udp`，默认 `tcp` |
 
-命令参数始终由服务规范化为 `127.0.0.1:hostPort:containerPort/protocol`。
+命令参数始终由服务规范化为 `127.0.0.1:hostPort:containerPort/protocol`；SSH 的典型映射为
+`127.0.0.1:2222:22/tcp`，但镜像仍需自行安装并运行 SSH 服务。
 
 ## EnvironmentEntry
 

@@ -227,7 +227,7 @@
       <label class="form-field">
         <span>端口映射（每行一项）</span>
         <textarea id="createPorts" name="ports" rows="3" placeholder="15432:5432/tcp" aria-describedby="createPortsHelp createPortsError"></textarea>
-        <small id="createPortsHelp">格式为“主机端口:容器端口[/tcp|udp]”，主机地址固定为 127.0.0.1。</small>
+        <small id="createPortsHelp">格式为“主机端口:容器端口[/tcp|udp]”，主机地址固定为 127.0.0.1；主机端口范围为 1024...65535。</small>
         <span id="createPortsError" class="field-error" aria-live="polite"></span>
       </label>
       <label class="form-field">

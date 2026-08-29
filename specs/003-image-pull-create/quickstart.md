@@ -30,7 +30,8 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun swift test
 - 拉取命令只能是固定的 `image pull --progress plain` 参数数组。
 - plain 下载/解压行必须解析为单调 Operation 进度；无关行和分块边界不能导致错误百分比或拉取失败。
 - 创建命令只包含允许字段，且选项位于镜像参数之前。
-- 无效名称、镜像、平台、CPU、内存、端口、环境变量和参数不会调用执行器。
+- 无效名称、镜像、平台、CPU、内存、端口、环境变量和参数不会调用执行器；主机端口 `1...1023`
+  会在 CLI 执行前以逐字段错误拒绝。
 - 环境变量值不出现在 Operation、ProblemDetail 或浏览器状态中。
 - 拉取后缺少镜像、创建后缺少容器、可选启动后未运行均不能显示成功。
 - 现有容器读取、指标、启停和日志测试保持通过。
@@ -79,7 +80,8 @@ xcrun swift run ContainerGUI
 7. “拉取镜像”对话框只包含完整地址和 Docker Hub 两种输入方式，以及可选目标架构。
 8. Docker Hub 的 `postgres:latest` 提交为 `docker.io/library/postgres:latest`；其他 OCI 注册表完整地址原样提交。
 9. 页面不显示 GHCR 平台、owner 输入或 GitHub Token 配置。
-10. “创建容器”对话框包含名称、镜像、CPU、内存、端口、环境变量、进程参数和创建后启动。
+10. “创建容器”对话框包含名称、镜像、CPU、内存、端口、环境变量、进程参数和创建后启动；端口帮助
+    明确主机端口范围为 `1024...65535`，SSH 可填写 `2222:22/tcp`。
 11. 本地镜像名称可用于创建表单建议。
 12. 无效输入显示逐字段中文错误，未发出写请求。
 13. 不提交任何真实拉取或创建操作。

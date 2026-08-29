@@ -161,6 +161,17 @@
 
 ---
 
+## Phase 11: Privileged Host Port Validation (Priority: P1)
+
+**Goal**: 在执行 CLI 前拒绝需要 root 的主机低位端口，并给出可操作的中文原因。
+
+- [X] T055 [US2] Add failing domain, API, browser asset and version tests for host port 100.
+- [X] T056 [US2] Restrict host ports to 1024...65535 in both Swift and browser validation.
+- [X] T057 [US2] Document the loopback SSH example 2222:22/tcp and the separate requirement to run sshd.
+- [X] T058 [US2] Complete full tests, safe live validation, restart and Git commit.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

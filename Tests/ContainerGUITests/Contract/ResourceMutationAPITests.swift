@@ -177,6 +177,36 @@ final class ResourceMutationAPITests: XCTestCase {
         XCTAssertEqual(createCount, 0)
     }
 
+    func testCreateRejectsPrivilegedHostPortBeforeMutation() async throws {
+        let manager = StubImageManager()
+        let app = makeImageApplication(manager: manager)
+        let expectedOrigin = origin
+        let headerName = idempotencyName
+
+        try await app.test(.router) { client in
+            let headers: HTTPFields = [
+                .origin: expectedOrigin,
+                .contentType: "application/json",
+                headerName: UUID().uuidString,
+            ]
+            try await client.execute(
+                uri: "/api/v1/containers",
+                method: .post,
+                headers: headers,
+                body: ByteBuffer(string: #"{"name":"ubuntu-test","image":"ubuntu:26.04","ports":[{"hostPort":100,"containerPort":22}]}"#)
+            ) { response in
+                XCTAssertEqual(response.status, .unprocessableContent)
+                let problem = try JSONDecoder.containerGUI.decode(ProblemDetail.self, from: response.body)
+                XCTAssertEqual(problem.code, .validationFailed)
+                XCTAssertEqual(problem.fieldErrors, [
+                    FieldError(field: "ports", message: "主机端口必须使用 1024...65535；1024 以下需要 root 权限")
+                ])
+            }
+        }
+        let createCount = await manager.createCount
+        XCTAssertEqual(createCount, 0)
+    }
+
     func testCreateExitZeroWithoutReadbackEndsFailed() async throws {
         let manager = StubImageManager(mode: .missingCreateReadback)
         let app = makeImageApplication(manager: manager)

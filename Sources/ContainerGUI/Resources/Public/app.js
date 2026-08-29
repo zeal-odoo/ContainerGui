@@ -914,6 +914,9 @@ function parsePortLines(value) {
     if (!match) throw new Error("端口格式必须为 主机端口:容器端口[/tcp|udp]");
     const hostPort = Number(match[1]);
     const containerPort = Number(match[2]);
+    if (hostPort > 0 && hostPort < 1024) {
+      throw new Error("主机端口必须使用 1024...65535；1024 以下需要 root 权限");
+    }
     if (hostPort < 1 || hostPort > 65535 || containerPort < 1 || containerPort > 65535) {
       throw new Error("端口必须在 1...65535 之间");
     }

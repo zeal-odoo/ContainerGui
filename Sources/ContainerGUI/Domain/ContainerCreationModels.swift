@@ -96,7 +96,9 @@ struct ContainerCreateRequest: Codable, Equatable, Sendable {
         if let memoryMiB, !(1...1_048_576).contains(memoryMiB) {
             errors["memoryMiB"] = "内存必须在 1...1048576 MiB 之间"
         }
-        if ports.count > 32 || ports.contains(where: {
+        if ports.contains(where: { (1...1_023).contains($0.hostPort) }) {
+            errors["ports"] = "主机端口必须使用 1024...65535；1024 以下需要 root 权限"
+        } else if ports.count > 32 || ports.contains(where: {
             !(1...65_535).contains($0.hostPort)
                 || !(1...65_535).contains($0.containerPort)
                 || ($0.protocolName != "tcp" && $0.protocolName != "udp")

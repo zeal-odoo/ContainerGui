@@ -66,6 +66,25 @@ final class ImageAndCreationCLITests: XCTestCase {
         )
     }
 
+    func testContainerCreateRejectsPrivilegedHostPort() throws {
+        let request = ContainerCreateRequest(
+            name: "ubuntu-test",
+            image: "ubuntu:26.04",
+            ports: [PortMapping(hostPort: 100, containerPort: 22)]
+        )
+
+        XCTAssertThrowsError(try request.validated()) { error in
+            guard let problem = error as? ProblemDetail else {
+                return XCTFail("Expected ProblemDetail")
+            }
+            XCTAssertEqual(problem.code, .validationFailed)
+            XCTAssertEqual(
+                problem.fieldErrors,
+                [FieldError(field: "ports", message: "主机端口必须使用 1024...65535；1024 以下需要 root 权限")]
+            )
+        }
+    }
+
     func testParsesImageListAndInspectFixtures() throws {
         let list = try CLIOutputParser.parseImageList(
             data: fixture("images-list.json"),
