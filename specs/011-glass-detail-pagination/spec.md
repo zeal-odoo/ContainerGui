@@ -1,0 +1,50 @@
+# Feature Specification: 克制玻璃表面与远程镜像分页
+
+**Feature Branch**: `main`
+
+**Created**: 2026-08-30
+
+**Status**: Implemented
+
+**Input**: 用户确认采用克制的 Material 3 + glass 效果，并要求“查看详情”再次点击可收起，以及仓库结果和镜像标签每页显示 20 条。
+
+## User Scenarios & Testing
+
+### User Story 1 - 克制的玻璃表面 (Priority: P1)
+
+顶栏、容器详情支持面板和操作弹窗使用半透明、模糊与轻微高光；表格和主要内容区保持实色，确保信息清晰。
+
+### User Story 2 - 同一按钮开合详情 (Priority: P1)
+
+首次点击某容器的“查看详情”打开详情，再次点击同一按钮收起；点击另一个容器时直接切换到对应详情。
+
+### User Story 3 - 远程镜像分页 (Priority: P1)
+
+Docker Hub 仓库结果和标签结果都只展示当前页，固定每页 20 条，并提供上一页、当前页和下一页控件。
+
+## Requirements
+
+- **FR-001**: 顶栏、详情面板和 dialog MUST 使用克制透明度、模糊、饱和度和边缘高光。
+- **FR-002**: 表格、远程结果卡片和主体内容 MUST 保持实色，不得全局玻璃化。
+- **FR-003**: 不支持 backdrop filter 或偏好降低透明度时 MUST 回退到实色背景。
+- **FR-004**: 详情按钮 MUST 通过 `aria-expanded` 暴露状态，并在“查看详情”与“收起详情”之间切换。
+- **FR-005**: 同一容器按钮第二次点击 MUST 收起详情；另一容器按钮 MUST 切换详情。
+- **FR-006**: 仓库和标签分页 MUST 使用后端 `page` 参数，每页 20 条，并以新页替换旧页。
+- **FR-007**: 浏览远程镜像 MUST 保持只读；选择标签前不得触发拉取。
+- **FR-008**: GUI 版本 MUST 递增，完整测试、浏览器验收和 Git 推送 MUST 完成。
+
+## Success Criteria
+
+- **SC-001**: 三个限定玻璃表面在支持的浏览器中均回读到 blur/saturate，表格仍为实色。
+- **SC-002**: 同一详情按钮连续两次点击后详情回到关闭状态，文案与 `aria-expanded` 一致。
+- **SC-003**: 仓库与标签任一页最多 20 条，上一页/下一页切换时不累加旧页。
+- **SC-004**: Swift、Node、JavaScript 语法和 diff 检查无失败。
+
+## Validation Evidence
+
+- 2026-08-30：先修改版本、glass、详情 toggle 和分页契约测试；实现前定向执行 29 个测试，产生 33 个预期失败断言，确认旧实现仍为单向详情和累加式“加载更多”。
+- 2026-08-30：实现后定向测试 29/29 通过；完整 Swift 测试 175 个（2 个外部只读测试按设计跳过、0 失败），Node 前端测试 6/6，JavaScript 语法和 `git diff --check` 均通过。
+- 2026-08-30：仅重启本机 Container GUI，`GET /api/v1` 回读 GUI `2.13.0`，health 回读 Apple container CLI 与 apiserver `1.3.1` healthy；未执行容器或镜像写操作。
+- 2026-08-30：真实浏览器首次点击详情后按钮回读“收起详情”与 `aria-expanded=true`，再次点击回读“查看详情”与 `false`；切换到另一容器时标题同步且只有一个展开按钮，经过自动刷新仍保持一致。
+- 2026-08-30：真实浏览器计算样式回读顶栏、详情面板与 dialog 均为 `blur(20px) saturate(1.2)` 和半透明背景；普通表格包装无 backdrop filter。创建 dialog 只打开检查并取消。
+- 2026-08-30：Docker Hub 搜索 `ubuntu` 回读仓库第 1 页 20 条，下一页仍为 20 条且首项变化，返回后首项恢复；官方 Ubuntu 标签回读每页 20 条、共 743 条，前后翻页同样替换内容，拉取 dialog 始终未打开。

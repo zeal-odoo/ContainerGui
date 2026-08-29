@@ -183,7 +183,7 @@
         </label>
         <button id="searchRemoteRepositoriesButton" class="button remote-search-button" type="submit">搜索镜像</button>
       </form>
-      <p class="remote-search-help">Docker Hub 按关键词搜索公开仓库并分页读取标签。</p>
+      <p class="remote-search-help">Docker Hub 按关键词搜索公开仓库；仓库与标签均每页显示 20 条。</p>
 
       <div class="remote-browser">
         <section class="remote-column" aria-labelledby="remoteRepositoriesTitle">
@@ -194,7 +194,11 @@
           <div id="remoteRepositoryStatus" class="state-block compact remote-state" role="status">输入条件后点击“搜索镜像”。</div>
           <div id="remoteRepositoryError" class="state-block compact remote-state error" role="alert" hidden></div>
           <div id="remoteRepositoryResults" class="remote-results" aria-live="polite"></div>
-          <button id="loadMoreRepositoriesButton" class="button secondary load-more" type="button" hidden>加载更多仓库</button>
+          <nav id="remoteRepositoryPagination" class="pagination" aria-label="仓库结果分页" hidden>
+            <button id="previousRepositoriesButton" class="button secondary small" type="button">上一页</button>
+            <span id="remoteRepositoryPageLabel" class="quiet" aria-live="polite">第 1 页</span>
+            <button id="nextRepositoriesButton" class="button secondary small" type="button">下一页</button>
+          </nav>
         </section>
 
         <section id="remoteTagPanel" class="remote-column" aria-labelledby="remoteTagsTitle">
@@ -205,7 +209,11 @@
           <div id="remoteTagStatus" class="state-block compact remote-state" role="status">选择一个仓库查看可用标签。</div>
           <div id="remoteTagError" class="state-block compact remote-state error" role="alert" hidden></div>
           <div id="remoteTagResults" class="remote-results" aria-live="polite"></div>
-          <button id="loadMoreTagsButton" class="button secondary load-more" type="button" hidden>加载更多标签</button>
+          <nav id="remoteTagPagination" class="pagination" aria-label="镜像标签分页" hidden>
+            <button id="previousTagsButton" class="button secondary small" type="button">上一页</button>
+            <span id="remoteTagPageLabel" class="quiet" aria-live="polite">第 1 页</span>
+            <button id="nextTagsButton" class="button secondary small" type="button">下一页</button>
+          </nav>
         </section>
       </div>
     </section>

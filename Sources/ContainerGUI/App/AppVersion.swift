@@ -1,3 +1,3 @@
 enum AppVersion {
-    static let current = "2.12.1"
+    static let current = "2.13.0"
 }

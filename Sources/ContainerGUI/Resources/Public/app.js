@@ -57,9 +57,10 @@ const elements = Object.fromEntries([
   "createFormStatus", "cancelCreateContainerButton", "submitCreateContainerButton",
   "remoteRegistrySection", "remoteRegistryForm", "remoteSearchQuery",
   "searchRemoteRepositoriesButton", "remoteRepositoryCount", "remoteRepositoryStatus",
-  "remoteRepositoryError", "remoteRepositoryResults", "loadMoreRepositoriesButton",
+  "remoteRepositoryError", "remoteRepositoryResults", "remoteRepositoryPagination",
+  "previousRepositoriesButton", "remoteRepositoryPageLabel", "nextRepositoriesButton",
   "remoteTagPanel", "remoteTagCount", "remoteTagStatus", "remoteTagError", "remoteTagResults",
-  "loadMoreTagsButton"
+  "remoteTagPagination", "previousTagsButton", "remoteTagPageLabel", "nextTagsButton"
 ].map((id) => [id, document.getElementById(id)]));
 
 const state = {
@@ -67,9 +68,11 @@ const state = {
   refreshing: false, submitting: false, eventSource: null,
   reconnectAttempts: 0, reconnectTimer: null, metricsByID: new Map(), metricsStatus: "loading",
   images: [], imagesLoaded: false, containersLoaded: false, imageSubmitting: false, createSubmitting: false,
-  remoteRepositories: [], remoteRepositoryPage: 0, remoteRepositoryHasMore: false,
+  remoteRepositories: [], remoteRepositoryPage: 0, remoteRepositoryPageSize: 20,
+  remoteRepositoryTotalCount: null, remoteRepositoryHasMore: false,
   remoteSearchParameters: null, selectedRemoteRepository: null,
-  remoteTags: [], remoteTagPage: 0, remoteTagHasMore: false,
+  remoteTags: [], remoteTagPage: 0, remoteTagPageSize: 20,
+  remoteTagTotalCount: null, remoteTagHasMore: false,
   remoteRepositoryLoading: false, remoteTagLoading: false
 };
 
@@ -220,8 +223,12 @@ function renderContainers() {
     detailButton.type = "button";
     detailButton.className = "button secondary small";
     detailButton.textContent = "查看详情";
+    detailButton.dataset.detailId = container.id;
+    detailButton.dataset.detailName = container.displayName;
+    detailButton.setAttribute("aria-controls", "detailContent");
+    detailButton.setAttribute("aria-expanded", "false");
     detailButton.setAttribute("aria-label", `查看 ${container.displayName} 的详情`);
-    detailButton.addEventListener("click", () => loadDetail(container.id));
+    detailButton.addEventListener("click", () => toggleDetail(container.id));
     actionCell.append(detailButton);
     row.append(nameCell, imageCell, stateCell, cpuCell, memoryCell, storageCell, addressCell, actionCell);
     elements.containerRows.append(row);
@@ -235,6 +242,27 @@ function renderContainers() {
     elements.errorState.hidden = false;
     elements.errorState.textContent = "没有符合筛选条件的容器。";
   }
+  syncDetailButtons();
+}
+
+function syncDetailButtons() {
+  for (const button of elements.containerRows.querySelectorAll("[data-detail-id]")) {
+    const isExpanded = state.selectedID === button.dataset.detailId && !elements.detailContent.hidden;
+    button.textContent = isExpanded ? "收起详情" : "查看详情";
+    button.setAttribute("aria-expanded", String(isExpanded));
+    button.setAttribute(
+      "aria-label",
+      `${isExpanded ? "收起" : "查看"} ${button.dataset.detailName} 的详情`
+    );
+  }
+}
+
+function toggleDetail(id) {
+  if (state.selectedID === id && !elements.detailContent.hidden) {
+    closeDetail();
+    return;
+  }
+  loadDetail(id);
 }
 
 function metricFor(container) {
@@ -465,43 +493,70 @@ function setImagesExpanded(expanded) {
   }
 }
 
-function appendUniqueBy(current, incoming, key) {
-  const seen = new Set(current.map((item) => item[key]));
-  return current.concat(incoming.filter((item) => {
-    if (seen.has(item[key])) return false;
-    seen.add(item[key]);
-    return true;
-  }));
-}
-
 function resetRemoteTags(message = "选择一个仓库查看可用标签。") {
   state.selectedRemoteRepository = null;
   state.remoteTags = [];
   state.remoteTagPage = 0;
+  state.remoteTagPageSize = 20;
+  state.remoteTagTotalCount = null;
   state.remoteTagHasMore = false;
   elements.remoteTagResults.replaceChildren();
+  elements.remoteTagResults.setAttribute("aria-busy", "false");
   elements.remoteTagError.hidden = true;
   elements.remoteTagStatus.hidden = false;
   elements.remoteTagStatus.textContent = message;
   elements.remoteTagCount.textContent = "尚未选择仓库";
-  elements.loadMoreTagsButton.hidden = true;
+  elements.remoteTagPagination.hidden = true;
 }
 
 function resetRemoteRepositories(message = "输入条件后点击“搜索镜像”。") {
   state.remoteRepositories = [];
   state.remoteRepositoryPage = 0;
+  state.remoteRepositoryPageSize = 20;
+  state.remoteRepositoryTotalCount = null;
   state.remoteRepositoryHasMore = false;
   state.remoteSearchParameters = null;
   elements.remoteRepositoryResults.replaceChildren();
+  elements.remoteRepositoryResults.setAttribute("aria-busy", "false");
   elements.remoteRepositoryError.hidden = true;
   elements.remoteRepositoryStatus.hidden = false;
   elements.remoteRepositoryStatus.textContent = message;
   elements.remoteRepositoryCount.textContent = "尚未搜索";
-  elements.loadMoreRepositoriesButton.hidden = true;
+  elements.remoteRepositoryPagination.hidden = true;
   resetRemoteTags();
 }
 
-function renderRemoteRepositories(totalCount = null) {
+function paginationLabel(page, pageSize, totalCount) {
+  if (!Number.isFinite(totalCount)) return `第 ${page} 页`;
+  const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
+  return `第 ${page} / ${pageCount} 页`;
+}
+
+function updateRemoteRepositoryPagination() {
+  const hasPage = state.remoteRepositoryPage > 0 && state.remoteRepositories.length > 0;
+  elements.remoteRepositoryPagination.hidden = !hasPage;
+  elements.remoteRepositoryPageLabel.textContent = paginationLabel(
+    state.remoteRepositoryPage,
+    state.remoteRepositoryPageSize,
+    state.remoteRepositoryTotalCount
+  );
+  elements.previousRepositoriesButton.disabled = state.remoteRepositoryLoading || state.remoteRepositoryPage <= 1;
+  elements.nextRepositoriesButton.disabled = state.remoteRepositoryLoading || !state.remoteRepositoryHasMore;
+}
+
+function updateRemoteTagPagination() {
+  const hasPage = state.remoteTagPage > 0 && state.remoteTags.length > 0;
+  elements.remoteTagPagination.hidden = !hasPage;
+  elements.remoteTagPageLabel.textContent = paginationLabel(
+    state.remoteTagPage,
+    state.remoteTagPageSize,
+    state.remoteTagTotalCount
+  );
+  elements.previousTagsButton.disabled = state.remoteTagLoading || state.remoteTagPage <= 1;
+  elements.nextTagsButton.disabled = state.remoteTagLoading || !state.remoteTagHasMore;
+}
+
+function renderRemoteRepositories() {
   elements.remoteRepositoryResults.replaceChildren();
   for (const repository of state.remoteRepositories) {
     const card = document.createElement("article");
@@ -547,10 +602,9 @@ function renderRemoteRepositories(totalCount = null) {
   const count = state.remoteRepositories.length;
   elements.remoteRepositoryStatus.hidden = count !== 0;
   if (count === 0) elements.remoteRepositoryStatus.textContent = "没有找到匹配的远程镜像。";
-  elements.remoteRepositoryCount.textContent = Number.isFinite(totalCount)
-    ? `已显示 ${count} / ${totalCount}` : `已显示 ${count}`;
-  elements.loadMoreRepositoriesButton.hidden = !state.remoteRepositoryHasMore;
-  elements.loadMoreRepositoriesButton.disabled = state.remoteRepositoryLoading;
+  elements.remoteRepositoryCount.textContent = Number.isFinite(state.remoteRepositoryTotalCount)
+    ? `本页 ${count} 条 · 共 ${state.remoteRepositoryTotalCount} 条` : `本页 ${count} 条`;
+  updateRemoteRepositoryPagination();
 }
 
 function renderRemoteTags() {
@@ -592,16 +646,17 @@ function renderRemoteTags() {
   const count = state.remoteTags.length;
   elements.remoteTagStatus.hidden = count !== 0;
   if (count === 0) elements.remoteTagStatus.textContent = "该仓库当前没有可选择的标签。";
-  elements.remoteTagCount.textContent = `已显示 ${count} 个标签`;
-  elements.loadMoreTagsButton.hidden = !state.remoteTagHasMore;
-  elements.loadMoreTagsButton.disabled = state.remoteTagLoading;
+  elements.remoteTagCount.textContent = Number.isFinite(state.remoteTagTotalCount)
+    ? `本页 ${count} 条 · 共 ${state.remoteTagTotalCount} 条` : `本页 ${count} 条`;
+  updateRemoteTagPagination();
 }
 
 async function loadRemoteRepositoryPage(page) {
   if (!state.remoteSearchParameters || state.remoteRepositoryLoading) return;
   state.remoteRepositoryLoading = true;
   elements.searchRemoteRepositoriesButton.disabled = true;
-  elements.loadMoreRepositoriesButton.disabled = true;
+  elements.remoteRepositoryResults.setAttribute("aria-busy", "true");
+  updateRemoteRepositoryPagination();
   elements.remoteRepositoryError.hidden = true;
   if (page === 1) {
     elements.remoteRepositoryStatus.hidden = false;
@@ -610,10 +665,12 @@ async function loadRemoteRepositoryPage(page) {
   try {
     const parameters = new URLSearchParams({ ...state.remoteSearchParameters, page: String(page) });
     const result = await fetchJSON(`${ENDPOINTS.registryRepositories}?${parameters}`);
-    state.remoteRepositories = appendUniqueBy(state.remoteRepositories, result.items || [], "reference");
+    state.remoteRepositories = result.items || [];
     state.remoteRepositoryPage = result.page;
+    state.remoteRepositoryPageSize = Number.isFinite(result.pageSize) ? result.pageSize : 20;
+    state.remoteRepositoryTotalCount = Number.isFinite(result.totalCount) ? result.totalCount : null;
     state.remoteRepositoryHasMore = Boolean(result.hasNextPage) && result.page < 500;
-    renderRemoteRepositories(result.totalCount);
+    renderRemoteRepositories();
   } catch (error) {
     elements.remoteRepositoryStatus.hidden = true;
     elements.remoteRepositoryError.hidden = false;
@@ -621,7 +678,8 @@ async function loadRemoteRepositoryPage(page) {
   } finally {
     state.remoteRepositoryLoading = false;
     elements.searchRemoteRepositoriesButton.disabled = false;
-    elements.loadMoreRepositoriesButton.disabled = false;
+    elements.remoteRepositoryResults.setAttribute("aria-busy", "false");
+    updateRemoteRepositoryPagination();
   }
 }
 
@@ -629,7 +687,8 @@ async function loadRemoteTagPage(page) {
   const repository = state.selectedRemoteRepository;
   if (!repository || state.remoteTagLoading) return;
   state.remoteTagLoading = true;
-  elements.loadMoreTagsButton.disabled = true;
+  elements.remoteTagResults.setAttribute("aria-busy", "true");
+  updateRemoteTagPagination();
   elements.remoteTagError.hidden = true;
   if (page === 1) {
     elements.remoteTagStatus.hidden = false;
@@ -642,8 +701,10 @@ async function loadRemoteTagPage(page) {
       page: String(page)
     });
     const result = await fetchJSON(`${ENDPOINTS.registryTags}?${parameters}`);
-    state.remoteTags = appendUniqueBy(state.remoteTags, result.items || [], "reference");
+    state.remoteTags = result.items || [];
     state.remoteTagPage = result.page;
+    state.remoteTagPageSize = Number.isFinite(result.pageSize) ? result.pageSize : 20;
+    state.remoteTagTotalCount = Number.isFinite(result.totalCount) ? result.totalCount : null;
     state.remoteTagHasMore = Boolean(result.hasNextPage) && result.page < 500;
     renderRemoteTags();
   } catch (error) {
@@ -652,7 +713,8 @@ async function loadRemoteTagPage(page) {
     elements.remoteTagError.textContent = formatProblem(error);
   } finally {
     state.remoteTagLoading = false;
-    elements.loadMoreTagsButton.disabled = false;
+    elements.remoteTagResults.setAttribute("aria-busy", "false");
+    updateRemoteTagPagination();
   }
 }
 
@@ -671,7 +733,11 @@ async function searchRemoteRepositories(event) {
   await loadRemoteRepositoryPage(1);
 }
 
-function loadMoreRemoteRepositories() {
+function showPreviousRemoteRepositories() {
+  if (state.remoteRepositoryPage > 1) loadRemoteRepositoryPage(state.remoteRepositoryPage - 1);
+}
+
+function showNextRemoteRepositories() {
   if (state.remoteRepositoryHasMore) loadRemoteRepositoryPage(state.remoteRepositoryPage + 1);
 }
 
@@ -682,7 +748,11 @@ function openRemoteRepository(repository) {
   loadRemoteTagPage(1);
 }
 
-function loadMoreRemoteTags() {
+function showPreviousRemoteTags() {
+  if (state.remoteTagPage > 1) loadRemoteTagPage(state.remoteTagPage - 1);
+}
+
+function showNextRemoteTags() {
   if (state.remoteTagHasMore) loadRemoteTagPage(state.remoteTagPage + 1);
 }
 
@@ -752,6 +822,7 @@ async function loadDetail(id, { quiet = false } = {}) {
   const shouldReveal = elements.detailContent.hidden || state.selectedID !== id;
   state.selectedID = id;
   if (shouldReveal) revealDetailContent();
+  syncDetailButtons();
   if (!quiet) elements.detailTitle.textContent = "正在读取…";
   elements.detailPanel.setAttribute("aria-busy", "true");
   try {
@@ -904,6 +975,7 @@ function closeDetail() {
   state.selectedID = null;
   state.selectedDetail = null;
   state.selectedSSHStatus = null;
+  syncDetailButtons();
   elements.sshConnectionPanel.hidden = true;
   if (detailRevealTimer !== null) {
     window.clearTimeout(detailRevealTimer);
@@ -1760,8 +1832,10 @@ elements.cancelPullImageButton.addEventListener("click", () => closeDialog(eleme
 elements.pullImageRegistry.addEventListener("change", updatePullRegistryHint);
 elements.pullImageForm.addEventListener("submit", submitImagePull);
 elements.remoteRegistryForm.addEventListener("submit", searchRemoteRepositories);
-elements.loadMoreRepositoriesButton.addEventListener("click", loadMoreRemoteRepositories);
-elements.loadMoreTagsButton.addEventListener("click", loadMoreRemoteTags);
+elements.previousRepositoriesButton.addEventListener("click", showPreviousRemoteRepositories);
+elements.nextRepositoriesButton.addEventListener("click", showNextRemoteRepositories);
+elements.previousTagsButton.addEventListener("click", showPreviousRemoteTags);
+elements.nextTagsButton.addEventListener("click", showNextRemoteTags);
 elements.openCreateContainerButton.addEventListener("click", openCreateContainerDialog);
 elements.cancelCreateContainerButton.addEventListener("click", () => closeDialog(elements.createContainerDialog, "cancel"));
 elements.createImage.addEventListener("input", updateImageSpecificCreateFields);

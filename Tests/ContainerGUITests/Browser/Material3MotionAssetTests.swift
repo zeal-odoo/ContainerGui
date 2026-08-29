@@ -65,10 +65,32 @@ final class Material3MotionAssetTests: XCTestCase {
         XCTAssertTrue(script.contains("if (shouldReveal) revealDetailContent()"))
     }
 
+    func testContainerDetailButtonTogglesTheSameSupportingPane() throws {
+        let script = try asset("app.js")
+
+        XCTAssertTrue(script.contains("function toggleDetail("))
+        XCTAssertTrue(script.contains("state.selectedID === id && !elements.detailContent.hidden"))
+        XCTAssertTrue(script.contains("detailButton.addEventListener(\"click\", () => toggleDetail(container.id))"))
+        XCTAssertTrue(script.contains("detailButton.setAttribute(\"aria-controls\", \"detailContent\")"))
+        XCTAssertTrue(script.contains("button.setAttribute(\"aria-expanded\", String(isExpanded))"))
+        XCTAssertTrue(script.contains("isExpanded ? \"收起详情\" : \"查看详情\""))
+        let loadDetail = try functionBody("loadDetail", in: script)
+        let reveal = try XCTUnwrap(loadDetail.range(of: "if (shouldReveal) revealDetailContent()"))
+        let sync = try XCTUnwrap(loadDetail.range(of: "syncDetailButtons()"))
+        XCTAssertLessThan(reveal.lowerBound, sync.lowerBound)
+    }
+
     private func asset(_ name: String) throws -> String {
         try String(
             contentsOf: AppFactory.publicDirectoryURL.appendingPathComponent(name),
             encoding: .utf8
         )
+    }
+
+    private func functionBody(_ name: String, in script: String) throws -> String {
+        let start = try XCTUnwrap(script.range(of: "function \(name)("))
+        let remaining = script[start.lowerBound...]
+        let end = remaining.dropFirst().range(of: "\nfunction ")?.lowerBound ?? script.endIndex
+        return String(script[start.lowerBound..<end])
     }
 }

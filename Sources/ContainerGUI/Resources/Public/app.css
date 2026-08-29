@@ -56,6 +56,10 @@
   --md-sys-elevation-level-1: 0 1px 2px rgb(0 0 0 / 18%), 0 1px 3px 1px rgb(0 0 0 / 9%);
   --md-sys-elevation-level-2: 0 2px 6px 2px rgb(0 0 0 / 10%), 0 1px 2px rgb(0 0 0 / 16%);
   --md-sys-elevation-level-3: 0 4px 8px 3px rgb(0 0 0 / 10%), 0 1px 3px rgb(0 0 0 / 18%);
+  --md-sys-glass-blur: 20px;
+  --md-sys-glass-saturation: 120%;
+  --md-sys-glass-border: color-mix(in srgb, var(--md-sys-color-outline-variant) 72%, transparent);
+  --md-sys-glass-highlight: inset 0 1px 0 rgb(255 255 255 / 18%);
 
   --md-sys-motion-duration-short: 120ms;
   --md-sys-motion-duration-medium: 240ms;
@@ -131,11 +135,12 @@ pre:focus-visible {
   padding: 0 max(24px, calc((100vw - 1440px) / 2));
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  border-bottom: 1px solid var(--md-sys-glass-border);
   background: var(--md-sys-color-surface-container);
-  background: color-mix(in srgb, var(--md-sys-color-surface-container) 92%, transparent);
-  box-shadow: var(--md-sys-elevation-level-1);
-  backdrop-filter: blur(18px);
+  background: color-mix(in srgb, var(--md-sys-color-surface-container) 82%, transparent);
+  box-shadow: var(--md-sys-glass-highlight), var(--md-sys-elevation-level-1);
+  -webkit-backdrop-filter: blur(var(--md-sys-glass-blur)) saturate(var(--md-sys-glass-saturation));
+  backdrop-filter: blur(var(--md-sys-glass-blur)) saturate(var(--md-sys-glass-saturation));
 }
 
 .brand {
@@ -654,6 +659,16 @@ tbody tr:hover {
   position: sticky;
   top: 90px;
   background: var(--md-sys-color-surface-container-low);
+  background: color-mix(in srgb, var(--md-sys-color-surface-container-low) 84%, transparent);
+  box-shadow: var(--md-sys-glass-highlight), var(--md-sys-elevation-level-1);
+  -webkit-backdrop-filter: blur(var(--md-sys-glass-blur)) saturate(var(--md-sys-glass-saturation));
+  backdrop-filter: blur(var(--md-sys-glass-blur)) saturate(var(--md-sys-glass-saturation));
+}
+
+.detail-panel .panel-header,
+.detail-panel .logs,
+.detail-panel .raw-detail {
+  background: color-mix(in srgb, var(--md-sys-color-surface-container-lowest) 74%, transparent);
 }
 
 .detail-panel.is-detail-transitioning {
@@ -1023,9 +1038,19 @@ pre {
   font-size: .625rem;
 }
 
-.load-more {
+.pagination {
   display: flex;
-  margin: 14px auto 0;
+  min-height: 40px;
+  margin-top: 16px;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+}
+
+.pagination .quiet {
+  min-width: 92px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 dialog {
@@ -1037,14 +1062,18 @@ dialog {
   border-radius: var(--md-sys-shape-corner-extra-large);
   color: var(--md-sys-color-on-surface);
   background: var(--md-sys-color-surface-container-high);
-  box-shadow: var(--md-sys-elevation-level-3);
+  background: color-mix(in srgb, var(--md-sys-color-surface-container-high) 86%, transparent);
+  box-shadow: var(--md-sys-glass-highlight), var(--md-sys-elevation-level-3);
+  -webkit-backdrop-filter: blur(var(--md-sys-glass-blur)) saturate(var(--md-sys-glass-saturation));
+  backdrop-filter: blur(var(--md-sys-glass-blur)) saturate(var(--md-sys-glass-saturation));
   transform-origin: center;
 }
 
 dialog::backdrop {
   background: rgb(0 0 0 / 54%);
   background: color-mix(in srgb, var(--md-sys-color-scrim) 54%, transparent);
-  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
 }
 
 dialog[open]:not(.is-closing) {
@@ -1560,6 +1589,52 @@ dialog code {
 
   .dialog-actions .button {
     width: 100%;
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .topbar {
+    background: var(--md-sys-color-surface-container);
+  }
+
+  .detail-panel {
+    background: var(--md-sys-color-surface-container-low);
+  }
+
+  .detail-panel .panel-header,
+  .detail-panel .logs,
+  .detail-panel .raw-detail {
+    background: var(--md-sys-color-surface-container-lowest);
+  }
+
+  dialog {
+    background: var(--md-sys-color-surface-container-high);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .topbar {
+    background: var(--md-sys-color-surface-container);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .detail-panel {
+    background: var(--md-sys-color-surface-container-low);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .detail-panel .panel-header,
+  .detail-panel .logs,
+  .detail-panel .raw-detail {
+    background: var(--md-sys-color-surface-container-lowest);
+  }
+
+  dialog {
+    background: var(--md-sys-color-surface-container-high);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }
 

@@ -67,6 +67,19 @@ final class Material3AssetTests: XCTestCase {
         XCTAssertTrue(style.contains("color-scheme: dark"))
     }
 
+    func testRestrainedGlassSurfacesHaveBlurAndOpaqueFallback() throws {
+        let style = try asset("app.css")
+
+        XCTAssertTrue(style.contains("--md-sys-glass-blur"))
+        XCTAssertTrue(style.contains(".topbar"))
+        XCTAssertTrue(style.contains(".detail-panel"))
+        XCTAssertTrue(style.contains("dialog"))
+        XCTAssertTrue(style.contains("-webkit-backdrop-filter"))
+        XCTAssertTrue(style.contains("backdrop-filter"))
+        XCTAssertTrue(style.contains("@supports not ((backdrop-filter"))
+        XCTAssertTrue(style.contains("@media (prefers-reduced-transparency: reduce)"))
+    }
+
     func testHTMLDeclaresLocalThemeMetadataWithoutRemoteDependencies() throws {
         let html = try asset("index.html")
         let style = try asset("app.css")
