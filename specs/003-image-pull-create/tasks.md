@@ -101,6 +101,32 @@
 
 ---
 
+## Phase 7: Remote Registry Search and Exact Tag Selection (Priority: P1)
+
+**Goal**: 直接展示全部本机镜像，并按用户请求分页浏览 Docker Hub 仓库或指定用户/组织范围内的 GHCR package；分页读取标签后，只有明确选择的标签才回填拉取表单。
+
+**Independent Test**: 使用固定的 Docker Hub 和 GitHub JSON 多页夹具与内存 HTTP transport，验证仓库/标签结果无遗漏无重复、固定允许列表、GHCR Token 不泄露、未选择标签时拉取请求数为零；本机镜像区域不依赖远程结果。
+
+### Tests for Remote Registry Search
+
+- [ ] T032 [P] [US1] Add sanitized multi-page Docker Hub repository/tag and GitHub package/version fixtures in Tests/ContainerGUITests/Fixtures/Registry/docker-hub/ and Tests/ContainerGUITests/Fixtures/Registry/github/
+- [ ] T033 [P] [US1] Add failing URL, header, pagination, parser, size-limit, error-mapping and token-redaction tests in Tests/ContainerGUITests/Unit/RegistrySearchClientTests.swift
+- [ ] T034 [P] [US1] Add failing GET /api/v1/registry-search/repositories and /api/v1/registry-search/tags validation and response tests in Tests/ContainerGUITests/Contract/RegistrySearchAPITests.swift
+- [ ] T035 [P] [US1] Add failing initial-local-list, explicit-search, repository/tag pagination and tag-to-pull-form asset tests in Tests/ContainerGUITests/Browser/ResourceMutationAssetTests.swift
+
+### Implementation for Remote Registry Search
+
+- [ ] T036 [US1] Implement RemoteRegistry, GHCRNamespaceType, repository/tag summaries and paged response models in Sources/ContainerGUI/Domain/RegistrySearchModels.swift
+- [ ] T037 [US1] Implement fixed-host Foundation HTTP transport plus Docker Hub and GHCR repository/tag parsers in Sources/ContainerGUI/Registry/RegistrySearchClient.swift
+- [ ] T038 [US1] Add CONTAINER_GUI_GITHUB_TOKEN configuration, safe registry ProblemDetail mappings and read-only routes in Sources/ContainerGUI/App/AppConfiguration.swift, Sources/ContainerGUI/Domain/ProblemDetail.swift, Sources/ContainerGUI/Web/RegistrySearchRoutes.swift and Sources/ContainerGUI/App/AppFactory.swift
+- [ ] T039 [US1] Add remote registry controls, repository/tag result pagination and exact-tag pull-form handoff in Sources/ContainerGUI/Resources/Public/index.html, Sources/ContainerGUI/Resources/Public/app.css and Sources/ContainerGUI/Resources/Public/app.js
+- [ ] T040 [US1] Add opt-in Docker Hub GET-only smoke coverage in Tests/ContainerGUITests/Integration/RegistryReadOnlySmokeTests.swift and document the no-token GHCR state in README.md
+- [ ] T041 [US1] Run focused and full Swift tests, JavaScript syntax checks, explicit read-only CLI/registry checks and diff validation, then record evidence in specs/003-image-pull-create/verification-us1.md
+
+**Checkpoint**: 本机镜像全部可见；Docker Hub 与 GHCR 的远程结果和标签可逐页浏览；选择标签不会自动拉取。
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -109,10 +135,13 @@
 - Phase 2 depends on Phase 1 and blocks both user stories.
 - US1 and US2 both depend on Phase 2; implementation proceeds P1 then P2 for this single-agent run.
 - Phase 5 depends on both stories.
+- Phase 6 depends on US1 and adds deterministic registry shortcuts.
+- Phase 7 depends on Phase 6 and adds read-only remote discovery without changing mutation semantics.
 
 ### User Story Dependencies
 
 - **US1**: No dependency on US2; uses image-specific models and routes.
+- **US1 remote search increment**: Depends only on the existing US1 pull-form handoff; it remains independently testable with HTTP fixtures.
 - **US2**: Does not require a newly pulled image; it can use any existing reference. It reuses shared validation and operation infrastructure only.
 
 ### Within Each User Story
@@ -128,6 +157,7 @@
 - T003 and T004 touch separate unit-test files.
 - Within US1, T008-T010 touch separate test files.
 - Within US2, T017-T019 touch separate test files.
+- Within Phase 7, T032-T035 touch separate fixture or test paths and can be prepared in parallel before implementation.
 
 ## Parallel Example: User Story 1
 
@@ -135,6 +165,10 @@
 T008: Tests/ContainerGUITests/Unit/ImageAndCreationCLITests.swift
 T009: Tests/ContainerGUITests/Contract/ResourceMutationAPITests.swift
 T010: Tests/ContainerGUITests/Browser/ResourceMutationAssetTests.swift
+T032: Tests/ContainerGUITests/Fixtures/Registry/
+T033: Tests/ContainerGUITests/Unit/RegistrySearchClientTests.swift
+T034: Tests/ContainerGUITests/Contract/RegistrySearchAPITests.swift
+T035: Tests/ContainerGUITests/Browser/ResourceMutationAssetTests.swift
 ```
 
 ## Implementation Strategy
@@ -146,6 +180,7 @@ T010: Tests/ContainerGUITests/Browser/ResourceMutationAssetTests.swift
 3. Stop and independently validate US1.
 4. Implement US2 create and optional start.
 5. Run all cross-cutting gates and commit the complete feature.
+6. Add remote registry search as a read-only US1 increment, select an exact tag, then repeat all gates.
 
 ### Safety Rules
 
