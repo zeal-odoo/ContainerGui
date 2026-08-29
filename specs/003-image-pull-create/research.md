@@ -6,7 +6,7 @@
 
 - 镜像列表：`container image list --format json`
 - 镜像详情：`container image inspect <reference>`
-- 镜像拉取：`container image pull --progress none [--platform <platform>] <reference>`
+- 镜像拉取：`container image pull --progress plain [--platform <platform>] <reference>`
 - 容器创建：`container create --name <name> [受控选项] -- <image> [参数...]`
 - 容器回读：`container list --all --format json`
 
@@ -178,3 +178,18 @@ Token 对公开、私有和内部 package 的既有可读范围；明确 owner �
 - 选中仓库即拉取 `latest`：标签可能不存在，也属于未经确认的真实写操作。
 - 搜索时同时加载每个仓库全部标签：会产生大量请求并容易触发限流。
 - 对本机镜像分页：本机规模为数十项，增加交互但没有实际收益。
+
+## Decision 13: 使用 CLI plain 输出提供真实拉取进度
+
+**Decision**: 镜像拉取改用 `--progress plain`，通过现有流式进程执行器同时读取 stdout/stderr。只解析
+`[阶段/总阶段] Fetching image` 与 `Unpacking image` 完整行，将 CLI 百分比换算为总体百分比并保证
+Operation 内单调不倒退；命令成功退出后进入 100% 的验证阶段，最终成功仍取决于独立镜像回读。
+
+**Rationale**: Apple Container CLI 1.3.1 已提供稳定的 plain 阶段输出；使用该事实数据可避免按时间伪造
+百分比，同时复用现有 500ms Operation 轮询，无需增加 WebSocket、数据库或真实拉取测试。
+
+**Alternatives considered**:
+
+- 仅显示循环动画：无法回答已经完成多少，不满足用户要求。
+- 按经过时间估算百分比：下载大小和网络速度未知，会产生虚假进度。
+- 把 CLI 原始输出直接推到浏览器：扩大输出与转义边界，也会暴露不必要的诊断文本。

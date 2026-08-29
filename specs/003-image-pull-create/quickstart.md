@@ -27,7 +27,8 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun swift test
 重点验证：
 
 - 镜像列表和详情 1.3.1 JSON 夹具解析。
-- 拉取命令只能是固定的 `image pull --progress none` 参数数组。
+- 拉取命令只能是固定的 `image pull --progress plain` 参数数组。
+- plain 下载/解压行必须解析为单调 Operation 进度；无关行和分块边界不能导致错误百分比或拉取失败。
 - 创建命令只包含允许字段，且选项位于镜像参数之前。
 - 无效名称、镜像、平台、CPU、内存、端口、环境变量和参数不会调用执行器。
 - 环境变量值不出现在 Operation、ProblemDetail 或浏览器状态中。
@@ -71,13 +72,15 @@ xcrun swift run ContainerGUI
 2. 本机镜像不分页，当前列表中的全部镜像直接展示。
 3. 远程区域初始不请求注册表；输入 `postgres` 并点击搜索后分页展示 Docker Hub 仓库。
 4. 选择 Docker Hub 仓库后分页展示确切标签；点击标签只打开并回填拉取对话框。
-5. “拉取镜像”对话框只包含完整地址和 Docker Hub 两种输入方式，以及可选目标架构。
-6. Docker Hub 的 `postgres:latest` 提交为 `docker.io/library/postgres:latest`；其他 OCI 注册表完整地址原样提交。
-7. 页面不显示 GHCR 平台、owner 输入或 GitHub Token 配置。
-8. “创建容器”对话框包含名称、镜像、CPU、内存、端口、环境变量、进程参数和创建后启动。
-9. 本地镜像名称可用于创建表单建议。
-10. 无效输入显示逐字段中文错误，未发出写请求。
-11. 不提交任何真实拉取或创建操作。
+5. 镜像拉取 Operation 显示下载、解压、验证阶段及可访问的原生进度条；浏览器自动化只使用模拟对象
+   或隔离测试 CLI，不提交真实拉取。
+6. “拉取镜像”对话框只包含完整地址和 Docker Hub 两种输入方式，以及可选目标架构。
+7. Docker Hub 的 `postgres:latest` 提交为 `docker.io/library/postgres:latest`；其他 OCI 注册表完整地址原样提交。
+8. 页面不显示 GHCR 平台、owner 输入或 GitHub Token 配置。
+9. “创建容器”对话框包含名称、镜像、CPU、内存、端口、环境变量、进程参数和创建后启动。
+10. 本地镜像名称可用于创建表单建议。
+11. 无效输入显示逐字段中文错误，未发出写请求。
+12. 不提交任何真实拉取或创建操作。
 
 ## Mutation acceptance with explicit authorization only
 

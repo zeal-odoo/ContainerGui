@@ -60,6 +60,8 @@ final class ResourceMutationAPITests: XCTestCase {
                 XCTAssertEqual(operation.state, .succeeded)
                 XCTAssertNotNil(operation.readback?.observedImage)
                 XCTAssertEqual(operation.readback?.expectationMatched, true)
+                XCTAssertEqual(operation.progress?.phase, .verifying)
+                XCTAssertEqual(operation.progress?.percentComplete, 100)
             }
         }
         let pullCount = await manager.pullCount
@@ -250,8 +252,17 @@ private actor StubImageManager: ImageReading, ResourceMutating, ContainerControl
         image()
     }
 
-    func pullImage(_ request: ImagePullRequest) async throws -> ImagePullOutcome {
+    func pullImage(
+        _ request: ImagePullRequest,
+        progress: @escaping @Sendable (ImagePullProgress) async -> Void
+    ) async throws -> ImagePullOutcome {
         pullCount += 1
+        await progress(ImagePullProgress(
+            phase: .fetching,
+            percentComplete: 35,
+            completedUnits: 7,
+            totalUnits: 20
+        ))
         return ImagePullOutcome(
             exitCode: 0,
             observedImage: image(),

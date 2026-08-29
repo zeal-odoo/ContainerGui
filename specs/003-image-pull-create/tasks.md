@@ -127,6 +127,18 @@
 
 ---
 
+## Phase 8: Image Pull Progress (Priority: P1)
+
+**Goal**: 使用 Apple Container CLI plain 流式输出，在现有 Operation API 和页面中显示真实拉取进度。
+
+- [X] T042 [US1] Add failing parser, coordinator, contract, browser asset and version tests for image pull progress.
+- [X] T043 [US1] Stream `image pull --progress plain`, parse download/unpack stages and persist monotonic progress in Operation.
+- [X] T044 [US1] Add an accessible native progress bar with queued, fetching, unpacking, verifying and terminal states.
+- [X] T045 [US1] Update spec, plan, research, data model, OpenAPI, quickstart and README for the progress contract.
+- [X] T046 [US1] Run focused/full tests, restart the local service and perform isolated browser progress verification.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

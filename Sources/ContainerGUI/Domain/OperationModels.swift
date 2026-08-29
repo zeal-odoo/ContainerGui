@@ -104,6 +104,7 @@ struct Operation: Codable, Equatable, Sendable {
     var startedAt: Date?
     var finishedAt: Date?
     let safeRequestSummary: [String: JSONValue]
+    var progress: ImagePullProgress? = nil
     var exitCode: Int32?
     var error: ProblemDetail?
     var readback: OperationReadback?

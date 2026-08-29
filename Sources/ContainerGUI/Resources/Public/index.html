@@ -121,6 +121,13 @@
         </div>
       </div>
       <div id="imageOperationStatus" class="operation-status resource-status" role="status" aria-live="polite" hidden></div>
+      <div id="imagePullProgress" class="pull-progress" hidden>
+        <div class="pull-progress-meta">
+          <span id="imagePullProgressLabel">等待镜像拉取</span>
+          <span id="imagePullProgressValue">等待进度</span>
+        </div>
+        <progress id="imagePullProgressBar" max="100" aria-label="镜像拉取进度"></progress>
+      </div>
       <div id="imageLoadingState" class="state-block compact" role="status">正在读取镜像…</div>
       <div id="imageEmptyState" class="state-block compact" hidden>
         <strong>还没有本机镜像</strong>

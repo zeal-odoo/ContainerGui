@@ -50,6 +50,21 @@
 
 `running` 执行拉取；`verifying` 使用原引用读取详情并检查可选平台；只有匹配才成功。
 
+## ImagePullProgress
+
+镜像拉取期间由 CLI `--progress plain` 的完整行解析，并作为 `Operation.progress` 的可选字段返回。
+
+| Field | Type | Rules |
+|---|---|---|
+| phase | ImagePullProgressPhase | `fetching`、`unpacking` 或 `verifying` |
+| percentComplete | Int | 0...100；按 CLI `[当前阶段/总阶段]` 与阶段百分比计算，Operation 内单调不倒退 |
+| completedUnits | Int? | CLI 提供 Blob 计数时返回，非负 |
+| totalUnits | Int? | CLI 提供 Blob 总数时返回，正数 |
+| updatedAt | Date | 本次进度观测时间 |
+
+无法解析的输出行被忽略；尚无百分比时 Operation 可以没有 progress，页面使用原生不确定进度条。
+命令退出成功后进入 `verifying`，进度设为 100%，但只有权威镜像回读匹配后 Operation 才能成功。
+
 ## PortMapping
 
 | Field | Type | Rules |

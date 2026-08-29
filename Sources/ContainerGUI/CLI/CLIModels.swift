@@ -161,6 +161,55 @@ enum CLIOutputParser {
         return image
     }
 
+    static func parseImagePullProgress(
+        line: String,
+        observedAt: Date = Date()
+    ) -> ImagePullProgress? {
+        guard let stage = regexCaptures(
+            #"^\[(\d+)\/(\d+)\]\s+(.*?)\s+\[[^\]]+\]\s*$"#,
+            in: line
+        ), stage.count == 3,
+              let stageNumber = Int(stage[0]),
+              let stageCount = Int(stage[1]),
+              stageNumber > 0, stageNumber <= stageCount else {
+            return nil
+        }
+
+        let body = stage[2]
+        let phase: ImagePullProgressPhase
+        if body.hasPrefix("Fetching image") {
+            phase = .fetching
+        } else if body.hasPrefix("Unpacking image") {
+            phase = .unpacking
+        } else {
+            return nil
+        }
+
+        let unitCaptures = regexCaptures(#"\((\d+)\s+of\s+(\d+)\s+blobs(?:,|\))"#, in: body)
+        let completedUnits = unitCaptures?.first.flatMap(Int.init)
+        let totalUnits = unitCaptures?.dropFirst().first.flatMap(Int.init)
+        let explicitPercent = regexCaptures(#"(?:^|\s)(\d{1,3})%"#, in: body)?
+            .first.flatMap(Int.init).map { min($0, 100) }
+        let phaseFraction: Double
+        if let explicitPercent {
+            phaseFraction = Double(explicitPercent) / 100
+        } else if let completedUnits, let totalUnits, totalUnits > 0 {
+            phaseFraction = min(Double(completedUnits) / Double(totalUnits), 1)
+        } else {
+            phaseFraction = 0
+        }
+        let overall = Int((
+            (Double(stageNumber - 1) + phaseFraction) / Double(stageCount) * 100
+        ).rounded())
+        return ImagePullProgress(
+            phase: phase,
+            percentComplete: overall,
+            completedUnits: completedUnits,
+            totalUnits: totalUnits,
+            updatedAt: observedAt
+        )
+    }
+
     private static func summary(from value: JSONValue, observedAt: Date) throws -> ContainerSummary {
         guard let object = value.objectValue,
               let id = object["id"]?.stringValue,
@@ -226,5 +275,19 @@ enum CLIOutputParser {
 
     private static func parseDate(_ value: String) -> Date? {
         ISO8601DateFormatter().date(from: value)
+    }
+}
+
+private func regexCaptures(_ pattern: String, in value: String) -> [String]? {
+    guard let expression = try? NSRegularExpression(pattern: pattern),
+          let match = expression.firstMatch(
+            in: value,
+            range: NSRange(value.startIndex..<value.endIndex, in: value)
+          ) else {
+        return nil
+    }
+    return (1..<match.numberOfRanges).compactMap { index in
+        guard let range = Range(match.range(at: index), in: value) else { return nil }
+        return String(value[range])
     }
 }

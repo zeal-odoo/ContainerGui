@@ -44,8 +44,17 @@ protocol ImageReading: Sendable {
 }
 
 protocol ResourceMutating: Sendable {
-    func pullImage(_ request: ImagePullRequest) async throws -> ImagePullOutcome
+    func pullImage(
+        _ request: ImagePullRequest,
+        progress: @escaping @Sendable (ImagePullProgress) async -> Void
+    ) async throws -> ImagePullOutcome
     func createContainer(_ request: ContainerCreateRequest) async throws -> ContainerCreateOutcome
+}
+
+extension ResourceMutating {
+    func pullImage(_ request: ImagePullRequest) async throws -> ImagePullOutcome {
+        try await pullImage(request, progress: { _ in })
+    }
 }
 
 protocol ContainerControlling: Sendable {
@@ -205,16 +214,19 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
         return try CLIOutputParser.parseImageInspect(data: result.stdout)
     }
 
-    func pullImage(_ request: ImagePullRequest) async throws -> ImagePullOutcome {
+    func pullImage(
+        _ request: ImagePullRequest,
+        progress: @escaping @Sendable (ImagePullProgress) async -> Void
+    ) async throws -> ImagePullOutcome {
         let request = try request.validated()
         try await requireSupportedInstallation()
-        var arguments = ["image", "pull", "--progress", "none"]
+        var arguments = ["image", "pull", "--progress", "plain"]
         if let platform = request.platform {
             arguments += ["--platform", platform]
         }
         arguments.append(request.reference)
-        let result = try await execute(arguments, timeout: imagePullTimeout)
-        guard result.exitCode == 0 else { throw ContainerCLIError.nonZeroExit(result.exitCode) }
+        let exitCode = try await executeImagePull(arguments, progress: progress)
+        guard exitCode == 0 else { throw ContainerCLIError.nonZeroExit(exitCode) }
         let observed = try await inspectImage(reference: request.reference)
         let platformMatched = request.platform.map { expected in
             let allowsVariant = expected.split(separator: "/").count == 2
@@ -224,7 +236,7 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
             }
         } ?? true
         return ImagePullOutcome(
-            exitCode: result.exitCode,
+            exitCode: exitCode,
             observedImage: observed,
             matchedExpectation: platformMatched
         )
@@ -358,6 +370,61 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
         )
     }
 
+    private func executeImagePull(
+        _ arguments: [String],
+        progress: @escaping @Sendable (ImagePullProgress) async -> Void
+    ) async throws -> Int32 {
+        guard let executableURL else {
+            throw ContainerCLIError.unavailable(unavailableCompatibility)
+        }
+        let events = executor.stream(CommandRequest(
+            executableURL: executableURL,
+            arguments: arguments,
+            timeout: imagePullTimeout,
+            maximumOutputBytes: maximumOutputBytes
+        ))
+        var stdoutLines = ProgressLineBuffer()
+        var stderrLines = ProgressLineBuffer()
+        var outputBytes = 0
+        var exitCode: Int32?
+
+        for try await event in events {
+            let lines: [String]
+            switch event {
+            case .stdout(let data):
+                outputBytes = try checkedOutputSize(current: outputBytes, adding: data.count)
+                lines = stdoutLines.append(data)
+            case .stderr(let data):
+                outputBytes = try checkedOutputSize(current: outputBytes, adding: data.count)
+                lines = stderrLines.append(data)
+            case .dropped:
+                continue
+            case .exited(let status):
+                exitCode = status
+                continue
+            }
+            for line in lines {
+                if let update = CLIOutputParser.parseImagePullProgress(line: line) {
+                    await progress(update)
+                }
+            }
+        }
+        for line in stdoutLines.finish() + stderrLines.finish() {
+            if let update = CLIOutputParser.parseImagePullProgress(line: line) {
+                await progress(update)
+            }
+        }
+        guard let exitCode else { throw CommandExecutionError.streamFailed }
+        return exitCode
+    }
+
+    private func checkedOutputSize(current: Int, adding: Int) throws -> Int {
+        guard adding <= maximumOutputBytes - current else {
+            throw CommandExecutionError.outputLimitExceeded(limit: maximumOutputBytes)
+        }
+        return current + adding
+    }
+
     private func requireContainer(id: String) async throws -> ContainerSummary {
         guard !id.isEmpty, !id.hasPrefix("-") else { throw ContainerCLIError.invalidIdentifier }
         let list = try await listContainers()
@@ -385,5 +452,30 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
         case .unsupported, .unrecognized: ProblemDetail(code: .cliVersionUnsupported)
         case .supported: ProblemDetail(code: .internalError)
         }
+    }
+}
+
+private struct ProgressLineBuffer {
+    private var pending = Data()
+
+    mutating func append(_ data: Data) -> [String] {
+        pending.append(data)
+        var lines: [String] = []
+        while let separator = pending.firstIndex(where: { $0 == 0x0A || $0 == 0x0D }) {
+            let line = Data(pending[..<separator])
+            var end = pending.index(after: separator)
+            while end < pending.endIndex && (pending[end] == 0x0A || pending[end] == 0x0D) {
+                end = pending.index(after: end)
+            }
+            pending.removeSubrange(..<end)
+            if !line.isEmpty { lines.append(String(decoding: line, as: UTF8.self)) }
+        }
+        return lines
+    }
+
+    mutating func finish() -> [String] {
+        guard !pending.isEmpty else { return [] }
+        defer { pending.removeAll(keepingCapacity: false) }
+        return [String(decoding: pending, as: UTF8.self)]
     }
 }

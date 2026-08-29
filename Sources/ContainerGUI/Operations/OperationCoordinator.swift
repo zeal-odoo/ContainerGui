@@ -111,13 +111,30 @@ actor OperationCoordinator {
         operations[id] = operation
     }
 
-    func markVerifying(_ id: UUID, exitCode: Int32, now _: Date = Date()) throws {
+    func markVerifying(_ id: UUID, exitCode: Int32, now: Date = Date()) throws {
         guard var operation = operations[id] else { throw OperationCoordinatorError.operationNotFound }
         guard operation.state == .running || operation.state == .cancelled else {
             throw OperationCoordinatorError.illegalTransition
         }
         operation.state = .verifying
         operation.exitCode = exitCode
+        if operation.kind == .pullImage {
+            operation.progress = ImagePullProgress(
+                phase: .verifying,
+                percentComplete: 100,
+                updatedAt: now
+            )
+        }
+        operations[id] = operation
+    }
+
+    func updateProgress(_ id: UUID, progress: ImagePullProgress) throws {
+        guard var operation = operations[id] else { throw OperationCoordinatorError.operationNotFound }
+        guard operation.state == .running, operation.kind == .pullImage else {
+            throw OperationCoordinatorError.illegalTransition
+        }
+        let minimum = operation.progress?.percentComplete ?? 0
+        operation.progress = progress.preservingPercent(atLeast: minimum)
         operations[id] = operation
     }
 

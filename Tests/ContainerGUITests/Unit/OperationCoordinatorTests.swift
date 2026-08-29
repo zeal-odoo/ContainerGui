@@ -117,6 +117,39 @@ final class OperationCoordinatorTests: XCTestCase {
         XCTAssertEqual(decoded.readback?.observedImage, observedImage)
     }
 
+    func testTracksMonotonicImagePullProgressAndMarksVerificationComplete() async throws {
+        let coordinator = OperationCoordinator()
+        let operation = try await coordinator.create(
+            idempotencyKey: "pull-progress",
+            fingerprint: "pull:postgres:latest",
+            kind: .pullImage,
+            target: .image(reference: "postgres:latest"),
+            safeRequestSummary: ["reference": .string("postgres:latest")]
+        )
+        try await coordinator.markRunning(operation.id)
+        try await coordinator.updateProgress(operation.id, progress: ImagePullProgress(
+            phase: .fetching,
+            percentComplete: 40,
+            completedUnits: 4,
+            totalUnits: 10
+        ))
+        try await coordinator.updateProgress(operation.id, progress: ImagePullProgress(
+            phase: .fetching,
+            percentComplete: 20,
+            completedUnits: 2,
+            totalUnits: 10
+        ))
+
+        let observedRunning = await coordinator.operation(id: operation.id)
+        var current = try XCTUnwrap(observedRunning)
+        XCTAssertEqual(current.progress?.percentComplete, 40)
+        try await coordinator.markVerifying(operation.id, exitCode: 0)
+        let observedVerifying = await coordinator.operation(id: operation.id)
+        current = try XCTUnwrap(observedVerifying)
+        XCTAssertEqual(current.progress?.phase, .verifying)
+        XCTAssertEqual(current.progress?.percentComplete, 100)
+    }
+
     func testEnforcesGlobalMutationLimit() async throws {
         let coordinator = OperationCoordinator(maximumConcurrentMutations: 2)
         var ids: [UUID] = []

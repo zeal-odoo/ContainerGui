@@ -87,10 +87,44 @@ final class ImageAndCreationCLITests: XCTestCase {
         XCTAssertEqual(inspected.observedAt, observedAt)
     }
 
+    func testParsesPlainImagePullProgressIntoOverallPercentage() throws {
+        let fetching = try XCTUnwrap(CLIOutputParser.parseImagePullProgress(
+            line: "[1/2] Fetching image 37% (19 of 31 blobs, 6.9/18.2 MB, 4.3 MB/s) [5s]",
+            observedAt: observedAt
+        ))
+        let unpacking = try XCTUnwrap(CLIOutputParser.parseImagePullProgress(
+            line: "[2/2] Unpacking image for platform linux/arm64/v8 0% [8s]",
+            observedAt: observedAt
+        ))
+        let completed = try XCTUnwrap(CLIOutputParser.parseImagePullProgress(
+            line: "[2/2] Unpacking image for platform linux/arm64/v8 100% (440 entries, 3.9 MB) [11s]",
+            observedAt: observedAt
+        ))
+
+        XCTAssertEqual(fetching.phase, .fetching)
+        XCTAssertEqual(fetching.percentComplete, 19)
+        XCTAssertEqual(fetching.completedUnits, 19)
+        XCTAssertEqual(fetching.totalUnits, 31)
+        XCTAssertEqual(unpacking.phase, .unpacking)
+        XCTAssertEqual(unpacking.percentComplete, 50)
+        XCTAssertEqual(completed.percentComplete, 100)
+        XCTAssertNil(CLIOutputParser.parseImagePullProgress(line: "unrelated output"))
+    }
+
     func testPullUsesFixedArgumentsLongTimeoutAndInspectReadback() async throws {
+        let progressOutput = """
+        [1/2] Fetching image 37% (19 of 31 blobs, 6.9/18.2 MB, 4.3 MB/s) [5s]
+        [2/2] Unpacking image for platform linux/arm64/v8 0% [8s]
+        [2/2] Unpacking image for platform linux/arm64/v8 100% (440 entries, 3.9 MB) [11s]
+        """
         let executor = ResourceScriptedCommandExecutor(steps: [
             .success(resourceVersionResult()),
-            .success(resourceEmptySuccess()),
+            .success(CommandResult(
+                stdout: Data(),
+                stderr: Data(progressOutput.utf8),
+                exitCode: 0,
+                duration: .zero
+            )),
             .success(CommandResult(
                 stdout: try fixture("image-inspect.json"),
                 stderr: Data(),
@@ -99,19 +133,23 @@ final class ImageAndCreationCLITests: XCTestCase {
             )),
         ])
         let client = resourceClient(executor)
+        let progress = ImagePullProgressRecorder()
 
         let outcome = try await client.pullImage(
-            ImagePullRequest(reference: "postgres:latest", platform: "linux/arm64")
+            ImagePullRequest(reference: "postgres:latest", platform: "linux/arm64"),
+            progress: { update in await progress.append(update) }
         )
 
         XCTAssertTrue(outcome.matchedExpectation)
         XCTAssertEqual(outcome.observedImage.name, "docker.io/library/postgres:latest")
         let requests = await executor.requests
         XCTAssertEqual(requests[1].arguments, [
-            "image", "pull", "--progress", "none", "--platform", "linux/arm64", "postgres:latest",
+            "image", "pull", "--progress", "plain", "--platform", "linux/arm64", "postgres:latest",
         ])
         XCTAssertEqual(requests[1].timeout, .seconds(30 * 60))
         XCTAssertEqual(requests[2].arguments, ["image", "inspect", "postgres:latest"])
+        let updates = await progress.values
+        XCTAssertEqual(updates.map(\.percentComplete), [19, 50, 100])
     }
 
     func testCreateUsesOnlyFixedOptionsBeforeImageAndReadsBackTarget() async throws {
@@ -231,6 +269,14 @@ final class ImageAndCreationCLITests: XCTestCase {
             imagePullTimeout: .seconds(30 * 60),
             maximumOutputBytes: 1_000_000
         )
+    }
+}
+
+private actor ImagePullProgressRecorder {
+    private(set) var values: [ImagePullProgress] = []
+
+    func append(_ value: ImagePullProgress) {
+        values.append(value)
     }
 }
 

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Container GUI Image Browse, Pull and Container Create API
-  version: 1.0.0
+  version: 2.1.0
   description: Feature contract for local image reads, remote registry browsing, image pulls and container creation.
 servers:
   - url: http://127.0.0.1:8787/api/v1
@@ -524,6 +524,10 @@ components:
           additionalProperties: true
         exitCode:
           type: [integer, "null"]
+        progress:
+          oneOf:
+            - $ref: "#/components/schemas/ImagePullProgress"
+            - type: "null"
         error:
           oneOf:
             - $ref: "#/components/schemas/ProblemDetail"
@@ -532,6 +536,28 @@ components:
           oneOf:
             - $ref: "#/components/schemas/OperationReadback"
             - type: "null"
+
+    ImagePullProgress:
+      type: object
+      additionalProperties: false
+      required: [phase, percentComplete, updatedAt]
+      properties:
+        phase:
+          type: string
+          enum: [fetching, unpacking, verifying]
+        percentComplete:
+          type: integer
+          minimum: 0
+          maximum: 100
+        completedUnits:
+          type: [integer, "null"]
+          minimum: 0
+        totalUnits:
+          type: [integer, "null"]
+          minimum: 1
+        updatedAt:
+          type: string
+          format: date-time
 
     ProblemDetail:
       type: object

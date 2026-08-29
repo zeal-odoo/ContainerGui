@@ -32,7 +32,9 @@ where Manager: ImageReading, Manager: ResourceMutating {
     private func execute(operation: Operation, request: ImagePullRequest) async {
         do {
             try await coordinator.markRunning(operation.id)
-            let outcome = try await manager.pullImage(request)
+            let outcome = try await manager.pullImage(request) { [coordinator] progress in
+                try? await coordinator.updateProgress(operation.id, progress: progress)
+            }
             try await coordinator.markVerifying(operation.id, exitCode: outcome.exitCode)
             let readback = try makeReadback(outcome)
             if outcome.matchedExpectation {

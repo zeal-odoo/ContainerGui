@@ -22,7 +22,8 @@ const elements = Object.fromEntries([
   "containerActions", "operationStatus", "closeDetailButton", "loadLogsButton", "followLogsButton",
   "logStatus", "logOutput", "rawDetail", "confirmDialog", "confirmTitle", "confirmMessage",
   "confirmTarget", "confirmActionButton", "toast", "imagesSection", "openPullImageButton",
-  "imageOperationStatus", "imageLoadingState",
+  "imageOperationStatus", "imagePullProgress", "imagePullProgressLabel", "imagePullProgressValue",
+  "imagePullProgressBar", "imageLoadingState",
   "imageEmptyState", "imageErrorState", "imageTableWrap", "imageTableBody", "pullImageDialog",
   "pullImageForm", "pullImageRegistry", "pullImageReference", "pullImagePlatform", "pullRegistryError",
   "pullReferenceError", "pullPlatformError", "pullFormStatus", "cancelPullImageButton", "submitPullImageButton",
@@ -695,6 +696,7 @@ async function pollOperation(id, statusElement = elements.operationStatus) {
   for (let attempt = 0; attempt < 120; attempt += 1) {
     const operation = await fetchJSON(`${ENDPOINTS.operations}${encodeURIComponent(id)}`);
     showOperationStatus(labels[operation.state] || operation.state, operation.state === "failed", statusElement);
+    if (statusElement === elements.imageOperationStatus) renderImagePullProgress(operation);
     if (["succeeded", "failed", "cancelled"].includes(operation.state)) {
       if (operation.state !== "succeeded") {
         throw Object.assign(new Error(operation.error?.message || labels[operation.state]), { problem: operation.error });
@@ -706,6 +708,38 @@ async function pollOperation(id, statusElement = elements.operationStatus) {
     await new Promise((resolve) => window.setTimeout(resolve, 500));
   }
   throw new Error("操作仍在进行，请稍后刷新查看。");
+}
+
+function renderImagePullProgress(operation) {
+  if (operation.kind !== "pullImage") {
+    elements.imagePullProgress.hidden = true;
+    return;
+  }
+  const phaseLabels = {
+    fetching: "正在下载镜像层",
+    unpacking: "正在解压镜像",
+    verifying: "正在验证本机镜像"
+  };
+  const terminalLabels = {
+    succeeded: "镜像拉取完成",
+    failed: "镜像拉取失败",
+    cancelled: "镜像拉取已取消"
+  };
+  const progress = operation.progress;
+  const percent = Number.isInteger(progress?.percentComplete)
+    ? Math.min(Math.max(progress.percentComplete, 0), 100)
+    : null;
+  elements.imagePullProgress.hidden = false;
+  elements.imagePullProgressLabel.textContent = terminalLabels[operation.state]
+    || phaseLabels[progress?.phase]
+    || (operation.state === "queued" ? "等待开始拉取" : "正在准备镜像拉取");
+  if (percent === null) {
+    elements.imagePullProgressBar.removeAttribute("value");
+    elements.imagePullProgressValue.textContent = "等待进度";
+  } else {
+    elements.imagePullProgressBar.value = percent;
+    elements.imagePullProgressValue.textContent = `${percent}%`;
+  }
 }
 
 function showOperationStatus(message, isError = false, target = elements.operationStatus) {
@@ -806,6 +840,7 @@ async function submitImagePull(event) {
   state.imageSubmitting = true;
   elements.submitPullImageButton.disabled = true;
   elements.pullFormStatus.textContent = "正在提交拉取操作…";
+  renderImagePullProgress({ kind: "pullImage", state: "queued", progress: null });
   try {
     const operation = await fetchJSON(ENDPOINTS.imagePull, {
       method: "POST",
@@ -941,6 +976,7 @@ async function createContainer(event) {
   state.createSubmitting = true;
   elements.submitCreateContainerButton.disabled = true;
   elements.createFormStatus.textContent = "正在提交创建操作…";
+  elements.imagePullProgress.hidden = true;
   try {
     const operation = await fetchJSON(ENDPOINTS.containers, {
       method: "POST",

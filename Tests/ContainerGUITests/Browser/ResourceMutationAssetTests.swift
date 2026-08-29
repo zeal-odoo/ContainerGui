@@ -12,6 +12,9 @@ final class ResourceMutationAssetTests: XCTestCase {
         XCTAssertTrue(html.contains("id=\"imageTableBody\""))
         XCTAssertTrue(html.contains("id=\"pullImageDialog\""))
         XCTAssertTrue(html.contains("id=\"pullImageForm\""))
+        XCTAssertTrue(html.contains("id=\"imagePullProgress\""))
+        XCTAssertTrue(html.contains("id=\"imagePullProgressBar\""))
+        XCTAssertTrue(html.contains("<progress"))
         XCTAssertTrue(html.contains("name=\"platform\""))
         XCTAssertTrue(html.contains("aria-live=\"polite\""))
         XCTAssertTrue(script.contains("/api/v1/images"))
@@ -19,6 +22,8 @@ final class ResourceMutationAssetTests: XCTestCase {
         XCTAssertTrue(script.contains("loadImages"))
         XCTAssertTrue(script.contains("validateImagePull"))
         XCTAssertTrue(script.contains("pollOperation"))
+        XCTAssertTrue(script.contains("renderImagePullProgress"))
+        XCTAssertTrue(script.contains("operation.progress"))
         XCTAssertTrue(script.contains("Idempotency-Key"))
     }
 

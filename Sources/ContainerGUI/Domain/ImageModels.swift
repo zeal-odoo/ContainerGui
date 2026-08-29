@@ -60,6 +60,44 @@ struct ImagePullRequest: Codable, Equatable, Sendable {
     }
 }
 
+enum ImagePullProgressPhase: String, Codable, Equatable, Sendable {
+    case fetching
+    case unpacking
+    case verifying
+}
+
+struct ImagePullProgress: Codable, Equatable, Sendable {
+    let phase: ImagePullProgressPhase
+    let percentComplete: Int
+    let completedUnits: Int?
+    let totalUnits: Int?
+    let updatedAt: Date
+
+    init(
+        phase: ImagePullProgressPhase,
+        percentComplete: Int,
+        completedUnits: Int? = nil,
+        totalUnits: Int? = nil,
+        updatedAt: Date = Date()
+    ) {
+        self.phase = phase
+        self.percentComplete = min(max(percentComplete, 0), 100)
+        self.completedUnits = completedUnits
+        self.totalUnits = totalUnits
+        self.updatedAt = updatedAt
+    }
+
+    func preservingPercent(atLeast minimum: Int) -> Self {
+        Self(
+            phase: phase,
+            percentComplete: max(percentComplete, minimum),
+            completedUnits: completedUnits,
+            totalUnits: totalUnits,
+            updatedAt: updatedAt
+        )
+    }
+}
+
 struct ImagePullOutcome: Equatable, Sendable {
     let exitCode: Int32
     let observedImage: ImageSummary
