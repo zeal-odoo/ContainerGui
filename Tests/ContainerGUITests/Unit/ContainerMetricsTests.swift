@@ -49,6 +49,33 @@ final class ContainerMetricsTests: XCTestCase {
         )
     }
 
+    func testParsesRootFilesystemCapacityAsExactBytes() throws {
+        let usage = try CLIOutputParser.parseContainerRootFilesystemUsage(
+            data: fixture("df-root-valid.txt")
+        )
+
+        XCTAssertEqual(usage.state, .ready)
+        XCTAssertEqual(usage.capacityBytes, 528_432_952 * 1_024)
+        XCTAssertEqual(usage.usedBytes, 2_498_132 * 1_024)
+        XCTAssertEqual(usage.availableBytes, 525_918_436 * 1_024)
+        XCTAssertEqual(
+            try XCTUnwrap(usage.usagePercent),
+            Double(2_498_132) / Double(528_432_952) * 100,
+            accuracy: 0.000_001
+        )
+    }
+
+    func testRejectsInvalidRootFilesystemCapacity() throws {
+        for data in [
+            try fixture("df-root-invalid.txt"),
+            Data("Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/vdb 10 11 0 110% /\n".utf8),
+            Data("Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/vdb 18014398509481984 1 1 1% /\n".utf8),
+            Data("not a filesystem table\n".utf8),
+        ] {
+            XCTAssertThrowsError(try CLIOutputParser.parseContainerRootFilesystemUsage(data: data))
+        }
+    }
+
     func testFirstAndContinuousSamplesCalculateCPUAndMemory() async throws {
         let sampler = ContainerMetricsSampler()
         let firstBatch = batch(cpu: 1_000_000, memory: 1_073_741_824, limit: 4_294_967_296, offset: 0)
@@ -156,6 +183,10 @@ final class ContainerMetricsTests: XCTestCase {
                 stdout: try fixture("stats-first.json"),
                 stderr: Data(), exitCode: 0, duration: .zero
             ),
+            CommandResult(
+                stdout: try fixture("df-root-valid.txt"),
+                stderr: Data(), exitCode: 0, duration: .zero
+            ),
         ])
         let client = ContainerCLIClient(
             executor: executor,
@@ -165,13 +196,31 @@ final class ContainerMetricsTests: XCTestCase {
         let snapshot = try await client.containerMetrics()
 
         XCTAssertEqual(snapshot.items.first?.cpuState, .sampling)
+        XCTAssertEqual(snapshot.items.first?.rootFilesystem.state, .ready)
         let requests = await executor.requests
         XCTAssertEqual(requests.map(\.arguments), [
             ["--version"],
             ["stats", "--no-stream", "--format", "json"],
+            ["exec", "demo-running", "df", "-kP", "/"],
         ])
         XCTAssertFalse(requests.flatMap(\.arguments).contains("--all"))
         XCTAssertTrue(requests.allSatisfy { $0.executableURL.path == "/fixture/container" })
+    }
+
+    func testFilesystemFailureIsIsolatedFromOtherContainerMetrics() async throws {
+        let executor = FilesystemMetricsCommandExecutor(validFilesystem: try fixture("df-root-valid.txt"))
+        let client = ContainerCLIClient(
+            executor: executor,
+            executableURL: URL(fileURLWithPath: "/fixture/container")
+        )
+
+        let snapshot = try await client.containerMetrics()
+        let byID = Dictionary(uniqueKeysWithValues: snapshot.items.map { ($0.containerID, $0) })
+
+        XCTAssertEqual(byID["demo-ready"]?.rootFilesystem.state, .ready)
+        XCTAssertEqual(byID["demo-unavailable"]?.rootFilesystem.state, .unavailable)
+        XCTAssertNil(byID["demo-unavailable"]?.rootFilesystem.capacityBytes)
+        XCTAssertEqual(snapshot.items.count, 2)
     }
 
     private func batch(
@@ -239,5 +288,35 @@ private actor MetricsCommandExecutor: CommandExecuting {
         requests.append(request)
         guard !results.isEmpty else { throw CommandExecutionError.streamFailed }
         return results.removeFirst()
+    }
+}
+
+private actor FilesystemMetricsCommandExecutor: CommandExecuting {
+    private let validFilesystem: Data
+
+    init(validFilesystem: Data) {
+        self.validFilesystem = validFilesystem
+    }
+
+    func run(_ request: CommandRequest) async throws -> CommandResult {
+        let result: (Data, Int32)
+        switch request.arguments {
+        case ["--version"]:
+            result = (Data("container CLI version 1.3.1".utf8), 0)
+        case ["stats", "--no-stream", "--format", "json"]:
+            result = (Data("""
+            [
+              {"id":"demo-ready","cpuUsageUsec":1,"memoryUsageBytes":1,"memoryLimitBytes":2},
+              {"id":"demo-unavailable","cpuUsageUsec":1,"memoryUsageBytes":1,"memoryLimitBytes":2}
+            ]
+            """.utf8), 0)
+        case ["exec", "demo-ready", "df", "-kP", "/"]:
+            result = (validFilesystem, 0)
+        case ["exec", "demo-unavailable", "df", "-kP", "/"]:
+            result = (Data(), 127)
+        default:
+            throw CommandExecutionError.streamFailed
+        }
+        return CommandResult(stdout: result.0, stderr: Data(), exitCode: result.1, duration: .zero)
     }
 }

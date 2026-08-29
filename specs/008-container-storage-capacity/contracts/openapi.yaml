@@ -1,0 +1,110 @@
+openapi: 3.1.0
+info:
+  title: Container GUI Metrics API
+  version: 2.10.0
+  description: 容器 CPU、内存与根文件系统容量的只读快照契约。
+servers:
+  - url: http://127.0.0.1:8787/api/v1
+paths:
+  /containers/metrics:
+    get:
+      operationId: getContainerMetrics
+      summary: 读取全部运行中容器的当前资源指标
+      responses:
+        "200":
+          description: 成功获取指标快照；单容器容量失败以 unavailable 返回。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContainerMetricsSnapshot"
+        "500":
+          description: 基础资源统计输出无效。
+        "503":
+          description: CLI 不可用或版本不受支持。
+        "504":
+          description: 整体资源指标读取超时。
+components:
+  schemas:
+    ContainerMetricsSnapshot:
+      type: object
+      additionalProperties: false
+      required: [items, observedAt]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContainerResourceUsage"
+        observedAt:
+          type: string
+          format: date-time
+    ContainerResourceUsage:
+      type: object
+      additionalProperties: false
+      required:
+        - containerId
+        - cpuPercent
+        - cpuState
+        - memoryUsageBytes
+        - memoryLimitBytes
+        - memoryPercent
+        - rootFilesystem
+        - observedAt
+      properties:
+        containerId:
+          type: string
+          minLength: 1
+        cpuPercent:
+          type: [number, "null"]
+          minimum: 0
+        cpuState:
+          type: string
+          enum: [sampling, ready]
+        memoryUsageBytes:
+          type: integer
+          minimum: 0
+        memoryLimitBytes:
+          type: integer
+          minimum: 0
+        memoryPercent:
+          type: [number, "null"]
+          minimum: 0
+        rootFilesystem:
+          $ref: "#/components/schemas/ContainerRootFilesystemUsage"
+        observedAt:
+          type: string
+          format: date-time
+    ContainerRootFilesystemUsage:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [state, usedBytes, capacityBytes, availableBytes, usagePercent]
+          properties:
+            state:
+              const: ready
+            usedBytes:
+              type: integer
+              minimum: 0
+            capacityBytes:
+              type: integer
+              minimum: 1
+            availableBytes:
+              type: integer
+              minimum: 0
+            usagePercent:
+              type: number
+              minimum: 0
+              maximum: 100
+        - type: object
+          additionalProperties: false
+          required: [state, usedBytes, capacityBytes, availableBytes, usagePercent]
+          properties:
+            state:
+              const: unavailable
+            usedBytes:
+              type: "null"
+            capacityBytes:
+              type: "null"
+            availableBytes:
+              type: "null"
+            usagePercent:
+              type: "null"

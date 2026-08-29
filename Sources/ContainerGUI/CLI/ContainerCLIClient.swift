@@ -193,12 +193,63 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
     }
 
     func containerMetrics() async throws -> ContainerMetricsSnapshot {
-        try await metricsSampler.snapshot { [self] in
+        let snapshot = try await metricsSampler.snapshot { [self] in
             try await requireSupportedInstallation()
             let result = try await execute(["stats", "--no-stream", "--format", "json"])
             guard result.exitCode == 0 else { throw ContainerCLIError.nonZeroExit(result.exitCode) }
             return try CLIOutputParser.parseContainerResourceSamples(data: result.stdout)
         }
+        return await attachRootFilesystemUsage(to: snapshot)
+    }
+
+    private func attachRootFilesystemUsage(
+        to snapshot: ContainerMetricsSnapshot
+    ) async -> ContainerMetricsSnapshot {
+        let filesystems = await withTaskGroup(
+            of: (Int, ContainerRootFilesystemUsage).self,
+            returning: [Int: ContainerRootFilesystemUsage].self
+        ) { group in
+            for (index, item) in snapshot.items.enumerated() {
+                group.addTask { [self] in
+                    guard !item.containerID.isEmpty,
+                          !item.containerID.hasPrefix("-") else {
+                        return (index, .unavailable)
+                    }
+                    do {
+                        let result = try await execute([
+                            "exec", item.containerID, "df", "-kP", "/",
+                        ])
+                        guard result.exitCode == 0 else {
+                            return (index, .unavailable)
+                        }
+                        return (
+                            index,
+                            try CLIOutputParser.parseContainerRootFilesystemUsage(data: result.stdout)
+                        )
+                    } catch {
+                        return (index, .unavailable)
+                    }
+                }
+            }
+            var results: [Int: ContainerRootFilesystemUsage] = [:]
+            for await (index, filesystem) in group {
+                results[index] = filesystem
+            }
+            return results
+        }
+        let items = snapshot.items.enumerated().map { index, item in
+            ContainerResourceUsage(
+                containerID: item.containerID,
+                cpuPercent: item.cpuPercent,
+                cpuState: item.cpuState,
+                memoryUsageBytes: item.memoryUsageBytes,
+                memoryLimitBytes: item.memoryLimitBytes,
+                memoryPercent: item.memoryPercent,
+                rootFilesystem: filesystems[index] ?? .unavailable,
+                observedAt: item.observedAt
+            )
+        }
+        return ContainerMetricsSnapshot(items: items, observedAt: snapshot.observedAt)
     }
 
     func listImages() async throws -> ImageList {

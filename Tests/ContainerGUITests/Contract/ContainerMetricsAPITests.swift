@@ -19,7 +19,10 @@ final class ContainerMetricsAPITests: XCTestCase {
                 XCTAssertEqual(value.items.first?.containerID, "demo-running")
                 XCTAssertEqual(value.items.first?.cpuState, .sampling)
                 XCTAssertNil(value.items.first?.cpuPercent)
+                XCTAssertEqual(value.items.first?.rootFilesystem.state, .ready)
+                XCTAssertEqual(value.items.first?.rootFilesystem.capacityBytes, 541_115_342_848)
                 XCTAssertTrue(String(decoding: body, as: UTF8.self).contains("\"cpuPercent\":null"))
+                XCTAssertTrue(String(decoding: body, as: UTF8.self).contains("\"rootFilesystem\""))
             }
         }
     }
@@ -123,6 +126,13 @@ private actor StubMetricsReader: ContainerReading, ContainerMetricsReading {
                     memoryUsageBytes: 1_073_741_824,
                     memoryLimitBytes: 4_294_967_296,
                     memoryPercent: 25,
+                    rootFilesystem: ContainerRootFilesystemUsage(
+                        state: .ready,
+                        usedBytes: 2_558_087_168,
+                        capacityBytes: 541_115_342_848,
+                        availableBytes: 538_540_478_464,
+                        usagePercent: 0.472727,
+                    ),
                     observedAt: observedAt
                 )
             ],

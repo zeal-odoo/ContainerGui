@@ -4,11 +4,12 @@ import XCTest
 @testable import ContainerGUI
 
 final class ContainerMetricsAssetTests: XCTestCase {
-    func testDashboardHasAccessibleCPUAndMemoryColumns() throws {
+    func testDashboardHasAccessibleCPUAndMemoryAndStorageColumns() throws {
         let html = try asset("index.html")
 
         XCTAssertTrue(html.contains("<th scope=\"col\">CPU</th>"))
         XCTAssertTrue(html.contains("<th scope=\"col\">内存</th>"))
+        XCTAssertTrue(html.contains("<th scope=\"col\">存储</th>"))
     }
 
     func testScriptRefreshesMetricsIndependentlyAndRendersSafeStates() throws {
@@ -22,6 +23,11 @@ final class ContainerMetricsAssetTests: XCTestCase {
         XCTAssertTrue(script.contains("采样中"))
         XCTAssertTrue(script.contains("未运行"))
         XCTAssertTrue(script.contains("暂不可用"))
+        XCTAssertTrue(script.contains("function storageDisplay(container)"))
+        XCTAssertTrue(script.contains("metric.rootFilesystem"))
+        XCTAssertTrue(script.contains("[\"根文件系统\""))
+        XCTAssertTrue(script.contains("formatBytes(filesystem.usedBytes)"))
+        XCTAssertTrue(script.contains("formatBytes(filesystem.capacityBytes)"))
         XCTAssertTrue(script.contains("Promise.allSettled"))
         XCTAssertTrue(script.contains("5000"))
     }

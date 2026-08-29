@@ -94,7 +94,7 @@ h3 { font-size: 15px; }
 .search input { width: 240px; border: 1px solid var(--line); background: rgba(246,247,249,.85); color: inherit;
   border-radius: 11px; padding: 9px 12px; }
 .table-wrap { overflow: auto; }
-table { width: 100%; min-width: 900px; border-collapse: collapse; }
+table { width: 100%; min-width: 1020px; border-collapse: collapse; }
 th { text-align: left; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
   padding: 12px; border-bottom: 1px solid var(--line); }
 td { padding: 15px 12px; border-bottom: 1px solid var(--line); font-size: 13px; vertical-align: middle; }
@@ -187,7 +187,7 @@ dialog code { display: block; padding: 12px; background: #edf0f4; border-radius:
 
 @media (max-width: 1200px) {
   table { min-width: 620px; }
-  th:nth-child(2), td:nth-child(2), th:nth-child(6), td:nth-child(6) { display: none; }
+  th:nth-child(2), td:nth-child(2), th:nth-child(7), td:nth-child(7) { display: none; }
   .resource-table th:last-child, .resource-table td:last-child { display: table-cell; }
 }
 @media (max-width: 900px) {

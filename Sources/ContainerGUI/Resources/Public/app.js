@@ -142,6 +142,8 @@ function renderContainers() {
     renderMetricCell(cpuCell, cpuDisplay(container));
     const memoryCell = document.createElement("td");
     renderMetricCell(memoryCell, memoryDisplay(container));
+    const storageCell = document.createElement("td");
+    renderMetricCell(storageCell, storageDisplay(container));
     const addressCell = document.createElement("td");
     addressCell.textContent = container.ipv4Address || container.ipv6Address || "—";
     const actionCell = document.createElement("td");
@@ -152,7 +154,7 @@ function renderContainers() {
     detailButton.setAttribute("aria-label", `查看 ${container.displayName} 的详情`);
     detailButton.addEventListener("click", () => loadDetail(container.id));
     actionCell.append(detailButton);
-    row.append(nameCell, imageCell, stateCell, cpuCell, memoryCell, addressCell, actionCell);
+    row.append(nameCell, imageCell, stateCell, cpuCell, memoryCell, storageCell, addressCell, actionCell);
     elements.containerRows.append(row);
   }
 
@@ -202,6 +204,28 @@ function memoryDisplay(container) {
   return {
     value: percentage,
     detail: `${formatBytes(metric.memoryUsageBytes)} / ${formatBytes(metric.memoryLimitBytes)}`
+  };
+}
+
+function storageDisplay(container) {
+  if (container.state !== "running") return { value: "未运行", detail: "" };
+  const metric = metricFor(container);
+  if (!metric) {
+    return { value: state.metricsStatus === "loading" ? "读取中" : "暂不可用", detail: "" };
+  }
+  const filesystem = metric.rootFilesystem;
+  if (filesystem?.state !== "ready"
+      || !Number.isFinite(filesystem.usagePercent)
+      || !Number.isFinite(filesystem.usedBytes)
+      || !Number.isFinite(filesystem.capacityBytes)
+      || filesystem.capacityBytes <= 0
+      || filesystem.usedBytes < 0
+      || filesystem.usedBytes > filesystem.capacityBytes) {
+    return { value: "暂不可用", detail: "" };
+  }
+  return {
+    value: formatPercent(filesystem.usagePercent),
+    detail: `${formatBytes(filesystem.usedBytes)} / ${formatBytes(filesystem.capacityBytes)}`
   };
 }
 
@@ -727,11 +751,13 @@ function renderFacts(summary) {
   elements.detailFacts.replaceChildren();
   const cpu = cpuDisplay(summary);
   const memory = memoryDisplay(summary);
+  const storage = storageDisplay(summary);
   const facts = [
     ["完整标识", summary.id], ["状态", stateLabels[summary.state] || stateLabels.unknown],
     ["原始状态", summary.rawState || "—"], ["镜像", summary.imageReference || "—"],
     ["CPU 使用率", [cpu.value, cpu.detail].filter(Boolean).join(" · ")],
     ["内存使用", [memory.value, memory.detail].filter(Boolean).join(" · ")],
+    ["根文件系统", [storage.value, storage.detail].filter(Boolean).join(" · ")],
     ["IPv4", summary.ipv4Address || "—"], ["IPv6", summary.ipv6Address || "—"],
     ["创建时间", summary.createdAt ? formatTime(summary.createdAt) : "—"],
     ["读取时间", formatTime(summary.observedAt)]

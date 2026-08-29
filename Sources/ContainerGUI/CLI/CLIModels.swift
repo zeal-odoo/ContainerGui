@@ -146,6 +146,51 @@ enum CLIOutputParser {
         )
     }
 
+    static func parseContainerRootFilesystemUsage(data: Data) throws -> ContainerRootFilesystemUsage {
+        guard let output = String(data: data, encoding: .utf8) else {
+            throw ContainerCLIError.invalidOutput
+        }
+        let lines = output.split(whereSeparator: \.isNewline)
+        guard lines.count >= 2,
+              let dataLine = lines.last else {
+            throw ContainerCLIError.invalidOutput
+        }
+        let columns = dataLine.split(whereSeparator: \.isWhitespace)
+        guard columns.count >= 6,
+              columns.last == "/",
+              let capacityBlocks = UInt64(columns[1]),
+              let usedBlocks = UInt64(columns[2]),
+              let availableBlocks = UInt64(columns[3]),
+              capacityBlocks > 0,
+              usedBlocks <= capacityBlocks,
+              availableBlocks <= capacityBlocks else {
+            throw ContainerCLIError.invalidOutput
+        }
+        let (combinedBlocks, blocksOverflow) = usedBlocks.addingReportingOverflow(availableBlocks)
+        guard !blocksOverflow,
+              combinedBlocks <= capacityBlocks else {
+            throw ContainerCLIError.invalidOutput
+        }
+        let (capacityBytes, capacityOverflow) = capacityBlocks.multipliedReportingOverflow(by: 1_024)
+        let (usedBytes, usedOverflow) = usedBlocks.multipliedReportingOverflow(by: 1_024)
+        let (availableBytes, availableOverflow) = availableBlocks.multipliedReportingOverflow(by: 1_024)
+        guard !capacityOverflow, !usedOverflow, !availableOverflow else {
+            throw ContainerCLIError.invalidOutput
+        }
+        let usagePercent = Double(usedBytes) / Double(capacityBytes) * 100
+        guard usagePercent.isFinite,
+              (0...100).contains(usagePercent) else {
+            throw ContainerCLIError.invalidOutput
+        }
+        return ContainerRootFilesystemUsage(
+            state: .ready,
+            usedBytes: usedBytes,
+            capacityBytes: capacityBytes,
+            availableBytes: availableBytes,
+            usagePercent: usagePercent
+        )
+    }
+
     static func parseImageList(data: Data, observedAt: Date = Date()) throws -> ImageList {
         let rawImages = try JSONDecoder.containerGUI.decode([RawImage].self, from: data)
         guard rawImages.count <= 1_000 else { throw ContainerCLIError.invalidOutput }

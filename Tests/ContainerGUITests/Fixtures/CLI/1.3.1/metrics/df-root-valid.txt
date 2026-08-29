@@ -1,0 +1,2 @@
+Filesystem     1024-blocks    Used Available Capacity Mounted on
+/dev/vdb         528432952 2498132 525918436       1% /

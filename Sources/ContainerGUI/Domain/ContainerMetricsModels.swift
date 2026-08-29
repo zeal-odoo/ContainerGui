@@ -18,6 +18,40 @@ enum CPUUsageState: String, Codable, Equatable, Sendable {
     case ready
 }
 
+enum ContainerRootFilesystemState: String, Codable, Equatable, Sendable {
+    case ready
+    case unavailable
+}
+
+struct ContainerRootFilesystemUsage: Codable, Equatable, Sendable {
+    let state: ContainerRootFilesystemState
+    let usedBytes: UInt64?
+    let capacityBytes: UInt64?
+    let availableBytes: UInt64?
+    let usagePercent: Double?
+
+    static let unavailable = ContainerRootFilesystemUsage(
+        state: .unavailable,
+        usedBytes: nil,
+        capacityBytes: nil,
+        availableBytes: nil,
+        usagePercent: nil
+    )
+
+    enum CodingKeys: String, CodingKey {
+        case state, usedBytes, capacityBytes, availableBytes, usagePercent
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(state, forKey: .state)
+        try container.encode(usedBytes, forKey: .usedBytes)
+        try container.encode(capacityBytes, forKey: .capacityBytes)
+        try container.encode(availableBytes, forKey: .availableBytes)
+        try container.encode(usagePercent, forKey: .usagePercent)
+    }
+}
+
 struct ContainerResourceUsage: Codable, Equatable, Sendable {
     let containerID: String
     let cpuPercent: Double?
@@ -25,10 +59,11 @@ struct ContainerResourceUsage: Codable, Equatable, Sendable {
     let memoryUsageBytes: UInt64
     let memoryLimitBytes: UInt64
     let memoryPercent: Double?
+    let rootFilesystem: ContainerRootFilesystemUsage
     let observedAt: Date
 
     enum CodingKeys: String, CodingKey {
-        case cpuPercent, cpuState, memoryUsageBytes, memoryLimitBytes, memoryPercent, observedAt
+        case cpuPercent, cpuState, memoryUsageBytes, memoryLimitBytes, memoryPercent, rootFilesystem, observedAt
         case containerID = "containerId"
     }
 
@@ -39,6 +74,7 @@ struct ContainerResourceUsage: Codable, Equatable, Sendable {
         memoryUsageBytes: UInt64,
         memoryLimitBytes: UInt64,
         memoryPercent: Double?,
+        rootFilesystem: ContainerRootFilesystemUsage = .unavailable,
         observedAt: Date
     ) {
         self.containerID = containerID
@@ -47,6 +83,7 @@ struct ContainerResourceUsage: Codable, Equatable, Sendable {
         self.memoryUsageBytes = memoryUsageBytes
         self.memoryLimitBytes = memoryLimitBytes
         self.memoryPercent = memoryPercent
+        self.rootFilesystem = rootFilesystem
         self.observedAt = observedAt
     }
 
@@ -58,6 +95,10 @@ struct ContainerResourceUsage: Codable, Equatable, Sendable {
         memoryUsageBytes = try container.decode(UInt64.self, forKey: .memoryUsageBytes)
         memoryLimitBytes = try container.decode(UInt64.self, forKey: .memoryLimitBytes)
         memoryPercent = try container.decodeIfPresent(Double.self, forKey: .memoryPercent)
+        rootFilesystem = try container.decodeIfPresent(
+            ContainerRootFilesystemUsage.self,
+            forKey: .rootFilesystem
+        ) ?? .unavailable
         observedAt = try container.decode(Date.self, forKey: .observedAt)
     }
 
@@ -77,6 +118,7 @@ struct ContainerResourceUsage: Codable, Equatable, Sendable {
         } else {
             try container.encodeNil(forKey: .memoryPercent)
         }
+        try container.encode(rootFilesystem, forKey: .rootFilesystem)
         try container.encode(observedAt, forKey: .observedAt)
     }
 }
