@@ -1,0 +1,112 @@
+openapi: 3.1.0
+info:
+  title: Container GUI Shared Directory and Odoo Create API
+  version: 2.8.0
+  description: Optional bind mount for every image and database endpoint fields for the official Odoo image.
+servers:
+  - url: http://127.0.0.1:8787/api/v1
+security: []
+
+paths:
+  /containers:
+    post:
+      operationId: createContainer
+      summary: Create a container with an optional shared directory and official Odoo preset
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContainerCreateRequest"
+      responses:
+        "202":
+          description: Operation accepted; the response redacts the host path and database endpoint values
+        "422":
+          description: Validation failed before any container mutation
+
+components:
+  schemas:
+    SharedDirectoryConfiguration:
+      type: object
+      additionalProperties: false
+      required: [hostPath, containerPath]
+      properties:
+        hostPath:
+          type: string
+          minLength: 2
+          maxLength: 4096
+          pattern: "^/"
+          writeOnly: true
+        containerPath:
+          type: string
+          minLength: 2
+          maxLength: 4096
+          pattern: "^/"
+
+    OdooDatabaseConfiguration:
+      type: object
+      additionalProperties: false
+      required: [host, port]
+      properties:
+        host:
+          type: string
+          minLength: 1
+          maxLength: 255
+          default: db
+          writeOnly: true
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+          default: 5432
+          writeOnly: true
+
+    ContainerCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [name, image]
+      properties:
+        name:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        image:
+          type: string
+          minLength: 1
+          maxLength: 512
+        cpus:
+          type: number
+          minimum: 1
+          maximum: 1024
+        memoryMiB:
+          type: integer
+          minimum: 1
+          maximum: 1048576
+        ports:
+          type: array
+          maxItems: 32
+        environment:
+          type: array
+          maxItems: 64
+        arguments:
+          type: array
+          maxItems: 64
+        startAfterCreate:
+          type: boolean
+          default: false
+        ssh:
+          type: [object, "null"]
+        sharedDirectory:
+          oneOf:
+            - $ref: "#/components/schemas/SharedDirectoryConfiguration"
+            - type: "null"
+        odooDatabase:
+          oneOf:
+            - $ref: "#/components/schemas/OdooDatabaseConfiguration"
+            - type: "null"

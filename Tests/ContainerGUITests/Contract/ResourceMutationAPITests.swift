@@ -257,6 +257,180 @@ final class ResourceMutationAPITests: XCTestCase {
         XCTAssertEqual(optionalStartCount, 1)
     }
 
+    func testCreateSharedDirectoryAndOdooEndpointReachManagerButStayRedacted() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("container-gui-api-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let manager = StubImageManager()
+        let app = makeImageApplication(manager: manager)
+        let request = ContainerCreateRequest(
+            name: "odoo-api",
+            image: "docker.io/library/odoo:19.0",
+            sharedDirectory: SharedDirectoryConfiguration(
+                hostPath: directory.path,
+                containerPath: "/mnt/extra-addons"
+            ),
+            odooDatabase: OdooDatabaseConfiguration(host: "db.internal", port: 55_432)
+        )
+        let expectedOrigin = origin
+        let headerName = idempotencyName
+
+        try await app.test(.router) { client in
+            let headers: HTTPFields = [
+                .origin: expectedOrigin,
+                .contentType: "application/json",
+                headerName: UUID().uuidString,
+            ]
+            try await client.execute(
+                uri: "/api/v1/containers",
+                method: .post,
+                headers: headers,
+                body: ByteBuffer(data: try JSONEncoder.containerGUI.encode(request))
+            ) { response in
+                XCTAssertEqual(response.status, .accepted)
+                let encoded = String(decoding: response.body.readableBytesView, as: UTF8.self)
+                XCTAssertFalse(encoded.contains(directory.path))
+                XCTAssertFalse(encoded.contains("db.internal"))
+                let operation = try JSONDecoder.containerGUI.decode(Operation.self, from: response.body)
+                let encodedSummary = String(
+                    decoding: try JSONEncoder.containerGUI.encode(
+                        JSONValue.object(operation.safeRequestSummary)
+                    ),
+                    as: UTF8.self
+                )
+                XCTAssertFalse(encodedSummary.contains(directory.path))
+                XCTAssertFalse(encodedSummary.contains("db.internal"))
+                XCTAssertFalse(encodedSummary.contains("55432"))
+                XCTAssertEqual(
+                    operation.safeRequestSummary["sharedDirectory"]?.objectValue?["containerPath"],
+                    .string("/mnt/extra-addons")
+                )
+                XCTAssertEqual(operation.safeRequestSummary["odooDatabaseConfigured"], .bool(true))
+            }
+        }
+
+        let capturedRequest = await manager.lastCreateRequest
+        let received = try XCTUnwrap(capturedRequest)
+        XCTAssertEqual(received.sharedDirectory, request.sharedDirectory)
+        XCTAssertEqual(received.odooDatabase, request.odooDatabase)
+    }
+
+    func testCreateRejectsInvalidSharedDirectoryBeforeMutation() async throws {
+        let manager = StubImageManager()
+        let app = makeImageApplication(manager: manager)
+        let request = ContainerCreateRequest(
+            name: "missing-directory",
+            image: "ubuntu:26.04",
+            sharedDirectory: SharedDirectoryConfiguration(
+                hostPath: "/private/tmp/container-gui-directory-does-not-exist",
+                containerPath: "/workspace"
+            )
+        )
+        let expectedOrigin = origin
+        let headerName = idempotencyName
+
+        try await app.test(.router) { client in
+            let headers: HTTPFields = [
+                .origin: expectedOrigin,
+                .contentType: "application/json",
+                headerName: UUID().uuidString,
+            ]
+            try await client.execute(
+                uri: "/api/v1/containers",
+                method: .post,
+                headers: headers,
+                body: ByteBuffer(data: try JSONEncoder.containerGUI.encode(request))
+            ) { response in
+                XCTAssertEqual(response.status, .unprocessableContent)
+                let problem = try JSONDecoder.containerGUI.decode(ProblemDetail.self, from: response.body)
+                XCTAssertEqual(problem.fieldErrors?.map(\.field), ["sharedDirectory.hostPath"])
+            }
+        }
+        let createCount = await manager.createCount
+        XCTAssertEqual(createCount, 0)
+    }
+
+    func testCreateRejectsInvalidOrDuplicateOdooDatabaseEndpointBeforeMutation() async throws {
+        let requests: [(ContainerCreateRequest, Set<String>)] = [
+            (
+                ContainerCreateRequest(
+                    name: "invalid-odoo-db",
+                    image: "odoo:19.0",
+                    odooDatabase: OdooDatabaseConfiguration(host: "https://db host/path", port: 0)
+                ),
+                ["odooDatabase.host", "odooDatabase.port"]
+            ),
+            (
+                ContainerCreateRequest(
+                    name: "duplicate-odoo-db",
+                    image: "odoo:19.0",
+                    environment: [EnvironmentEntry(name: "PORT", value: "5433")],
+                    odooDatabase: OdooDatabaseConfiguration(host: "db", port: 5432)
+                ),
+                ["environment"]
+            ),
+        ]
+        let expectedOrigin = origin
+        let headerName = idempotencyName
+
+        for (request, expectedFields) in requests {
+            let manager = StubImageManager()
+            let app = makeImageApplication(manager: manager)
+            try await app.test(.router) { client in
+                let headers: HTTPFields = [
+                    .origin: expectedOrigin,
+                    .contentType: "application/json",
+                    headerName: UUID().uuidString,
+                ]
+                try await client.execute(
+                    uri: "/api/v1/containers",
+                    method: .post,
+                    headers: headers,
+                    body: ByteBuffer(data: try JSONEncoder.containerGUI.encode(request))
+                ) { response in
+                    XCTAssertEqual(response.status, .unprocessableContent)
+                    let problem = try JSONDecoder.containerGUI.decode(ProblemDetail.self, from: response.body)
+                    XCTAssertEqual(Set(problem.fieldErrors?.map(\.field) ?? []), expectedFields)
+                }
+            }
+            let createCount = await manager.createCount
+            XCTAssertEqual(createCount, 0)
+        }
+    }
+
+    func testCreateRejectsOdooDatabaseConfigurationOutsideOfficialOdooImage() async throws {
+        let manager = StubImageManager()
+        let app = makeImageApplication(manager: manager)
+        let request = ContainerCreateRequest(
+            name: "not-odoo",
+            image: "owner/odoo:19.0",
+            odooDatabase: OdooDatabaseConfiguration(host: "db", port: 5432)
+        )
+        let expectedOrigin = origin
+        let headerName = idempotencyName
+
+        try await app.test(.router) { client in
+            let headers: HTTPFields = [
+                .origin: expectedOrigin,
+                .contentType: "application/json",
+                headerName: UUID().uuidString,
+            ]
+            try await client.execute(
+                uri: "/api/v1/containers",
+                method: .post,
+                headers: headers,
+                body: ByteBuffer(data: try JSONEncoder.containerGUI.encode(request))
+            ) { response in
+                XCTAssertEqual(response.status, .unprocessableContent)
+                let problem = try JSONDecoder.containerGUI.decode(ProblemDetail.self, from: response.body)
+                XCTAssertEqual(problem.fieldErrors?.map(\.field), ["odooDatabase"])
+            }
+        }
+        let createCount = await manager.createCount
+        XCTAssertEqual(createCount, 0)
+    }
+
     func testCreateSSHPresetIsStructuredAndNeverReturnsThePublicKey() async throws {
         let manager = StubImageManager()
         let app = makeImageApplication(manager: manager)

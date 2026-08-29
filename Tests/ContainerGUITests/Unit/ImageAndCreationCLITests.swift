@@ -104,6 +104,140 @@ final class ImageAndCreationCLITests: XCTestCase {
         }
     }
 
+    func testContainerCreateDecodesOptionalDirectoryAndOdooDatabaseWithoutLeakingValues() throws {
+        let oldBody = Data(#"{"name":"legacy","image":"ubuntu:26.04"}"#.utf8)
+        let legacy = try JSONDecoder.containerGUI.decode(ContainerCreateRequest.self, from: oldBody)
+        XCTAssertNil(legacy.sharedDirectory)
+        XCTAssertNil(legacy.odooDatabase)
+
+        let hostPath = "/private/tmp/container-gui-sensitive-addons"
+        let request = ContainerCreateRequest(
+            name: "odoo-test",
+            image: "docker.io/library/odoo:19.0",
+            sharedDirectory: SharedDirectoryConfiguration(
+                hostPath: hostPath,
+                containerPath: "/mnt/extra-addons"
+            ),
+            odooDatabase: OdooDatabaseConfiguration(host: "db.internal", port: 55_432)
+        )
+        let encoded = try JSONEncoder.containerGUI.encode(request)
+        let decoded = try JSONDecoder.containerGUI.decode(ContainerCreateRequest.self, from: encoded)
+        XCTAssertEqual(decoded, request)
+
+        let summary = String(
+            decoding: try JSONEncoder.containerGUI.encode(JSONValue.object(request.safeRequestSummary)),
+            as: UTF8.self
+        )
+        XCTAssertEqual(
+            request.safeRequestSummary["sharedDirectory"]?.objectValue?["containerPath"],
+            .string("/mnt/extra-addons")
+        )
+        XCTAssertEqual(request.safeRequestSummary["odooDatabaseConfigured"], .bool(true))
+        XCTAssertFalse(summary.contains(hostPath))
+        XCTAssertFalse(summary.contains("db.internal"))
+        XCTAssertFalse(summary.contains("55432"))
+    }
+
+    func testSharedDirectoryValidationRequiresSafeExistingDirectory() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("container-gui-mount-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let valid = ContainerCreateRequest(
+            name: "generic",
+            image: "ubuntu:26.04",
+            sharedDirectory: SharedDirectoryConfiguration(
+                hostPath: directory.path,
+                containerPath: "/workspace"
+            )
+        )
+        XCTAssertEqual(try valid.validated(), valid)
+
+        let missing = ContainerCreateRequest(
+            name: "missing",
+            image: "ubuntu:26.04",
+            sharedDirectory: SharedDirectoryConfiguration(
+                hostPath: directory.appendingPathComponent("absent").path,
+                containerPath: "/workspace"
+            )
+        )
+        assertValidationError(try missing.validated(), fields: ["sharedDirectory.hostPath"])
+
+        let unsafe = ContainerCreateRequest(
+            name: "unsafe",
+            image: "ubuntu:26.04",
+            sharedDirectory: SharedDirectoryConfiguration(
+                hostPath: "/",
+                containerPath: "../workspace"
+            )
+        )
+        assertValidationError(
+            try unsafe.validated(),
+            fields: ["sharedDirectory.containerPath", "sharedDirectory.hostPath"]
+        )
+    }
+
+    func testOfficialOdooClassificationIsExactAndRequiresAddonsTarget() throws {
+        for reference in [
+            "odoo",
+            "odoo:19.0",
+            "odoo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "docker.io/library/odoo:19.0-20260817",
+        ] {
+            XCTAssertTrue(ContainerCreateRequest.isOfficialOdooImageReference(reference), reference)
+        }
+        for reference in [
+            "owner/odoo:19.0",
+            "ghcr.io/example/odoo:19.0",
+            "docker.io/library/my-odoo:19.0",
+            "odoo-helper:latest",
+        ] {
+            XCTAssertFalse(ContainerCreateRequest.isOfficialOdooImageReference(reference), reference)
+        }
+
+        let directory = FileManager.default.temporaryDirectory
+        let wrongTarget = ContainerCreateRequest(
+            name: "odoo-wrong-target",
+            image: "docker.io/library/odoo:19.0",
+            sharedDirectory: SharedDirectoryConfiguration(
+                hostPath: directory.path,
+                containerPath: "/workspace"
+            )
+        )
+        assertValidationError(
+            try wrongTarget.validated(),
+            fields: ["sharedDirectory.containerPath"]
+        )
+    }
+
+    func testOdooDatabaseValidationRejectsInvalidNonOdooAndEnvironmentConflicts() throws {
+        let invalidEndpoint = ContainerCreateRequest(
+            name: "odoo-invalid-db",
+            image: "odoo:19.0",
+            odooDatabase: OdooDatabaseConfiguration(host: "https://db host/path", port: 0)
+        )
+        assertValidationError(
+            try invalidEndpoint.validated(),
+            fields: ["odooDatabase.host", "odooDatabase.port"]
+        )
+
+        let nonOdoo = ContainerCreateRequest(
+            name: "ubuntu-db",
+            image: "ubuntu:26.04",
+            odooDatabase: OdooDatabaseConfiguration(host: "db", port: 5432)
+        )
+        assertValidationError(try nonOdoo.validated(), fields: ["odooDatabase"])
+
+        let conflict = ContainerCreateRequest(
+            name: "odoo-conflict",
+            image: "odoo:19.0",
+            environment: [EnvironmentEntry(name: "HOST", value: "other")],
+            odooDatabase: OdooDatabaseConfiguration(host: "db", port: 5432)
+        )
+        assertValidationError(try conflict.validated(), fields: ["environment"])
+    }
+
     func testParsesImageListAndInspectFixtures() throws {
         let list = try CLIOutputParser.parseImageList(
             data: fixture("images-list.json"),
@@ -344,6 +478,45 @@ final class ImageAndCreationCLITests: XCTestCase {
         ])
         XCTAssertEqual(requests[1].timeout, .seconds(30))
         XCTAssertEqual(requests[2].arguments, ["list", "--all", "--format", "json"])
+    }
+
+    func testCreateAddsOneBindMountAndOdooDatabaseEnvironmentBeforeImage() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("container-gui-odoo-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let executor = ResourceScriptedCommandExecutor(steps: [
+            .success(resourceVersionResult()),
+            .success(resourceEmptySuccess()),
+            .success(resourceContainerListResult(
+                id: "odoo-demo",
+                state: "created",
+                imageReference: "docker.io/library/odoo:19.0"
+            )),
+        ])
+        let request = ContainerCreateRequest(
+            name: "odoo-demo",
+            image: "docker.io/library/odoo:19.0",
+            environment: [EnvironmentEntry(name: "USER", value: "odoo")],
+            sharedDirectory: SharedDirectoryConfiguration(
+                hostPath: directory.path,
+                containerPath: "/mnt/extra-addons"
+            ),
+            odooDatabase: OdooDatabaseConfiguration(host: "postgres-odoo-apple", port: 15432)
+        )
+
+        let outcome = try await resourceClient(executor).createContainer(request)
+
+        XCTAssertTrue(outcome.matchedExpectation)
+        let requests = await executor.requests
+        XCTAssertEqual(requests[1].arguments, [
+            "create", "--name", "odoo-demo",
+            "--mount", "type=bind,source=\(directory.path),target=/mnt/extra-addons",
+            "--env", "HOST=postgres-odoo-apple",
+            "--env", "PORT=15432",
+            "--env", "USER=odoo",
+            "--", "docker.io/library/odoo:19.0",
+        ])
     }
 
     func testCreateOptionallyStartsOnlyAfterCreatedReadback() async throws {

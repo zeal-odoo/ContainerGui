@@ -35,6 +35,10 @@ const elements = Object.fromEntries([
   "createName", "createImage", "createCPUs", "createMemory", "createPorts", "createEnvironment",
   "createArguments", "createStartAfter", "createNameError", "createImageError", "createCPUsError",
   "createMemoryError", "createPortsError", "createEnvironmentError", "createArgumentsError",
+  "createSharedDirectorySection", "createSharedDirectoryLabel", "createSharedDirectoryHelp",
+  "createSharedHostPath", "createSharedContainerPath", "createSharedHostPathError",
+  "createSharedContainerPathError", "createOdooDatabaseFields", "createOdooDatabaseHost",
+  "createOdooDatabasePort", "createOdooDatabaseHostError", "createOdooDatabasePortError",
   "createSSHEnabled", "createSSHFields", "createSSHLoginAsRoot", "createSSHHostPort", "createSSHUsername",
   "createSSHPublicKey", "createSSHPublicKeyFile", "createSSHHostPortError",
   "createSSHUsernameError", "createSSHPublicKeyError", "generateSSHKeyPairButton",
@@ -1073,6 +1077,7 @@ async function submitImagePull(event) {
 function openCreateContainerDialog() {
   clearCreateErrors();
   elements.createFormStatus.textContent = "";
+  updateImageSpecificCreateFields();
   updateSSHFields();
   elements.createContainerDialog.showModal();
   elements.createName.focus();
@@ -1086,6 +1091,11 @@ const createFieldTargets = {
   ports: [elements.createPorts, elements.createPortsError],
   environment: [elements.createEnvironment, elements.createEnvironmentError],
   arguments: [elements.createArguments, elements.createArgumentsError],
+  "sharedDirectory.hostPath": [elements.createSharedHostPath, elements.createSharedHostPathError],
+  "sharedDirectory.containerPath": [elements.createSharedContainerPath, elements.createSharedContainerPathError],
+  odooDatabase: [elements.createOdooDatabaseHost, elements.createOdooDatabaseHostError],
+  "odooDatabase.host": [elements.createOdooDatabaseHost, elements.createOdooDatabaseHostError],
+  "odooDatabase.port": [elements.createOdooDatabasePort, elements.createOdooDatabasePortError],
   "ssh.hostPort": [elements.createSSHHostPort, elements.createSSHHostPortError],
   "ssh.username": [elements.createSSHUsername, elements.createSSHUsernameError],
   "ssh.publicKey": [elements.createSSHPublicKey, elements.createSSHPublicKeyError]
@@ -1141,6 +1151,42 @@ function parseEnvironmentLines(value) {
     throw new Error("环境变量名称不能重复");
   }
   return entries;
+}
+
+function updateImageSpecificCreateFields() {
+  const mode = ContainerGUIOdooCreateForm.createFormMode(elements.createImage.value.trim());
+  const wasOdoo = elements.createSharedDirectorySection.dataset.odooMode === "true";
+  if (mode.isOdoo && !wasOdoo) {
+    elements.createSharedDirectorySection.dataset.genericContainerPath =
+      elements.createSharedContainerPath.value.trim() || "/workspace";
+  }
+  if (mode.isOdoo) {
+    elements.createSharedContainerPath.value = mode.containerPath;
+  } else if (wasOdoo) {
+    elements.createSharedContainerPath.value =
+      elements.createSharedDirectorySection.dataset.genericContainerPath || mode.containerPath;
+  } else if (!elements.createSharedContainerPath.value.trim()) {
+    elements.createSharedContainerPath.value = mode.containerPath;
+  }
+  elements.createSharedDirectorySection.dataset.odooMode = String(mode.isOdoo);
+  elements.createSharedDirectoryLabel.textContent = mode.directoryLabel;
+  elements.createSharedDirectoryHelp.textContent = mode.directoryHelp;
+  elements.createSharedContainerPath.readOnly = mode.targetReadOnly;
+  elements.createOdooDatabaseFields.hidden = !mode.showDatabase;
+  elements.createOdooDatabaseHost.disabled = !mode.showDatabase;
+  elements.createOdooDatabasePort.disabled = !mode.showDatabase;
+}
+
+function isSafeAbsoluteMountPath(path) {
+  return path.length <= 4096 && path.startsWith("/") && path !== "/"
+    && !/[\0\r\n,]/.test(path)
+    && !path.split("/").some((component) => component === "." || component === "..");
+}
+
+function isValidOdooDatabaseHost(host) {
+  return host.length >= 1 && host.length <= 255
+    && /[A-Za-z0-9]/.test(host)
+    && /^[A-Za-z0-9._:-]+$/.test(host);
 }
 
 function validateSSHPublicKey(value) {
@@ -1277,6 +1323,34 @@ function buildCreateRequest() {
   if (argumentsList.length > 64 || argumentsList.some((item) => item.length > 4096)) {
     errors.arguments = "进程参数数量或内容无效";
   }
+  const mode = ContainerGUIOdooCreateForm.createFormMode(image);
+  const hostPath = elements.createSharedHostPath.value.trim();
+  const containerPath = elements.createSharedContainerPath.value.trim();
+  let sharedDirectory = null;
+  if (hostPath) {
+    if (!isSafeAbsoluteMountPath(hostPath)) {
+      errors["sharedDirectory.hostPath"] = "本机目录必须是安全的非根绝对路径";
+    }
+    if (!isSafeAbsoluteMountPath(containerPath)) {
+      errors["sharedDirectory.containerPath"] = "容器目录必须是安全的非根绝对路径";
+    } else if (mode.isOdoo && containerPath !== "/mnt/extra-addons") {
+      errors["sharedDirectory.containerPath"] = "Odoo 自定义模块目录必须为 /mnt/extra-addons";
+    }
+    sharedDirectory = { hostPath, containerPath };
+  }
+  let odooDatabase = null;
+  if (mode.isOdoo) {
+    const host = elements.createOdooDatabaseHost.value.trim();
+    const port = Number(elements.createOdooDatabasePort.value);
+    if (!isValidOdooDatabaseHost(host)) errors["odooDatabase.host"] = "数据库地址格式无效";
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      errors["odooDatabase.port"] = "数据库端口必须在 1...65535 之间";
+    }
+    if (environment.some((entry) => entry.name === "HOST" || entry.name === "PORT")) {
+      errors.environment = "已使用 Odoo 数据库字段，环境变量不能重复定义 HOST 或 PORT";
+    }
+    odooDatabase = { host, port };
+  }
   if (Object.keys(errors).length) {
     renderCreateErrors(errors);
     return null;
@@ -1285,6 +1359,8 @@ function buildCreateRequest() {
     name, image, ports, environment, arguments: argumentsList,
     startAfterCreate: elements.createStartAfter.checked
   };
+  if (sharedDirectory) request.sharedDirectory = sharedDirectory;
+  if (odooDatabase) request.odooDatabase = odooDatabase;
   if (elements.createSSHEnabled.checked) {
     const hostPort = Number(elements.createSSHHostPort.value);
     const loginAsRoot = elements.createSSHLoginAsRoot.checked;
@@ -1352,6 +1428,7 @@ async function createContainer(event) {
     await pollOperation(operation.id, elements.imageOperationStatus);
     elements.createContainerForm.reset();
     elements.generatedSSHKeyStatus.textContent = "";
+    updateImageSpecificCreateFields();
     updateSSHFields();
   } catch (error) {
     const errors = Object.fromEntries((error.problem?.fieldErrors || []).map((item) => [item.field, item.message]));
@@ -1508,6 +1585,8 @@ elements.loadMoreRepositoriesButton.addEventListener("click", loadMoreRemoteRepo
 elements.loadMoreTagsButton.addEventListener("click", loadMoreRemoteTags);
 elements.openCreateContainerButton.addEventListener("click", openCreateContainerDialog);
 elements.cancelCreateContainerButton.addEventListener("click", () => elements.createContainerDialog.close());
+elements.createImage.addEventListener("input", updateImageSpecificCreateFields);
+elements.createImage.addEventListener("change", updateImageSpecificCreateFields);
 elements.createSSHEnabled.addEventListener("change", updateSSHFields);
 elements.createSSHLoginAsRoot.addEventListener("change", updateSSHRootMode);
 elements.createSSHPublicKeyFile.addEventListener("change", readSSHPublicKeyFile);
@@ -1521,5 +1600,6 @@ window.setInterval(() => {
   if (document.visibilityState === "visible") refreshDashboard();
 }, REFRESH_INTERVAL_MS);
 loadApplicationVersion();
+updateImageSpecificCreateFields();
 updateSSHFields();
 refreshDashboard();

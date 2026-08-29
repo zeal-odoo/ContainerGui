@@ -241,6 +241,40 @@
         <small id="createPortsHelp">格式为“主机端口:容器端口[/tcp|udp]”，主机地址固定为 127.0.0.1；主机端口范围为 1024...65535。</small>
         <span id="createPortsError" class="field-error" aria-live="polite"></span>
       </label>
+      <fieldset id="createSharedDirectorySection" class="ssh-config" data-odoo-mode="false">
+        <legend class="sr-only">目录映射</legend>
+        <h3 id="createSharedDirectoryLabel">本机共享目录</h3>
+        <p id="createSharedDirectoryHelp" class="ssh-preset-note">用于本机与容器之间读写和传输文件；留空则不挂载。</p>
+        <div class="form-grid">
+          <label class="form-field">
+            <span>本机目录（可选）</span>
+            <input id="createSharedHostPath" name="sharedHostPath" maxlength="4096" spellcheck="false" placeholder="/Volumes/LaCie/shared" aria-describedby="createSharedHostPathHelp createSharedHostPathError">
+            <small id="createSharedHostPathHelp">请填写运行本服务的 Mac 上已存在目录的完整绝对路径。</small>
+            <span id="createSharedHostPathError" class="field-error" aria-live="polite"></span>
+          </label>
+          <label class="form-field">
+            <span>容器目录</span>
+            <input id="createSharedContainerPath" name="sharedContainerPath" maxlength="4096" value="/workspace" spellcheck="false" aria-describedby="createSharedContainerPathError">
+            <span id="createSharedContainerPathError" class="field-error" aria-live="polite"></span>
+          </label>
+        </div>
+      </fieldset>
+      <fieldset id="createOdooDatabaseFields" class="ssh-config" hidden>
+        <legend>Odoo 数据库连接</legend>
+        <p class="ssh-preset-note">仅配置数据库地址与端口；数据库用户和密码仍可在下方环境变量中填写。</p>
+        <div class="form-grid">
+          <label class="form-field">
+            <span>数据库地址</span>
+            <input id="createOdooDatabaseHost" name="odooDatabaseHost" maxlength="255" value="db" spellcheck="false" aria-describedby="createOdooDatabaseHostError">
+            <span id="createOdooDatabaseHostError" class="field-error" aria-live="polite"></span>
+          </label>
+          <label class="form-field">
+            <span>数据库端口</span>
+            <input id="createOdooDatabasePort" name="odooDatabasePort" type="number" min="1" max="65535" step="1" value="5432" aria-describedby="createOdooDatabasePortError">
+            <span id="createOdooDatabasePortError" class="field-error" aria-live="polite"></span>
+          </label>
+        </div>
+      </fieldset>
       <fieldset class="ssh-config">
         <legend class="sr-only">SSH 快速配置</legend>
         <label class="checkbox-field">
@@ -363,6 +397,7 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <script src="/ssh-key-generator.js" defer></script>
+  <script src="/odoo-create-form.js" defer></script>
   <script src="/app.js" defer></script>
 </body>
 </html>

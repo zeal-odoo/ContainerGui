@@ -33,6 +33,22 @@ struct EnvironmentEntry: Codable, Equatable, Sendable {
     let value: String
 }
 
+struct SharedDirectoryConfiguration: Codable, Equatable, Sendable {
+    static let odooAddonsPath = "/mnt/extra-addons"
+
+    let hostPath: String
+    let containerPath: String
+
+    var mountSpec: String {
+        "type=bind,source=\(hostPath),target=\(containerPath)"
+    }
+}
+
+struct OdooDatabaseConfiguration: Codable, Equatable, Sendable {
+    let host: String
+    let port: Int
+}
+
 struct ContainerCreateRequest: Codable, Equatable, Sendable {
     let name: String
     let image: String
@@ -43,9 +59,12 @@ struct ContainerCreateRequest: Codable, Equatable, Sendable {
     let arguments: [String]
     let startAfterCreate: Bool
     let ssh: SSHCreateConfiguration?
+    let sharedDirectory: SharedDirectoryConfiguration?
+    let odooDatabase: OdooDatabaseConfiguration?
 
     private enum CodingKeys: String, CodingKey {
         case name, image, cpus, memoryMiB, ports, environment, arguments, startAfterCreate, ssh
+        case sharedDirectory, odooDatabase
     }
 
     init(
@@ -57,7 +76,9 @@ struct ContainerCreateRequest: Codable, Equatable, Sendable {
         environment: [EnvironmentEntry] = [],
         arguments: [String] = [],
         startAfterCreate: Bool = false,
-        ssh: SSHCreateConfiguration? = nil
+        ssh: SSHCreateConfiguration? = nil,
+        sharedDirectory: SharedDirectoryConfiguration? = nil,
+        odooDatabase: OdooDatabaseConfiguration? = nil
     ) {
         self.name = name
         self.image = image
@@ -68,6 +89,8 @@ struct ContainerCreateRequest: Codable, Equatable, Sendable {
         self.arguments = arguments
         self.startAfterCreate = startAfterCreate
         self.ssh = ssh
+        self.sharedDirectory = sharedDirectory
+        self.odooDatabase = odooDatabase
     }
 
     init(from decoder: Decoder) throws {
@@ -81,6 +104,24 @@ struct ContainerCreateRequest: Codable, Equatable, Sendable {
         arguments = try container.decodeIfPresent([String].self, forKey: .arguments) ?? []
         startAfterCreate = try container.decodeIfPresent(Bool.self, forKey: .startAfterCreate) ?? false
         ssh = try container.decodeIfPresent(SSHCreateConfiguration.self, forKey: .ssh)
+        sharedDirectory = try container.decodeIfPresent(SharedDirectoryConfiguration.self, forKey: .sharedDirectory)
+        odooDatabase = try container.decodeIfPresent(OdooDatabaseConfiguration.self, forKey: .odooDatabase)
+    }
+
+    static func isOfficialOdooImageReference(_ reference: String) -> Bool {
+        var repository = reference
+        if let digestSeparator = repository.firstIndex(of: "@") {
+            repository = String(repository[..<digestSeparator])
+        }
+        if let tagSeparator = repository.lastIndex(of: ":") {
+            let slashOffset = repository.lastIndex(of: "/")
+                .map { repository.distance(from: repository.startIndex, to: $0) } ?? -1
+            let tagOffset = repository.distance(from: repository.startIndex, to: tagSeparator)
+            if tagOffset > slashOffset {
+                repository = String(repository[..<tagSeparator])
+            }
+        }
+        return repository == "odoo" || repository == "docker.io/library/odoo"
     }
 
     func validated() throws -> Self {
@@ -122,6 +163,40 @@ struct ContainerCreateRequest: Codable, Equatable, Sendable {
         }
         if arguments.count > 64 || arguments.contains(where: { $0.count > 4096 || $0.contains("\0") }) {
             errors["arguments"] = "进程参数数量或内容无效"
+        }
+        let officialOdooImage = Self.isOfficialOdooImageReference(image)
+        if let sharedDirectory {
+            if !Self.isSafeMountPath(sharedDirectory.hostPath) {
+                errors["sharedDirectory.hostPath"] = "本机目录必须是安全的非根绝对路径"
+            } else {
+                var isDirectory: ObjCBool = false
+                if !FileManager.default.fileExists(
+                    atPath: sharedDirectory.hostPath,
+                    isDirectory: &isDirectory
+                ) || !isDirectory.boolValue {
+                    errors["sharedDirectory.hostPath"] = "本机目录不存在或不是目录"
+                }
+            }
+            if !Self.isSafeMountPath(sharedDirectory.containerPath) {
+                errors["sharedDirectory.containerPath"] = "容器目录必须是安全的非根绝对路径"
+            } else if officialOdooImage
+                        && sharedDirectory.containerPath != SharedDirectoryConfiguration.odooAddonsPath {
+                errors["sharedDirectory.containerPath"] = "Odoo 自定义模块目录必须为 /mnt/extra-addons"
+            }
+        }
+        if let odooDatabase {
+            if !officialOdooImage {
+                errors["odooDatabase"] = "数据库配置只适用于 Docker Hub 官方 Odoo 镜像"
+            }
+            if !Self.isValidDatabaseHost(odooDatabase.host) {
+                errors["odooDatabase.host"] = "数据库地址格式无效"
+            }
+            if !(1...65_535).contains(odooDatabase.port) {
+                errors["odooDatabase.port"] = "数据库端口必须在 1...65535 之间"
+            }
+            if environment.contains(where: { $0.name == "HOST" || $0.name == "PORT" }) {
+                errors["environment"] = "已使用 Odoo 数据库字段，环境变量不能重复定义 HOST 或 PORT"
+            }
         }
         if let ssh {
             do {
@@ -169,7 +244,35 @@ struct ContainerCreateRequest: Codable, Equatable, Sendable {
         if let cpus { summary["cpus"] = .number(cpus) }
         if let memoryMiB { summary["memoryMiB"] = .number(Double(memoryMiB)) }
         if let ssh { summary["ssh"] = .object(ssh.safeRequestSummary) }
+        if let sharedDirectory {
+            summary["sharedDirectory"] = .object([
+                "configured": .bool(true),
+                "containerPath": .string(sharedDirectory.containerPath),
+            ])
+        }
+        if odooDatabase != nil { summary["odooDatabaseConfigured"] = .bool(true) }
         return summary
+    }
+
+    private static func isSafeMountPath(_ path: String) -> Bool {
+        guard path.count <= 4096,
+              path.hasPrefix("/"),
+              path != "/",
+              !path.contains(","),
+              !path.contains("\0"),
+              !path.contains("\n"),
+              !path.contains("\r") else { return false }
+        return !path.split(separator: "/", omittingEmptySubsequences: false)
+            .contains(where: { $0 == "." || $0 == ".." })
+    }
+
+    private static func isValidDatabaseHost(_ host: String) -> Bool {
+        guard (1...255).contains(host.count),
+              host.contains(where: { $0.isLetter || $0.isNumber }),
+              host.range(of: #"^[A-Za-z0-9._:-]+$"#, options: .regularExpression) != nil else {
+            return false
+        }
+        return true
     }
 }
 

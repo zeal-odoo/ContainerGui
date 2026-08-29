@@ -121,6 +121,51 @@ final class ResourceMutationAssetTests: XCTestCase {
         XCTAssertTrue(script.contains("/api/v1/containers"))
     }
 
+    func testCreateDialogOffersGenericAndOdooSpecificDirectoryConfiguration() throws {
+        let html = try asset("index.html")
+        let script = try asset("app.js")
+        let helper = try asset("odoo-create-form.js")
+
+        XCTAssertTrue(html.contains("src=\"/odoo-create-form.js\""))
+        XCTAssertTrue(html.contains("id=\"createSharedDirectorySection\""))
+        XCTAssertTrue(html.contains("id=\"createSharedDirectoryLabel\""))
+        XCTAssertTrue(html.contains("id=\"createSharedHostPath\""))
+        XCTAssertTrue(html.contains("id=\"createSharedContainerPath\""))
+        XCTAssertTrue(html.contains("value=\"/workspace\""))
+        XCTAssertTrue(html.contains("本机与容器之间"))
+
+        XCTAssertTrue(helper.contains("isOfficialOdooImage"))
+        XCTAssertTrue(helper.contains("docker.io/library/odoo"))
+        XCTAssertTrue(helper.contains("/mnt/extra-addons"))
+        XCTAssertTrue(script.contains("updateImageSpecificCreateFields"))
+        XCTAssertTrue(script.contains("createImage.addEventListener(\"input\", updateImageSpecificCreateFields)"))
+        XCTAssertTrue(script.contains("createImage.addEventListener(\"change\", updateImageSpecificCreateFields)"))
+
+        let builder = try functionBody("buildCreateRequest", in: script)
+        XCTAssertTrue(builder.contains("request.sharedDirectory"))
+        XCTAssertTrue(builder.contains("hostPath"))
+        XCTAssertTrue(builder.contains("containerPath"))
+    }
+
+    func testCreateDialogShowsDatabaseEndpointOnlyForOfficialOdooImages() throws {
+        let html = try asset("index.html")
+        let script = try asset("app.js")
+
+        XCTAssertTrue(html.contains("id=\"createOdooDatabaseFields\""))
+        XCTAssertTrue(html.contains("id=\"createOdooDatabaseHost\""))
+        XCTAssertTrue(html.contains("value=\"db\""))
+        XCTAssertTrue(html.contains("id=\"createOdooDatabasePort\""))
+        XCTAssertTrue(html.contains("value=\"5432\""))
+        XCTAssertTrue(html.contains("hidden"))
+
+        let updater = try functionBody("updateImageSpecificCreateFields", in: script)
+        XCTAssertTrue(updater.contains("elements.createOdooDatabaseFields.hidden = !mode.showDatabase"))
+        let builder = try functionBody("buildCreateRequest", in: script)
+        XCTAssertTrue(builder.contains("request.odooDatabase"))
+        XCTAssertTrue(builder.contains("HOST"))
+        XCTAssertTrue(builder.contains("PORT"))
+    }
+
     func testCreateDialogOffersSimpleStructuredSSHConfiguration() throws {
         let html = try asset("index.html")
         let script = try asset("app.js")

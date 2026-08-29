@@ -281,6 +281,9 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
         if let memoryMiB = request.memoryMiB {
             arguments += ["--memory", "\(memoryMiB)M"]
         }
+        if let sharedDirectory = request.sharedDirectory {
+            arguments += ["--mount", sharedDirectory.mountSpec]
+        }
         for port in request.ports {
             arguments += ["--publish", port.normalizedSpec]
         }
@@ -289,6 +292,10 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
             arguments += ["--label", "\(SSHContainerLabels.enabled)=true"]
             arguments += ["--label", "\(SSHContainerLabels.hostPort)=\(ssh.hostPort)"]
             arguments += ["--label", "\(SSHContainerLabels.username)=\(ssh.username)"]
+        }
+        if let odooDatabase = request.odooDatabase {
+            arguments += ["--env", "HOST=\(odooDatabase.host)"]
+            arguments += ["--env", "PORT=\(odooDatabase.port)"]
         }
         for environment in request.environment {
             arguments += ["--env", "\(environment.name)=\(environment.value)"]
