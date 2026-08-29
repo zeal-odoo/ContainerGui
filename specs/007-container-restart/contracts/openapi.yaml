@@ -1,0 +1,80 @@
+openapi: 3.1.0
+info:
+  title: Container Restart Local API
+  version: 2.9.0
+servers:
+  - url: http://127.0.0.1:8787/api/v1
+paths:
+  /containers/{containerId}/restart:
+    parameters:
+      - name: containerId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$'
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: restartContainer
+      summary: Gracefully stop and restart one running container
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [confirmationTarget]
+              properties:
+                confirmationTarget:
+                  type: string
+      responses:
+        '202':
+          description: Restart operation accepted or idempotently replayed
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Operation'
+        '404':
+          description: Container not found
+        '409':
+          description: Container is not running or another operation holds the target
+        '422':
+          description: Confirmation target does not match
+        '503':
+          description: CLI unavailable or operation execution failed
+components:
+  schemas:
+    Operation:
+      type: object
+      required: [id, kind, target, state, requestedAt, safeRequestSummary]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          const: restartContainer
+        target:
+          type: object
+        state:
+          enum: [queued, running, verifying, succeeded, failed, cancelled]
+        requestedAt:
+          type: string
+          format: date-time
+        safeRequestSummary:
+          type: object
+        exitCode:
+          type: [integer, 'null']
+        error:
+          type: [object, 'null']
+        readback:
+          type: [object, 'null']

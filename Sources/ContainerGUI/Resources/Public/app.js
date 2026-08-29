@@ -752,6 +752,13 @@ function renderActions(summary) {
   button.className = summary.state === "running" ? "button danger" : "button";
   button.disabled = state.submitting;
   if (summary.state === "running") {
+    const restartButton = document.createElement("button");
+    restartButton.type = "button";
+    restartButton.className = "button";
+    restartButton.textContent = "重启容器";
+    restartButton.disabled = state.submitting;
+    restartButton.addEventListener("click", () => restartContainer(summary));
+    elements.containerActions.append(restartButton);
     button.textContent = "正常停止";
     button.addEventListener("click", () => stopContainer(summary));
   } else if (["stopped", "created"].includes(summary.state)) {
@@ -805,6 +812,19 @@ async function stopContainer(summary) {
   );
   if (confirmed) {
     await submitContainerOperation("stop", summary.id, { confirmationTarget: summary.id });
+  }
+}
+
+async function restartContainer(summary) {
+  const confirmed = await requestConfirmation(
+    "重启容器",
+    `将正常停止“${summary.displayName}”并重新启动，期间服务会短暂中断。`,
+    summary.id,
+    "确认重启",
+    false
+  );
+  if (confirmed) {
+    await submitContainerOperation("restart", summary.id, { confirmationTarget: summary.id });
   }
 }
 
@@ -892,6 +912,7 @@ async function submitContainerOperation(action, id, body) {
     if (action === "delete" && completed.readback?.targetAbsent === true) closeDetail();
   } catch (error) {
     showOperationStatus(formatProblem(error), true);
+    if (action === "restart") await refreshDashboard();
   } finally {
     state.submitting = false;
     if (state.selectedDetail) renderActions(state.selectedDetail.summary);

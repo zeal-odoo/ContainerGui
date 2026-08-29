@@ -3,6 +3,7 @@ import Foundation
 enum OperationKind: String, Codable, Sendable {
     case startContainer
     case stopContainer
+    case restartContainer
     case runContainer
     case deleteContainer
     case startSystem
