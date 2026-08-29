@@ -183,7 +183,9 @@ GHCR 枚举范围：`user` 或 `organization`。只有 GHCR 请求使用。
 
 ## RemoteTagPage
 
-字段与 `RemoteRepositoryPage` 相同，但 `items` 为 `[RemoteTagSummary]`。
+字段与 `RemoteRepositoryPage` 相同，但 `items` 为 `[RemoteTagSummary]`。`pageSize=20` 表示来源 API
+每页的 tag（Docker Hub）或 package version（GHCR）数量；一个 GHCR version 可含多个标签，因此
+`items` 可超过 20，但整个上游响应仍受 2 MiB 上限约束。
 
 ## Remote query validation
 

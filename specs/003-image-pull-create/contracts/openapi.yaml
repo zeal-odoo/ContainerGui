@@ -59,7 +59,7 @@ paths:
     get:
       tags: [RegistrySearch]
       operationId: searchRemoteRepositories
-      summary: Search Docker Hub or browse public GHCR packages in an explicit owner scope
+      summary: Search Docker Hub or browse token-readable GHCR packages in an explicit owner scope
       parameters:
         - name: registry
           in: query
@@ -338,7 +338,6 @@ components:
       properties:
         items:
           type: array
-          maxItems: 20
           items:
             $ref: "#/components/schemas/RemoteTagSummary"
         page:

@@ -109,6 +109,8 @@ final class RegistrySearchClientTests: XCTestCase {
         XCTAssertTrue(requests.allSatisfy { $0.url.host == "api.github.com" })
         XCTAssertTrue(requests.allSatisfy { $0.headers["Authorization"] == "Bearer \(token)" })
         XCTAssertTrue(requests.allSatisfy { $0.headers["X-GitHub-Api-Version"] == "2026-03-10" })
+        let packageQuery = URLComponents(url: requests[0].url, resolvingAgainstBaseURL: false)?.queryItems
+        XCTAssertNil(packageQuery?.first(where: { $0.name == "visibility" }))
         XCTAssertTrue(requests[1].url.absoluteString.contains("containerization%2Fvminit"))
     }
 

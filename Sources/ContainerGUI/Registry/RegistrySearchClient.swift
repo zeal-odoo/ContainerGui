@@ -195,7 +195,6 @@ struct RegistrySearchClient<Transport: RegistryHTTPTransport>: RegistrySearching
             suffix: "/packages",
             queryItems: [
                 URLQueryItem(name: "package_type", value: "container"),
-                URLQueryItem(name: "visibility", value: "public"),
                 URLQueryItem(name: "per_page", value: String(Self.pageSize)),
                 URLQueryItem(name: "page", value: String(request.page)),
             ]

@@ -136,12 +136,13 @@ Docker Hub 官方短名称解析到 `docker.io/library/`，命名空间镜像解
 ## Decision 10: GHCR 使用用户或组织范围的 GitHub Packages API
 
 **Decision**: GHCR 不做无范围的全站关键词搜索。用户明确选择 `user` 或 `organization` 并输入
-owner；服务通过 `/users/<owner>/packages` 或 `/orgs/<owner>/packages` 分页读取公开 container 包，
+owner；服务通过 `/users/<owner>/packages` 或 `/orgs/<owner>/packages` 分页读取 Token 有权访问的 container 包，
 再通过对应 package versions 端点读取标签。只接受环境变量 `CONTAINER_GUI_GITHUB_TOKEN`，以 Bearer
 header 发送，并固定 `X-GitHub-Api-Version: 2026-03-10`；Token 不进入响应、日志、Git 或浏览器。
 
 **Rationale**: GitHub Packages REST API 的可枚举边界是用户或组织，官方 GitHub 搜索语法可用于网页
-搜索但没有等价的公共全站包搜索 REST 契约。明确范围能提供稳定分页和可测试行为。
+搜索但没有等价的公共全站包搜索 REST 契约。`visibility` 是可选过滤器，因此不发送该参数，保留
+Token 对公开、私有和内部 package 的既有可读范围；明确 owner 范围能提供稳定分页和可测试行为。
 
 **Alternatives considered**:
 
