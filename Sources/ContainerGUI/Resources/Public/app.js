@@ -270,9 +270,11 @@ async function loadImages() {
 
 function setImagesExpanded(expanded) {
   const isExpanded = Boolean(expanded);
+  const label = isExpanded ? "收起本机镜像" : "展开本机镜像";
   elements.imageSectionBody.hidden = !isExpanded;
   elements.toggleImagesButton.setAttribute("aria-expanded", String(isExpanded));
-  elements.toggleImagesButton.textContent = isExpanded ? "收起镜像" : "展开镜像";
+  elements.toggleImagesButton.setAttribute("aria-label", label);
+  elements.toggleImagesButton.title = label;
 }
 
 function appendUniqueBy(current, incoming, key) {

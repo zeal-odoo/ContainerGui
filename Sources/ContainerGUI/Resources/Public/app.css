@@ -55,6 +55,12 @@ h3 { font-size: 15px; }
 .stats strong { font-size: 24px; letter-spacing: -.04em; }
 .workspace { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(340px, .75fr); gap: 18px; align-items: start; }
 .resource-panel { margin-top: 18px; }
+.image-title-row { display: flex; align-items: center; gap: 5px; }
+.disclosure-button { width: 28px; height: 28px; padding: 6px; display: grid; place-items: center;
+  border: 0; border-radius: 8px; color: var(--muted); background: transparent; }
+.disclosure-button:hover { background: color-mix(in srgb, var(--accent-soft) 70%, transparent); }
+.disclosure-button img { width: 16px; height: 16px; transition: transform .15s ease; }
+.disclosure-button[aria-expanded="true"] img { transform: rotate(90deg); }
 .panel-actions { display: flex; gap: 8px; }
 .resource-status { margin-top: 18px; }
 .resource-table { min-width: 760px; }

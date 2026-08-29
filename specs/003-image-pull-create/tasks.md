@@ -150,6 +150,17 @@
 
 ---
 
+## Phase 10: Title Disclosure Chevron (Priority: P2)
+
+**Goal**: 按用户截图修正折叠入口：移除右侧文字按钮，在“本机镜像”标题旁使用向下/向右 chevron。
+
+- [X] T051 [US1] Add failing asset and version tests for icon placement, direction and accessible naming.
+- [X] T052 [US1] Move the disclosure control beside the title and render a standard Heroicons chevron.
+- [X] T053 [US1] Preserve keyboard, `aria-controls`, `aria-expanded` and auto-expand behavior without visible button text.
+- [X] T054 [US1] Complete full tests, design QA, live browser verification, restart and Git commit.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

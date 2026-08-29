@@ -113,11 +113,16 @@
       <div class="panel-header">
         <div>
           <p class="eyebrow">Images</p>
-          <h2 id="imagesTitle">本机镜像</h2>
+          <div class="image-title-row">
+            <h2 id="imagesTitle">本机镜像</h2>
+            <button id="toggleImagesButton" class="disclosure-button" type="button"
+              aria-expanded="true" aria-controls="imageSectionBody" aria-label="收起本机镜像"
+              title="收起本机镜像">
+              <img src="/icons/chevron-right.svg" alt="" width="16" height="16">
+            </button>
+          </div>
         </div>
         <div class="panel-actions">
-          <button id="toggleImagesButton" class="button secondary small" type="button"
-            aria-expanded="true" aria-controls="imageSectionBody">收起镜像</button>
           <button id="openCreateContainerButton" class="button secondary" type="button">创建容器</button>
           <button id="openPullImageButton" class="button" type="button">拉取镜像</button>
         </div>

@@ -74,8 +74,8 @@ xcrun swift run ContainerGUI
 4. 选择 Docker Hub 仓库后分页展示确切标签；点击标签只打开并回填拉取对话框。
 5. 镜像拉取 Operation 显示下载、解压、验证阶段及可访问的原生进度条；浏览器自动化只使用模拟对象
    或隔离测试 CLI，不提交真实拉取。
-6. 本机镜像区域默认展开；点击“收起镜像”后内容隐藏且按钮变为“展开镜像”，再次点击恢复；
-   `aria-expanded` 始终与可见状态一致。
+6. 本机镜像区域默认展开；“本机镜像”标题旁箭头向下。点击后内容隐藏且箭头向右，再次点击恢复；
+   `aria-expanded` 和“收起/展开本机镜像”无障碍名称始终与可见状态一致，右侧不显示文字折叠按钮。
 7. “拉取镜像”对话框只包含完整地址和 Docker Hub 两种输入方式，以及可选目标架构。
 8. Docker Hub 的 `postgres:latest` 提交为 `docker.io/library/postgres:latest`；其他 OCI 注册表完整地址原样提交。
 9. 页面不显示 GHCR 平台、owner 输入或 GitHub Token 配置。
