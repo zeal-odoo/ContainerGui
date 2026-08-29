@@ -43,21 +43,39 @@ final class ContainerMetricsAPITests: XCTestCase {
         }
     }
 
-    private func makeApplication(reader: StubMetricsReader) -> Application<RouterResponder<BasicRequestContext>> {
+    func testMetricsRouteBoundsAReaderThatDoesNotReturn() async throws {
+        let reader = StubMetricsReader(metricsDelay: .seconds(30))
+        let app = makeApplication(reader: reader, metricsTimeout: .milliseconds(50))
+
+        try await app.test(.router) { client in
+            try await client.execute(uri: "/api/v1/containers/metrics", method: .get) { response in
+                XCTAssertEqual(response.status, .gatewayTimeout)
+                let problem = try JSONDecoder.containerGUI.decode(ProblemDetail.self, from: response.body)
+                XCTAssertEqual(problem.code, .cliTimeout)
+            }
+        }
+    }
+
+    private func makeApplication(
+        reader: StubMetricsReader,
+        metricsTimeout: Duration = .seconds(5)
+    ) -> Application<RouterResponder<BasicRequestContext>> {
         let router = Router()
         router.middlewares.add(ErrorMiddleware())
         ContainerReadRoutes.register(on: router, reader: reader)
-        ContainerMetricsRoutes.register(on: router, reader: reader)
+        ContainerMetricsRoutes.register(on: router, reader: reader, timeout: metricsTimeout)
         return Application(router: router)
     }
 }
 
 private actor StubMetricsReader: ContainerReading, ContainerMetricsReading {
     private let metricsTimeOut: Bool
+    private let metricsDelay: Duration?
     private let observedAt = Date(timeIntervalSince1970: 1_787_987_200)
 
-    init(metricsTimeOut: Bool = false) {
+    init(metricsTimeOut: Bool = false, metricsDelay: Duration? = nil) {
         self.metricsTimeOut = metricsTimeOut
+        self.metricsDelay = metricsDelay
     }
 
     func systemHealth() async throws -> SystemHealth {
@@ -95,6 +113,7 @@ private actor StubMetricsReader: ContainerReading, ContainerMetricsReading {
 
     func containerMetrics() async throws -> ContainerMetricsSnapshot {
         if metricsTimeOut { throw CommandExecutionError.timedOut }
+        if let metricsDelay { try await Task.sleep(for: metricsDelay) }
         return ContainerMetricsSnapshot(
             items: [
                 ContainerResourceUsage(

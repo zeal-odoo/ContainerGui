@@ -28,17 +28,23 @@ final class ReadOnlyCLISmokeTests: XCTestCase {
 
         let list = try await client.listContainers()
         XCTAssertLessThanOrEqual(list.items.count, 1_000)
-        let metrics = try await client.containerMetrics()
-        XCTAssertLessThanOrEqual(metrics.items.count, 1_000)
-        XCTAssertEqual(Set(metrics.items.map(\.containerID)).count, metrics.items.count)
-        for metric in metrics.items {
-            if let cpuPercent = metric.cpuPercent {
-                XCTAssertTrue(cpuPercent.isFinite)
-                XCTAssertGreaterThanOrEqual(cpuPercent, 0)
-            }
-            if let memoryPercent = metric.memoryPercent {
-                XCTAssertTrue(memoryPercent.isFinite)
-                XCTAssertGreaterThanOrEqual(memoryPercent, 0)
+        for _ in 0..<4 {
+            let cancelledWaiter = Task { try await client.containerMetrics() }
+            try await Task.sleep(for: .milliseconds(50))
+            cancelledWaiter.cancel()
+            let metrics = try await client.containerMetrics()
+            _ = try? await cancelledWaiter.value
+            XCTAssertLessThanOrEqual(metrics.items.count, 1_000)
+            XCTAssertEqual(Set(metrics.items.map(\.containerID)).count, metrics.items.count)
+            for metric in metrics.items {
+                if let cpuPercent = metric.cpuPercent {
+                    XCTAssertTrue(cpuPercent.isFinite)
+                    XCTAssertGreaterThanOrEqual(cpuPercent, 0)
+                }
+                if let memoryPercent = metric.memoryPercent {
+                    XCTAssertTrue(memoryPercent.isFinite)
+                    XCTAssertGreaterThanOrEqual(memoryPercent, 0)
+                }
             }
         }
         if let first = list.items.first {

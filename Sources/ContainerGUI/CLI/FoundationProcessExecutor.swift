@@ -84,11 +84,19 @@ final class FoundationProcessExecutor: CommandExecuting, @unchecked Sendable {
 
         let clock = ContinuousClock()
         let started = clock.now
+        let terminationEvents = AsyncStream<Int32> { continuation in
+            process.terminationHandler = { process in
+                continuation.yield(process.terminationStatus)
+                continuation.finish()
+            }
+        }
         do {
             try process.run()
         } catch {
+            process.terminationHandler = nil
             throw CommandExecutionError.launchFailed
         }
+        defer { process.terminationHandler = nil }
 
         let accumulator = OutputAccumulator(limit: request.maximumOutputBytes)
         do {
@@ -103,7 +111,10 @@ final class FoundationProcessExecutor: CommandExecuting, @unchecked Sendable {
                         return .stderrEnded
                     }
                     group.addTask {
-                        process.waitUntilExit()
+                        for await status in terminationEvents {
+                            return .exited(status)
+                        }
+                        try Task.checkCancellation()
                         return .exited(process.terminationStatus)
                     }
                     group.addTask {

@@ -81,6 +81,27 @@ final class FoundationProcessExecutorTests: XCTestCase {
         }
     }
 
+    func testConcurrentFastExitsRemainObservable() async throws {
+        let executor = self.executor
+        try await withThrowingTaskGroup(of: CommandResult.self) { group in
+            for _ in 0..<64 {
+                group.addTask {
+                    try await executor.run(
+                        CommandRequest(
+                            executableURL: URL(fileURLWithPath: "/usr/bin/true"),
+                            arguments: [],
+                            timeout: .seconds(2),
+                            maximumOutputBytes: 64
+                        )
+                    )
+                }
+            }
+            for try await result in group {
+                XCTAssertEqual(result.exitCode, 0)
+            }
+        }
+    }
+
     func testRejectsCombinedOutputOverLimit() async {
         do {
             _ = try await executor.run(
