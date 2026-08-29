@@ -30,6 +30,27 @@ PASS. 镜像列表、拉取参数、幂等提交、操作轮询、镜像回读�
 - A GHCR-qualified address combined with Docker Hub resolves to `null` and is rejected before normal submission
 - The existing platform selector is now labelled “目标架构” and still submits `linux/arm64` or `linux/amd64`
 
+## Remote Registry Search Increment
+
+- TDD baseline: new registry client, API contract and browser tests failed before the implementation types and UI existed.
+- Backend focus: 14 tests, 0 failures, covering fixed Docker Hub/GitHub hosts, scoped GHCR paths, API version,
+  Bearer header, multi-page fixture parsing, response bounds, validation, rate limits and token-safe errors.
+- Browser assets: 6 tests, 0 failures; JavaScript syntax check passed.
+- Final full Swift suite: 98 tests, 0 failures; 2 opt-in read-only tests skipped by default.
+- Explicit live read-only CLI suite: 1 test, 0 failures.
+- Explicit Docker Hub GET-only suite: 1 test, 0 failures.
+- Runtime service: current build listens on `127.0.0.1:8787`; `/api/v1/images` returned all 3 local images.
+- Runtime Docker Hub: repository page 1 returned 20 of 52757 and tag page 1 returned 20 of 1421; both exposed a next page.
+- Browser pagination appended repositories from 20 to 40 with 40 unique references, and tags from 20 to 40 with
+  40 unique references.
+- Selecting exact tag `docker.io/library/postgres:15.19-trixie` opened the pull dialog and filled the full reference;
+  the selection handler contains no pull submission and “开始拉取” was not clicked.
+- GHCR without `CONTAINER_GUI_GITHUB_TOKEN` displayed the safe configuration error, hid the stale loading state and
+  left all 3 local image rows visible. The Token is read only from the service environment and never enters the page.
+- GitHub's optional `visibility` filter is intentionally omitted so the owner listing preserves every package the
+  configured Token can read, including public, private and internal packages.
+- This increment performed only local/remote GET reads. It did not pull an image or create, start, stop or delete a container.
+
 ## Live Validation Boundary Incident
 
 During the 2026-08-29 registry-shortcut browser check, the attempted Playwright request interception failed before

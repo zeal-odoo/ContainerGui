@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-29
 
-**Status**: In Progress
+**Status**: Complete
 
 **Input**: User description: "添加功能，需要能创建容器和拉取镜像"
 
@@ -184,8 +184,13 @@
 
 ## Verification
 
-- 2026-08-29 全量 Swift 测试：84 tests，0 failures；默认跳过 1 个需显式开启的本机 CLI 测试。
+- 2026-08-29 最终全量 Swift 测试：98 tests，0 failures；默认跳过 2 个需显式开启的只读测试。
 - 显式只读本机 CLI 测试：1 test，0 failures，覆盖容器与镜像列表/详情读取。
+- 显式 Docker Hub GET-only 测试：1 test，0 failures，覆盖仓库搜索与标签读取。
+- 运行态 API 验收：本机 3 个镜像全部返回；Docker Hub 仓库与标签首屏均为 20 项并提供下一页；
+  GHCR 未配置 Token 时返回安全的 `REGISTRY_AUTHENTICATION_REQUIRED`，本机镜像不受影响。
+- 浏览器分页验收：仓库从 20 追加到 40 项且 40 项唯一；标签从 20 追加到 40 项且 40 项唯一；选择
+  `docker.io/library/postgres:15.19-trixie` 只回填拉取表单，未提交镜像拉取。
 - 浏览器验收：Docker Hub、GHCR、目标架构、镜像列表、创建表单、键盘可访问性与逐字段校验通过。
 - 仓库引用解析结果为 `docker.io/library/postgres:latest` 和 `ghcr.io/owner/image:tag`；跨仓库混用返回拒绝结果。
 - 一次浏览器请求拦截设置失败导致真实拉取已有的 `postgres:latest` ARM64 变体；详情与未回滚原因记录在

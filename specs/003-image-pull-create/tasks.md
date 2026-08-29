@@ -121,7 +121,7 @@
 - [X] T038 [US1] Add CONTAINER_GUI_GITHUB_TOKEN configuration, safe registry ProblemDetail mappings and read-only routes in Sources/ContainerGUI/App/AppConfiguration.swift, Sources/ContainerGUI/Domain/ProblemDetail.swift, Sources/ContainerGUI/Web/RegistrySearchRoutes.swift and Sources/ContainerGUI/App/AppFactory.swift
 - [X] T039 [US1] Add remote registry controls, repository/tag result pagination and exact-tag pull-form handoff in Sources/ContainerGUI/Resources/Public/index.html, Sources/ContainerGUI/Resources/Public/app.css and Sources/ContainerGUI/Resources/Public/app.js
 - [X] T040 [US1] Add opt-in Docker Hub GET-only smoke coverage in Tests/ContainerGUITests/Integration/RegistryReadOnlySmokeTests.swift and document the no-token GHCR state in README.md
-- [ ] T041 [US1] Run focused and full Swift tests, JavaScript syntax checks, explicit read-only CLI/registry checks and diff validation, then record evidence in specs/003-image-pull-create/verification-us1.md
+- [X] T041 [US1] Run focused and full Swift tests, JavaScript syntax checks, explicit read-only CLI/registry checks and diff validation, then record evidence in specs/003-image-pull-create/verification-us1.md
 
 **Checkpoint**: 本机镜像全部可见；Docker Hub 与 GHCR 的远程结果和标签可逐页浏览；选择标签不会自动拉取。
 
