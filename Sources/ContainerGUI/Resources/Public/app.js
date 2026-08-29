@@ -3,6 +3,7 @@
 const ENDPOINTS = {
   health: "/api/v1/system/health",
   containers: "/api/v1/containers",
+  metrics: "/api/v1/containers/metrics",
   operations: "/api/v1/operations/"
 };
 const REFRESH_INTERVAL_MS = 5000;
@@ -19,9 +20,9 @@ const elements = Object.fromEntries([
 ].map((id) => [id, document.getElementById(id)]));
 
 const state = {
-  containers: [], selectedID: null, selectedDetail: null, refreshController: null,
-  detailController: null, refreshing: false, submitting: false, eventSource: null,
-  reconnectAttempts: 0, reconnectTimer: null
+  containers: [], selectedID: null, selectedDetail: null, detailController: null,
+  refreshing: false, submitting: false, eventSource: null,
+  reconnectAttempts: 0, reconnectTimer: null, metricsByID: new Map(), metricsStatus: "loading"
 };
 
 const stateLabels = {
@@ -93,6 +94,10 @@ function renderContainers() {
     pill.className = `pill ${container.state}`;
     pill.textContent = stateLabels[container.state] || stateLabels.unknown;
     stateCell.append(pill);
+    const cpuCell = document.createElement("td");
+    renderMetricCell(cpuCell, cpuDisplay(container));
+    const memoryCell = document.createElement("td");
+    renderMetricCell(memoryCell, memoryDisplay(container));
     const addressCell = document.createElement("td");
     addressCell.textContent = container.ipv4Address || container.ipv6Address || "—";
     const actionCell = document.createElement("td");
@@ -103,7 +108,7 @@ function renderContainers() {
     detailButton.setAttribute("aria-label", `查看 ${container.displayName} 的详情`);
     detailButton.addEventListener("click", () => loadDetail(container.id));
     actionCell.append(detailButton);
-    row.append(nameCell, imageCell, stateCell, addressCell, actionCell);
+    row.append(nameCell, imageCell, stateCell, cpuCell, memoryCell, addressCell, actionCell);
     elements.containerRows.append(row);
   }
 
@@ -114,6 +119,49 @@ function renderContainers() {
   if (state.containers.length !== 0 && visible.length === 0) {
     elements.errorState.hidden = false;
     elements.errorState.textContent = "没有符合筛选条件的容器。";
+  }
+}
+
+function metricFor(container) {
+  if (container.state !== "running") return null;
+  return state.metricsByID.get(container.id) || null;
+}
+
+function cpuDisplay(container) {
+  if (container.state !== "running") return { value: "未运行", detail: "" };
+  const metric = metricFor(container);
+  if (!metric) {
+    return { value: state.metricsStatus === "loading" ? "读取中" : "暂不可用", detail: "" };
+  }
+  if (metric.cpuState !== "ready" || !Number.isFinite(metric.cpuPercent)) {
+    return { value: "采样中", detail: "等待下一样本" };
+  }
+  return { value: formatPercent(metric.cpuPercent), detail: "100% = 1 核" };
+}
+
+function memoryDisplay(container) {
+  if (container.state !== "running") return { value: "未运行", detail: "" };
+  const metric = metricFor(container);
+  if (!metric) {
+    return { value: state.metricsStatus === "loading" ? "读取中" : "暂不可用", detail: "" };
+  }
+  const percentage = Number.isFinite(metric.memoryPercent) ? formatPercent(metric.memoryPercent) : "比例未知";
+  return {
+    value: percentage,
+    detail: `${formatBytes(metric.memoryUsageBytes)} / ${formatBytes(metric.memoryLimitBytes)}`
+  };
+}
+
+function renderMetricCell(cell, metric) {
+  const value = document.createElement("span");
+  value.className = "metric-value";
+  value.textContent = metric.value;
+  cell.append(value);
+  if (metric.detail) {
+    const detail = document.createElement("span");
+    detail.className = "metric-detail";
+    detail.textContent = metric.detail;
+    cell.append(detail);
   }
 }
 
@@ -134,16 +182,17 @@ function showListError(error) {
 }
 
 async function refreshDashboard({ announce = false } = {}) {
-  if (state.refreshing) state.refreshController?.abort();
-  const controller = new AbortController();
-  state.refreshController = controller;
+  if (state.refreshing) return;
+  state.metricsStatus = "loading";
   setBusy(true);
   if (state.containers.length === 0) elements.loadingState.hidden = false;
+  const metricsResultPromise = Promise.allSettled([
+    fetchJSON(ENDPOINTS.metrics)
+  ]).then(([result]) => result);
   const [healthResult, listResult] = await Promise.allSettled([
-    fetchJSON(ENDPOINTS.health, { signal: controller.signal }),
-    fetchJSON(ENDPOINTS.containers, { signal: controller.signal })
+    fetchJSON(ENDPOINTS.health),
+    fetchJSON(ENDPOINTS.containers)
   ]);
-  if (controller.signal.aborted) return;
   if (healthResult.status === "fulfilled") renderHealth(healthResult.value);
   else {
     elements.healthCard.setAttribute("aria-busy", "false");
@@ -155,10 +204,22 @@ async function refreshDashboard({ announce = false } = {}) {
     updateStatistics(listResult.value);
     renderContainers();
     if (state.selectedID && state.containers.some((item) => item.id === state.selectedID)) {
-      await loadDetail(state.selectedID, { quiet: true });
+      loadDetail(state.selectedID, { quiet: true });
     }
     if (announce) showToast("状态已从 CLI 刷新");
   } else showListError(listResult.reason);
+  const metricsResult = await metricsResultPromise;
+  if (metricsResult.status === "fulfilled") {
+    state.metricsByID = new Map(
+      metricsResult.value.items.map((metric) => [metric.containerId, metric])
+    );
+    state.metricsStatus = "ready";
+  } else {
+    state.metricsByID = new Map();
+    state.metricsStatus = "error";
+  }
+  if (listResult.status === "fulfilled") renderContainers();
+  if (state.selectedDetail) renderFacts(state.selectedDetail.summary);
   setBusy(false);
   document.documentElement.dataset.containerGui = "ready";
 }
@@ -197,9 +258,13 @@ async function loadDetail(id, { quiet = false } = {}) {
 
 function renderFacts(summary) {
   elements.detailFacts.replaceChildren();
+  const cpu = cpuDisplay(summary);
+  const memory = memoryDisplay(summary);
   const facts = [
     ["完整标识", summary.id], ["状态", stateLabels[summary.state] || stateLabels.unknown],
     ["原始状态", summary.rawState || "—"], ["镜像", summary.imageReference || "—"],
+    ["CPU 使用率", [cpu.value, cpu.detail].filter(Boolean).join(" · ")],
+    ["内存使用", [memory.value, memory.detail].filter(Boolean).join(" · ")],
     ["IPv4", summary.ipv4Address || "—"], ["IPv6", summary.ipv6Address || "—"],
     ["创建时间", summary.createdAt ? formatTime(summary.createdAt) : "—"],
     ["读取时间", formatTime(summary.observedAt)]
@@ -429,6 +494,22 @@ function formatTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
   return new Intl.DateTimeFormat("zh-Hans", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(date);
+}
+
+function formatPercent(value) {
+  return Number.isFinite(value) && value >= 0 ? `${value.toFixed(2)}%` : "—";
+}
+
+function formatBytes(value) {
+  if (!Number.isFinite(value) || value < 0) return "—";
+  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+  let amount = value;
+  let unit = 0;
+  while (amount >= 1024 && unit < units.length - 1) {
+    amount /= 1024;
+    unit += 1;
+  }
+  return unit === 0 ? `${Math.round(amount)} ${units[unit]}` : `${amount.toFixed(2)} ${units[unit]}`;
 }
 
 function showToast(message) {

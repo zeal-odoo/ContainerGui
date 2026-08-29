@@ -34,6 +34,10 @@ protocol ContainerReading: Sendable {
     func containerDetail(id: String) async throws -> ContainerDetail
 }
 
+protocol ContainerMetricsReading: Sendable {
+    func containerMetrics() async throws -> ContainerMetricsSnapshot
+}
+
 protocol ContainerControlling: Sendable {
     func listContainers() async throws -> ContainerList
     func startContainer(id: String) async throws -> ContainerControlOutcome
@@ -45,7 +49,7 @@ protocol ContainerLogReading: Sendable {
     func followLogs(id: String, tail: Int) async throws -> AsyncThrowingStream<CommandStreamEvent, Error>
 }
 
-final class ContainerCLIClient: ContainerReading, ContainerControlling, ContainerLogReading, @unchecked Sendable {
+final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, ContainerControlling, ContainerLogReading, @unchecked Sendable {
     private let executor: any CommandExecuting
     private let executableURL: URL?
     private let unavailableCompatibility: CLICompatibility
@@ -53,6 +57,7 @@ final class ContainerCLIClient: ContainerReading, ContainerControlling, Containe
     private let mutationTimeout: Duration
     private let maximumOutputBytes: Int
     private let installationCache = CLIInstallationCache()
+    private let metricsSampler = ContainerMetricsSampler()
 
     init(
         executor: any CommandExecuting,
@@ -161,6 +166,15 @@ final class ContainerCLIClient: ContainerReading, ContainerControlling, Containe
         let result = try await execute(["inspect", id])
         guard result.exitCode == 0 else { throw ContainerCLIError.nonZeroExit(result.exitCode) }
         return try CLIOutputParser.parseContainerDetail(data: result.stdout, expectedID: id)
+    }
+
+    func containerMetrics() async throws -> ContainerMetricsSnapshot {
+        try await metricsSampler.snapshot { [self] in
+            try await requireSupportedInstallation()
+            let result = try await execute(["stats", "--no-stream", "--format", "json"])
+            guard result.exitCode == 0 else { throw ContainerCLIError.nonZeroExit(result.exitCode) }
+            return try CLIOutputParser.parseContainerResourceSamples(data: result.stdout)
+        }
     }
 
     func startContainer(id: String) async throws -> ContainerControlOutcome {

@@ -4,7 +4,7 @@ import XCTest
 @testable import ContainerGUI
 
 final class ReadOnlyCLISmokeTests: XCTestCase {
-    func testLiveVersionStatusListAndOptionalDetail() async throws {
+    func testLiveVersionStatusListMetricsAndOptionalDetail() async throws {
         try XCTSkipUnless(
             ProcessInfo.processInfo.environment["CONTAINER_GUI_LIVE_READONLY"] == "1",
             "Set CONTAINER_GUI_LIVE_READONLY=1 to run non-mutating compatibility checks"
@@ -28,6 +28,19 @@ final class ReadOnlyCLISmokeTests: XCTestCase {
 
         let list = try await client.listContainers()
         XCTAssertLessThanOrEqual(list.items.count, 1_000)
+        let metrics = try await client.containerMetrics()
+        XCTAssertLessThanOrEqual(metrics.items.count, 1_000)
+        XCTAssertEqual(Set(metrics.items.map(\.containerID)).count, metrics.items.count)
+        for metric in metrics.items {
+            if let cpuPercent = metric.cpuPercent {
+                XCTAssertTrue(cpuPercent.isFinite)
+                XCTAssertGreaterThanOrEqual(cpuPercent, 0)
+            }
+            if let memoryPercent = metric.memoryPercent {
+                XCTAssertTrue(memoryPercent.isFinite)
+                XCTAssertGreaterThanOrEqual(memoryPercent, 0)
+            }
+        }
         if let first = list.items.first {
             let detail = try await client.containerDetail(id: first.id)
             XCTAssertEqual(detail.summary.id, first.id)

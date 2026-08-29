@@ -1,0 +1,7 @@
+[
+  {
+    "cpuUsageUsec": 1000000,
+    "memoryLimitBytes": 4294967296,
+    "memoryUsageBytes": 1073741824
+  }
+]

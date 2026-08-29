@@ -1,0 +1,103 @@
+openapi: 3.1.0
+info:
+  title: Container GUI Metrics API
+  version: 0.1.0
+  description: 容器 CPU 与内存指标的增量只读契约。
+servers:
+  - url: http://127.0.0.1:8787/api/v1
+paths:
+  /containers/metrics:
+    get:
+      operationId: getContainerMetrics
+      summary: 读取全部运行中容器的当前资源指标
+      responses:
+        "200":
+          description: 成功获取指标快照；首次 CPU 样本以 sampling 返回。
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContainerMetricsSnapshot"
+        "500":
+          description: CLI 非零退出或统计输出无效。
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: CLI 不可用或版本不受支持。
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "504":
+          description: CLI 统计读取超时。
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+components:
+  schemas:
+    ContainerMetricsSnapshot:
+      type: object
+      additionalProperties: false
+      required: [items, observedAt]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContainerResourceUsage"
+        observedAt:
+          type: string
+          format: date-time
+    ContainerResourceUsage:
+      type: object
+      additionalProperties: false
+      required:
+        - containerId
+        - cpuPercent
+        - cpuState
+        - memoryUsageBytes
+        - memoryLimitBytes
+        - memoryPercent
+        - observedAt
+      properties:
+        containerId:
+          type: string
+          minLength: 1
+        cpuPercent:
+          type: [number, "null"]
+          minimum: 0
+          description: 100 表示一个完整核心；允许大于 100。
+        cpuState:
+          type: string
+          enum: [sampling, ready]
+        memoryUsageBytes:
+          type: integer
+          minimum: 0
+        memoryLimitBytes:
+          type: integer
+          minimum: 0
+        memoryPercent:
+          type: [number, "null"]
+          minimum: 0
+        observedAt:
+          type: string
+          format: date-time
+    ProblemDetail:
+      type: object
+      required: [type, title, status, code, message]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        code:
+          type: string
+        message:
+          type: string
+        fieldErrors:
+          type: object
+          additionalProperties:
+            type: string

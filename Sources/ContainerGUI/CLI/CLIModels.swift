@@ -15,6 +15,13 @@ struct ContainerControlOutcome: Equatable, Sendable {
 }
 
 enum CLIOutputParser {
+    private struct RawContainerResourceSample: Decodable {
+        let id: String
+        let cpuUsageUsec: UInt64
+        let memoryUsageBytes: UInt64
+        let memoryLimitBytes: UInt64
+    }
+
     static func parseSystemHealth(
         data: Data,
         installation: CLIInstallation,
@@ -79,6 +86,30 @@ enum CLIOutputParser {
             configuration: configuration.redacted(),
             status: status.redacted(),
             raw: raw.redacted(),
+            observedAt: observedAt
+        )
+    }
+
+    static func parseContainerResourceSamples(
+        data: Data,
+        observedAt: Date = Date()
+    ) throws -> ContainerResourceSampleBatch {
+        let rawSamples = try JSONDecoder.containerGUI.decode([RawContainerResourceSample].self, from: data)
+        let identifiers = rawSamples.map(\.id)
+        guard identifiers.allSatisfy({ !$0.isEmpty }),
+              Set(identifiers).count == identifiers.count else {
+            throw ContainerCLIError.invalidOutput
+        }
+        return ContainerResourceSampleBatch(
+            samples: rawSamples.map { raw in
+                ContainerResourceSample(
+                    containerID: raw.id,
+                    cpuUsageUsec: raw.cpuUsageUsec,
+                    memoryUsageBytes: raw.memoryUsageBytes,
+                    memoryLimitBytes: raw.memoryLimitBytes,
+                    observedAt: observedAt
+                )
+            },
             observedAt: observedAt
         )
     }

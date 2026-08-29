@@ -29,6 +29,7 @@ enum AppFactory {
             maximumOutputBytes: configuration.maximumCommandOutputBytes
         )
         let router = makeRouter(configuration: configuration, reader: reader)
+        ContainerMetricsRoutes.register(on: router, reader: reader)
         let coordinator = OperationCoordinator(
             maximumConcurrentMutations: configuration.maximumConcurrentMutations,
             maximumOperationRecords: configuration.maximumOperationRecords,
