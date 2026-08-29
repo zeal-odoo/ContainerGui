@@ -1,0 +1,364 @@
+openapi: 3.1.0
+info:
+  title: Container GUI Image Pull and Container Create API
+  version: 0.3.0
+  description: Feature contract for local-only image reads, image pulls and container creation.
+servers:
+  - url: http://127.0.0.1:8787/api/v1
+security: []
+tags:
+  - name: Images
+  - name: Containers
+  - name: Operations
+
+paths:
+  /images:
+    get:
+      tags: [Images]
+      operationId: listImages
+      summary: Read the authoritative local image list
+      responses:
+        "200":
+          description: Current image snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageList"
+        "503":
+          $ref: "#/components/responses/ProblemResponse"
+        "504":
+          $ref: "#/components/responses/ProblemResponse"
+
+  /images/pull:
+    post:
+      tags: [Images]
+      operationId: pullImage
+      summary: Pull an image and verify it through an authoritative readback
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImagePullRequest"
+      responses:
+        "202":
+          $ref: "#/components/responses/OperationAccepted"
+        "409":
+          $ref: "#/components/responses/ProblemResponse"
+        "422":
+          $ref: "#/components/responses/ProblemResponse"
+        "503":
+          $ref: "#/components/responses/ProblemResponse"
+        "504":
+          $ref: "#/components/responses/ProblemResponse"
+
+  /containers:
+    post:
+      tags: [Containers]
+      operationId: createContainer
+      summary: Create a container and optionally start it after verified creation
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContainerCreateRequest"
+      responses:
+        "202":
+          $ref: "#/components/responses/OperationAccepted"
+        "409":
+          $ref: "#/components/responses/ProblemResponse"
+        "422":
+          $ref: "#/components/responses/ProblemResponse"
+        "503":
+          $ref: "#/components/responses/ProblemResponse"
+        "504":
+          $ref: "#/components/responses/ProblemResponse"
+
+  /operations/{operationId}:
+    get:
+      tags: [Operations]
+      operationId: getOperation
+      parameters:
+        - name: operationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Current operation state and optional readback
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Operation"
+        "404":
+          $ref: "#/components/responses/ProblemResponse"
+
+components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    OperationAccepted:
+      description: Operation accepted or existing idempotent operation returned
+      headers:
+        Location:
+          required: true
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Operation"
+    ProblemResponse:
+      description: Stable structured failure
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+
+  schemas:
+    ImagePlatform:
+      type: object
+      additionalProperties: false
+      required: [os, architecture]
+      properties:
+        os:
+          type: string
+          const: linux
+        architecture:
+          type: string
+          enum: [arm64, amd64]
+        variant:
+          type: [string, "null"]
+
+    ImageSummary:
+      type: object
+      additionalProperties: false
+      required: [id, name, digest, platforms, sizeBytes, observedAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        digest:
+          type: string
+          pattern: "^sha256:[0-9a-f]{64}$"
+        platforms:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImagePlatform"
+        sizeBytes:
+          type: integer
+          minimum: 0
+        observedAt:
+          type: string
+          format: date-time
+
+    ImageList:
+      type: object
+      additionalProperties: false
+      required: [items, observedAt]
+      properties:
+        items:
+          type: array
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/ImageSummary"
+        observedAt:
+          type: string
+          format: date-time
+
+    ImagePullRequest:
+      type: object
+      additionalProperties: false
+      required: [reference]
+      properties:
+        reference:
+          type: string
+          minLength: 1
+          maxLength: 512
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:/@-]*$"
+        platform:
+          type: [string, "null"]
+          pattern: "^linux/(arm64|amd64)(/[A-Za-z0-9._-]+)?$"
+
+    PortMapping:
+      type: object
+      additionalProperties: false
+      required: [hostPort, containerPort]
+      properties:
+        hostPort:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        containerPort:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        protocol:
+          type: string
+          enum: [tcp, udp]
+          default: tcp
+
+    EnvironmentEntry:
+      type: object
+      additionalProperties: false
+      required: [name, value]
+      properties:
+        name:
+          type: string
+          pattern: "^[A-Za-z_][A-Za-z0-9_]*$"
+        value:
+          type: string
+          maxLength: 4096
+          writeOnly: true
+
+    ContainerCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [name, image]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+        image:
+          type: string
+          minLength: 1
+          maxLength: 512
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:/@-]*$"
+        cpus:
+          type: [number, "null"]
+          exclusiveMinimum: 0
+          maximum: 1024
+        memoryMiB:
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 1048576
+        ports:
+          type: array
+          maxItems: 32
+          default: []
+          items:
+            $ref: "#/components/schemas/PortMapping"
+        environment:
+          type: array
+          maxItems: 64
+          default: []
+          items:
+            $ref: "#/components/schemas/EnvironmentEntry"
+        arguments:
+          type: array
+          maxItems: 64
+          default: []
+          items:
+            type: string
+            maxLength: 4096
+        startAfterCreate:
+          type: boolean
+          default: false
+
+    OperationTarget:
+      type: object
+      additionalProperties: false
+      required: [kind, id]
+      properties:
+        kind:
+          type: string
+          enum: [container, image, system]
+        id:
+          type: string
+
+    OperationReadback:
+      type: object
+      additionalProperties: false
+      required: [matchedExpectation, observedAt]
+      properties:
+        matchedExpectation:
+          type: boolean
+        observedContainer: {}
+        observedImage:
+          oneOf:
+            - $ref: "#/components/schemas/ImageSummary"
+            - type: "null"
+        observedSystemState:
+          type: [string, "null"]
+        targetAbsent:
+          type: [boolean, "null"]
+        observedAt:
+          type: string
+          format: date-time
+
+    Operation:
+      type: object
+      additionalProperties: false
+      required: [id, kind, target, state, requestedAt, safeRequestSummary]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [pullImage, createContainer]
+        target:
+          $ref: "#/components/schemas/OperationTarget"
+        state:
+          type: string
+          enum: [queued, running, verifying, succeeded, failed, cancelled]
+        requestedAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: [string, "null"]
+          format: date-time
+        finishedAt:
+          type: [string, "null"]
+          format: date-time
+        safeRequestSummary:
+          type: object
+          additionalProperties: true
+        exitCode:
+          type: [integer, "null"]
+        error:
+          oneOf:
+            - $ref: "#/components/schemas/ProblemDetail"
+            - type: "null"
+        readback:
+          oneOf:
+            - $ref: "#/components/schemas/OperationReadback"
+            - type: "null"
+
+    ProblemDetail:
+      type: object
+      additionalProperties: true
+      required: [type, title, status, code, message, retryable, diagnosticId]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        code:
+          type: string
+        message:
+          type: string
+        retryable:
+          type: boolean
+        diagnosticId:
+          type: string
+          format: uuid
