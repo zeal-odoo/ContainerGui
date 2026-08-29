@@ -337,7 +337,7 @@ final class ResourceMutationAssetTests: XCTestCase {
         XCTAssertTrue(script.contains("selectRemoteTag"))
         let selection = try functionBody("selectRemoteTag", in: script)
         XCTAssertTrue(selection.contains("elements.pullImageReference.value = tag.reference"))
-        XCTAssertTrue(selection.contains("elements.pullImageDialog.showModal()"))
+        XCTAssertTrue(selection.contains("openDialog(elements.pullImageDialog, elements.pullImageReference)"))
         XCTAssertFalse(selection.contains("ENDPOINTS.imagePull"))
         XCTAssertFalse(selection.contains("submitImagePull"))
     }

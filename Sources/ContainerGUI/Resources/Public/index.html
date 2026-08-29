@@ -141,27 +141,29 @@
         </div>
       </div>
       <div id="imageSectionBody">
-        <div id="imageOperationStatus" class="operation-status resource-status" role="status" aria-live="polite" hidden></div>
-        <div id="imagePullProgress" class="pull-progress" hidden>
-          <div class="pull-progress-meta">
-            <span id="imagePullProgressLabel">等待镜像拉取</span>
-            <span id="imagePullProgressValue">等待进度</span>
+        <div class="image-section-body-inner">
+          <div id="imageOperationStatus" class="operation-status resource-status" role="status" aria-live="polite" hidden></div>
+          <div id="imagePullProgress" class="pull-progress" hidden>
+            <div class="pull-progress-meta">
+              <span id="imagePullProgressLabel">等待镜像拉取</span>
+              <span id="imagePullProgressValue">等待进度</span>
+            </div>
+            <progress id="imagePullProgressBar" max="100" aria-label="镜像拉取进度"></progress>
           </div>
-          <progress id="imagePullProgressBar" max="100" aria-label="镜像拉取进度"></progress>
-        </div>
-        <div id="imageLoadingState" class="state-block compact" role="status">正在读取镜像…</div>
-        <div id="imageEmptyState" class="state-block compact" hidden>
-          <strong>还没有本机镜像</strong>
-          <span>可点击“拉取镜像”准备创建容器所需的镜像。</span>
-        </div>
-        <div id="imageErrorState" class="state-block compact error" role="alert" hidden></div>
-        <div id="imageTableWrap" class="table-wrap" hidden>
-          <table class="resource-table">
-            <thead>
-              <tr><th>名称</th><th>摘要</th><th>平台</th><th>大小</th><th>读取时间</th><th>操作</th></tr>
-            </thead>
-            <tbody id="imageTableBody"></tbody>
-          </table>
+          <div id="imageLoadingState" class="state-block compact" role="status">正在读取镜像…</div>
+          <div id="imageEmptyState" class="state-block compact" hidden>
+            <strong>还没有本机镜像</strong>
+            <span>可点击“拉取镜像”准备创建容器所需的镜像。</span>
+          </div>
+          <div id="imageErrorState" class="state-block compact error" role="alert" hidden></div>
+          <div id="imageTableWrap" class="table-wrap" hidden>
+            <table class="resource-table">
+              <thead>
+                <tr><th>名称</th><th>摘要</th><th>平台</th><th>大小</th><th>读取时间</th><th>操作</th></tr>
+              </thead>
+              <tbody id="imageTableBody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>

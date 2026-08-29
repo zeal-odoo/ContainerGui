@@ -15,6 +15,15 @@ const ENDPOINTS = {
 const REFRESH_INTERVAL_MS = 5000;
 const LOG_DISPLAY_LIMIT = 512 * 1024;
 const KEEP_ALIVE_ARGUMENTS = ["/bin/bash", "-lc", "exec sleep infinity"];
+const DIALOG_EXIT_DURATION_MS = 180;
+const PANE_EXIT_DURATION_MS = 160;
+const DISCLOSURE_DURATION_MS = 280;
+const TOAST_EXIT_DURATION_MS = 160;
+const dialogCloseTimers = new WeakMap();
+let detailCloseTimer = null;
+let imagesCollapseTimer = null;
+let toastVisibilityTimer = null;
+let toastExitTimer = null;
 
 const elements = Object.fromEntries([
   "appVersionBadge", "versionBadge", "healthCard", "healthLabel", "healthDetail",
@@ -70,6 +79,53 @@ const healthLabels = {
   healthy: "系统正常", stopped: "服务已停止", unregistered: "服务未注册",
   degraded: "服务异常", unavailable: "服务不可用", unknown: "状态未知"
 };
+
+function prefersReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function openDialog(dialog, focusTarget = null) {
+  const pendingClose = dialogCloseTimers.get(dialog);
+  if (pendingClose !== undefined) {
+    window.clearTimeout(pendingClose);
+    dialogCloseTimers.delete(dialog);
+  }
+  dialog.classList.remove("is-closing");
+  if (!dialog.open) dialog.showModal();
+  if (focusTarget) {
+    window.requestAnimationFrame(() => focusTarget.focus({ preventScroll: true }));
+  }
+}
+
+function closeDialog(dialog, returnValue = "") {
+  if (!dialog.open || dialog.classList.contains("is-closing")) return;
+  if (prefersReducedMotion()) {
+    dialog.close(returnValue);
+    return;
+  }
+  dialog.classList.add("is-closing");
+  const timer = window.setTimeout(() => {
+    dialogCloseTimers.delete(dialog);
+    if (dialog.open) dialog.close(returnValue);
+    dialog.classList.remove("is-closing");
+  }, DIALOG_EXIT_DURATION_MS);
+  dialogCloseTimers.set(dialog, timer);
+}
+
+function revealDetailContent() {
+  if (detailCloseTimer !== null) {
+    window.clearTimeout(detailCloseTimer);
+    detailCloseTimer = null;
+  }
+  elements.detailContent.classList.remove("is-closing", "is-revealing");
+  elements.detailPlaceholder.classList.remove("is-revealing");
+  elements.detailPlaceholder.hidden = true;
+  elements.detailContent.hidden = false;
+  if (!prefersReducedMotion()) {
+    void elements.detailContent.offsetWidth;
+    elements.detailContent.classList.add("is-revealing");
+  }
+}
 
 async function fetchJSON(path, options = {}) {
   const response = await fetch(path, {
@@ -365,11 +421,35 @@ async function loadImages() {
 
 function setImagesExpanded(expanded) {
   const isExpanded = Boolean(expanded);
+  const wasExpanded = elements.toggleImagesButton.getAttribute("aria-expanded") === "true";
   const label = isExpanded ? "收起本机镜像" : "展开本机镜像";
-  elements.imageSectionBody.hidden = !isExpanded;
   elements.toggleImagesButton.setAttribute("aria-expanded", String(isExpanded));
   elements.toggleImagesButton.setAttribute("aria-label", label);
   elements.toggleImagesButton.title = label;
+  if (wasExpanded === isExpanded) return;
+
+  if (imagesCollapseTimer !== null) {
+    window.clearTimeout(imagesCollapseTimer);
+    imagesCollapseTimer = null;
+  }
+  if (prefersReducedMotion()) {
+    elements.imageSectionBody.classList.toggle("is-collapsed", !isExpanded);
+    elements.imageSectionBody.hidden = !isExpanded;
+    return;
+  }
+  if (isExpanded) {
+    elements.imageSectionBody.hidden = false;
+    elements.imageSectionBody.classList.add("is-collapsed");
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => elements.imageSectionBody.classList.remove("is-collapsed"));
+    });
+  } else {
+    elements.imageSectionBody.classList.add("is-collapsed");
+    imagesCollapseTimer = window.setTimeout(() => {
+      elements.imageSectionBody.hidden = true;
+      imagesCollapseTimer = null;
+    }, DISCLOSURE_DURATION_MS);
+  }
 }
 
 function appendUniqueBy(current, incoming, key) {
@@ -599,8 +679,7 @@ function selectRemoteTag(tag) {
   clearPullImageErrors();
   updatePullRegistryHint();
   elements.pullFormStatus.textContent = `已选择标签 ${tag.name}；确认后再开始拉取。`;
-  elements.pullImageDialog.showModal();
-  elements.pullImageReference.focus();
+  openDialog(elements.pullImageDialog, elements.pullImageReference);
 }
 
 async function refreshDashboard({ announce = false } = {}) {
@@ -658,8 +737,7 @@ async function loadDetail(id, { quiet = false } = {}) {
   const controller = new AbortController();
   state.detailController = controller;
   state.selectedID = id;
-  elements.detailPlaceholder.hidden = true;
-  elements.detailContent.hidden = false;
+  revealDetailContent();
   if (!quiet) elements.detailTitle.textContent = "正在读取…";
   elements.detailPanel.setAttribute("aria-busy", "true");
   try {
@@ -813,8 +891,25 @@ function closeDetail() {
   state.selectedDetail = null;
   state.selectedSSHStatus = null;
   elements.sshConnectionPanel.hidden = true;
-  elements.detailContent.hidden = true;
-  elements.detailPlaceholder.hidden = false;
+  const finish = () => {
+    detailCloseTimer = null;
+    elements.detailContent.classList.remove("is-closing", "is-revealing");
+    elements.detailContent.hidden = true;
+    elements.detailPlaceholder.hidden = false;
+    if (!prefersReducedMotion()) {
+      elements.detailPlaceholder.classList.remove("is-revealing");
+      void elements.detailPlaceholder.offsetWidth;
+      elements.detailPlaceholder.classList.add("is-revealing");
+    }
+  };
+  if (detailCloseTimer !== null) window.clearTimeout(detailCloseTimer);
+  if (prefersReducedMotion() || elements.detailContent.hidden) {
+    finish();
+  } else {
+    elements.detailContent.classList.remove("is-revealing");
+    elements.detailContent.classList.add("is-closing");
+    detailCloseTimer = window.setTimeout(finish, PANE_EXIT_DURATION_MS);
+  }
 }
 
 async function startContainer(summary) {
@@ -909,7 +1004,7 @@ function requestConfirmation(title, message, target, confirmLabel, destructive) 
   elements.confirmActionButton.textContent = confirmLabel;
   elements.confirmActionButton.className = destructive ? "button danger" : "button";
   elements.confirmDialog.returnValue = "";
-  elements.confirmDialog.showModal();
+  openDialog(elements.confirmDialog);
   return new Promise((resolve) => {
     elements.confirmDialog.addEventListener("close", () => {
       resolve(elements.confirmDialog.returnValue === "confirm");
@@ -1009,8 +1104,7 @@ function openPullImageDialog() {
   clearPullImageErrors();
   elements.pullFormStatus.textContent = "";
   updatePullRegistryHint();
-  elements.pullImageDialog.showModal();
-  elements.pullImageReference.focus();
+  openDialog(elements.pullImageDialog, elements.pullImageReference);
 }
 
 function clearPullImageErrors() {
@@ -1108,7 +1202,7 @@ async function submitImagePull(event) {
       },
       body: JSON.stringify(body)
     });
-    elements.pullImageDialog.close();
+    closeDialog(elements.pullImageDialog);
     showOperationStatus("镜像拉取已排队", false, elements.imageOperationStatus);
     await pollOperation(operation.id, elements.imageOperationStatus);
   } catch (error) {
@@ -1126,8 +1220,7 @@ function openCreateContainerDialog() {
   elements.createFormStatus.textContent = "";
   updateImageSpecificCreateFields();
   updateSSHFields();
-  elements.createContainerDialog.showModal();
-  elements.createName.focus();
+  openDialog(elements.createContainerDialog, elements.createName);
 }
 
 const createFieldTargets = {
@@ -1470,7 +1563,7 @@ async function createContainer(event) {
       body: JSON.stringify(body)
     });
     elements.createEnvironment.value = "";
-    elements.createContainerDialog.close();
+    closeDialog(elements.createContainerDialog);
     showOperationStatus("容器创建已排队", false, elements.imageOperationStatus);
     await pollOperation(operation.id, elements.imageOperationStatus);
     elements.createContainerForm.reset();
@@ -1607,9 +1700,29 @@ function formatBytes(value) {
 }
 
 function showToast(message) {
+  if (toastVisibilityTimer !== null) window.clearTimeout(toastVisibilityTimer);
+  if (toastExitTimer !== null) window.clearTimeout(toastExitTimer);
   elements.toast.textContent = message;
   elements.toast.hidden = false;
-  window.setTimeout(() => { elements.toast.hidden = true; }, 2200);
+  elements.toast.classList.remove("is-showing", "is-hiding");
+  if (!prefersReducedMotion()) {
+    void elements.toast.offsetWidth;
+    elements.toast.classList.add("is-showing");
+  }
+  toastVisibilityTimer = window.setTimeout(() => {
+    toastVisibilityTimer = null;
+    if (prefersReducedMotion()) {
+      elements.toast.hidden = true;
+      return;
+    }
+    elements.toast.classList.remove("is-showing");
+    elements.toast.classList.add("is-hiding");
+    toastExitTimer = window.setTimeout(() => {
+      toastExitTimer = null;
+      elements.toast.hidden = true;
+      elements.toast.classList.remove("is-hiding");
+    }, TOAST_EXIT_DURATION_MS);
+  }, 2200);
 }
 
 elements.searchInput.addEventListener("input", renderContainers);
@@ -1624,14 +1737,14 @@ elements.toggleImagesButton.addEventListener("click", () => {
   setImagesExpanded(elements.toggleImagesButton.getAttribute("aria-expanded") !== "true");
 });
 elements.openPullImageButton.addEventListener("click", openPullImageDialog);
-elements.cancelPullImageButton.addEventListener("click", () => elements.pullImageDialog.close());
+elements.cancelPullImageButton.addEventListener("click", () => closeDialog(elements.pullImageDialog, "cancel"));
 elements.pullImageRegistry.addEventListener("change", updatePullRegistryHint);
 elements.pullImageForm.addEventListener("submit", submitImagePull);
 elements.remoteRegistryForm.addEventListener("submit", searchRemoteRepositories);
 elements.loadMoreRepositoriesButton.addEventListener("click", loadMoreRemoteRepositories);
 elements.loadMoreTagsButton.addEventListener("click", loadMoreRemoteTags);
 elements.openCreateContainerButton.addEventListener("click", openCreateContainerDialog);
-elements.cancelCreateContainerButton.addEventListener("click", () => elements.createContainerDialog.close());
+elements.cancelCreateContainerButton.addEventListener("click", () => closeDialog(elements.createContainerDialog, "cancel"));
 elements.createImage.addEventListener("input", updateImageSpecificCreateFields);
 elements.createImage.addEventListener("change", updateImageSpecificCreateFields);
 elements.createSSHEnabled.addEventListener("change", updateSSHFields);
@@ -1640,6 +1753,29 @@ elements.createSSHPublicKeyFile.addEventListener("change", readSSHPublicKeyFile)
 elements.generateSSHKeyPairButton.addEventListener("click", generateAndDownloadSSHKeyPair);
 elements.createKeepAlive.addEventListener("change", updateProcessModeFields);
 elements.createContainerForm.addEventListener("submit", createContainer);
+elements.confirmDialog.querySelector("form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  closeDialog(elements.confirmDialog, event.submitter?.value || "cancel");
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || event.defaultPrevented) return;
+  const openDialogElement = document.querySelector("dialog[open]");
+  if (!openDialogElement) return;
+  event.preventDefault();
+  closeDialog(openDialogElement, "cancel");
+});
+for (const dialog of document.querySelectorAll("dialog")) {
+  dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeDialog(dialog, "cancel");
+  });
+  dialog.addEventListener("close", () => {
+    const pendingClose = dialogCloseTimers.get(dialog);
+    if (pendingClose !== undefined) window.clearTimeout(pendingClose);
+    dialogCloseTimers.delete(dialog);
+    dialog.classList.remove("is-closing");
+  });
+}
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") refreshDashboard();
 });

@@ -59,7 +59,14 @@
 
   --md-sys-motion-duration-short: 120ms;
   --md-sys-motion-duration-medium: 240ms;
+  --md-sys-motion-duration-dialog-enter: 320ms;
+  --md-sys-motion-duration-dialog-exit: 180ms;
+  --md-sys-motion-duration-pane-enter: 280ms;
+  --md-sys-motion-duration-pane-exit: 160ms;
+  --md-sys-motion-duration-disclosure: 280ms;
   --md-sys-motion-easing-standard: cubic-bezier(.2, 0, 0, 1);
+  --md-sys-motion-easing-emphasized-decelerate: cubic-bezier(.05, .7, .1, 1);
+  --md-sys-motion-easing-emphasized-accelerate: cubic-bezier(.3, 0, .8, .15);
 
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Noto Sans SC", "PingFang SC", sans-serif;
 }
@@ -370,6 +377,29 @@ h3 {
   margin-top: 18px;
 }
 
+#imageSectionBody {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: translateY(0);
+  transform-origin: top;
+  transition:
+    grid-template-rows var(--md-sys-motion-duration-disclosure) var(--md-sys-motion-easing-emphasized-decelerate),
+    opacity var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-standard),
+    transform var(--md-sys-motion-duration-disclosure) var(--md-sys-motion-easing-emphasized-decelerate);
+}
+
+#imageSectionBody > .image-section-body-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+#imageSectionBody.is-collapsed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
 .image-title-row {
   display: flex;
   gap: 2px;
@@ -559,7 +589,7 @@ tbody tr:hover {
 .button:active:not(:disabled) {
   background: color-mix(in srgb, var(--md-sys-color-primary) 84%, var(--md-sys-color-on-primary));
   box-shadow: var(--md-sys-elevation-level-0);
-  transform: translateY(1px);
+  transform: translateY(1px) scale(.96);
 }
 
 .button.secondary {
@@ -622,6 +652,18 @@ tbody tr:hover {
   position: sticky;
   top: 90px;
   background: var(--md-sys-color-surface-container-low);
+}
+
+#detailContent.is-revealing,
+.detail-placeholder.is-revealing {
+  animation: md-pane-enter var(--md-sys-motion-duration-pane-enter)
+    var(--md-sys-motion-easing-emphasized-decelerate) both;
+}
+
+#detailContent.is-closing {
+  pointer-events: none;
+  animation: md-pane-exit var(--md-sys-motion-duration-pane-exit)
+    var(--md-sys-motion-easing-emphasized-accelerate) both;
 }
 
 .detail-placeholder span {
@@ -722,6 +764,11 @@ tbody tr:hover {
   background: var(--md-sys-color-primary-container);
   font-size: .75rem;
   font-weight: 600;
+}
+
+.operation-status:not([hidden]) {
+  animation: md-effect-enter var(--md-sys-motion-duration-medium)
+    var(--md-sys-motion-easing-standard) both;
 }
 
 .operation-status.error {
@@ -965,12 +1012,34 @@ dialog {
   color: var(--md-sys-color-on-surface);
   background: var(--md-sys-color-surface-container-high);
   box-shadow: var(--md-sys-elevation-level-3);
+  transform-origin: center;
 }
 
 dialog::backdrop {
   background: rgb(0 0 0 / 54%);
   background: color-mix(in srgb, var(--md-sys-color-scrim) 54%, transparent);
   backdrop-filter: blur(3px);
+}
+
+dialog[open]:not(.is-closing) {
+  animation: md-dialog-enter var(--md-sys-motion-duration-dialog-enter)
+    var(--md-sys-motion-easing-emphasized-decelerate) both;
+}
+
+dialog[open]:not(.is-closing)::backdrop {
+  animation: md-scrim-enter var(--md-sys-motion-duration-medium)
+    var(--md-sys-motion-easing-standard) both;
+}
+
+dialog[open].is-closing {
+  pointer-events: none;
+  animation: md-dialog-exit var(--md-sys-motion-duration-dialog-exit)
+    var(--md-sys-motion-easing-emphasized-accelerate) both;
+}
+
+dialog[open].is-closing::backdrop {
+  animation: md-scrim-exit var(--md-sys-motion-duration-dialog-exit)
+    var(--md-sys-motion-easing-emphasized-accelerate) both;
 }
 
 dialog form {
@@ -1168,6 +1237,104 @@ dialog code {
   background: var(--md-sys-color-inverse-surface);
   box-shadow: var(--md-sys-elevation-level-3);
   font-size: .8125rem;
+}
+
+.toast.is-showing {
+  animation: md-toast-enter var(--md-sys-motion-duration-medium)
+    var(--md-sys-motion-easing-emphasized-decelerate) both;
+}
+
+.toast.is-hiding {
+  pointer-events: none;
+  animation: md-toast-exit var(--md-sys-motion-duration-pane-exit)
+    var(--md-sys-motion-easing-emphasized-accelerate) both;
+}
+
+@keyframes md-dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes md-dialog-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px) scale(.98);
+  }
+}
+
+@keyframes md-scrim-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes md-scrim-exit {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes md-pane-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes md-pane-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(.99);
+  }
+}
+
+@keyframes md-effect-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes md-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes md-toast-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px) scale(.98);
+  }
 }
 
 .sr-only {
