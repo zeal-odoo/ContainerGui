@@ -624,6 +624,15 @@ function renderActions(summary) {
     button.disabled = true;
   }
   elements.containerActions.append(button);
+  if (["stopped", "created"].includes(summary.state)) {
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "button danger";
+    deleteButton.textContent = "删除容器";
+    deleteButton.disabled = state.submitting;
+    deleteButton.addEventListener("click", () => deleteContainer(summary));
+    elements.containerActions.append(deleteButton);
+  }
 }
 
 function closeDetail() {
@@ -640,6 +649,7 @@ async function startContainer(summary) {
     "启动容器",
     `将启动“${summary.displayName}”，完成后会重新读取 CLI 状态。`,
     summary.id,
+    "确认启动",
     false
   );
   if (confirmed) await submitContainerOperation("start", summary.id, {});
@@ -650,6 +660,7 @@ async function stopContainer(summary) {
     "正常停止容器",
     "将发送正常停止请求并等待最多 10 秒，不会使用 --all 或 --force。",
     summary.id,
+    "确认停止",
     true
   );
   if (confirmed) {
@@ -657,11 +668,24 @@ async function stopContainer(summary) {
   }
 }
 
-function requestConfirmation(title, message, target, destructive) {
+async function deleteContainer(summary) {
+  const confirmed = await requestConfirmation(
+    "删除容器",
+    "删除后无法恢复；只会删除当前已停止的精确目标，不会使用 --all 或 --force。",
+    summary.id,
+    "确认删除",
+    true
+  );
+  if (confirmed) {
+    await submitContainerOperation("delete", summary.id, { confirmationTarget: summary.id });
+  }
+}
+
+function requestConfirmation(title, message, target, confirmLabel, destructive) {
   elements.confirmTitle.textContent = title;
   elements.confirmMessage.textContent = message;
   elements.confirmTarget.textContent = target;
-  elements.confirmActionButton.textContent = destructive ? "确认停止" : "确认启动";
+  elements.confirmActionButton.textContent = confirmLabel;
   elements.confirmActionButton.className = destructive ? "button danger" : "button";
   elements.confirmDialog.returnValue = "";
   elements.confirmDialog.showModal();
@@ -689,7 +713,8 @@ async function submitContainerOperation(action, id, body) {
         body: JSON.stringify(body)
       }
     );
-    await pollOperation(operation.id);
+    const completed = await pollOperation(operation.id);
+    if (action === "delete" && completed.readback?.targetAbsent === true) closeDetail();
   } catch (error) {
     showOperationStatus(formatProblem(error), true);
   } finally {

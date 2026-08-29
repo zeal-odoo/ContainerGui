@@ -14,6 +14,12 @@ struct ContainerControlOutcome: Equatable, Sendable {
     let matchedExpectation: Bool
 }
 
+struct ContainerDeleteOutcome: Equatable, Sendable {
+    let exitCode: Int32
+    let targetAbsent: Bool
+    let observedAt: Date
+}
+
 enum CLIOutputParser {
     private struct RawImage: Decodable {
         struct Configuration: Decodable {

@@ -172,6 +172,18 @@
 
 ---
 
+## Phase 12: Safe Container Deletion (Priority: P1)
+
+**Goal**: 允许用户删除已停止或已创建的精确容器目标，运行中拒绝，不提供强制或批量删除。
+
+- [X] T059 [US3] Add failing CLI, API, browser asset and version tests for exact confirmed deletion.
+- [X] T060 [US3] Implement fixed `delete <id>` execution, stopped-state guards and authoritative absence readback.
+- [X] T061 [US3] Add the destructive confirmation UI, hide deletion for running containers and close stale detail after success.
+- [X] T062 [US3] Update the spec, plan, data model, research, OpenAPI, quickstart and bilingual README introduction.
+- [X] T063 [US3] Run full tests, read-only live checks, restart and browser-verify without deleting a real container.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -182,6 +194,7 @@
 - Phase 5 depends on both stories.
 - Phase 6 depends on US1 and adds deterministic registry shortcuts.
 - Phase 7 depends on Phase 6 and adds read-only remote discovery without changing mutation semantics.
+- Phase 12 depends on the existing container detail and Operation slices; it remains independently testable with fake controllers.
 
 ### User Story Dependencies
 

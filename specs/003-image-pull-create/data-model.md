@@ -108,6 +108,20 @@
 
 实现可在同一操作内部记录阶段，但对外 Operation.state 保持现有枚举；任何阶段失败都终止后续阶段。
 
+## ContainerDeleteOutcome
+
+| Field | Type | Rules |
+|---|---|---|
+| exitCode | Int32 | 必须为 0 才能进入验证，但不能单独证明成功 |
+| targetAbsent | Bool | 最新权威列表中精确 ID 和显示名称均不存在时为 true |
+| observedAt | Date | 删除后完整容器列表的观测时间 |
+
+删除只接受 `stopped` 或 `created`：
+
+`queued -> running(delete exact id) -> verifying(list --all) -> succeeded|failed`
+
+页面与 API 均要求 `confirmationTarget` 与精确容器 ID 相同；命令模型不包含批量或强制删除字段。
+
 ## Operation extensions
 
 ### OperationKind
@@ -116,6 +130,7 @@
 
 - `pullImage`
 - `createContainer`
+- `deleteContainer`
 
 ### OperationTarget
 

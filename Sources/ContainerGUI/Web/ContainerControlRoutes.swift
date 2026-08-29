@@ -35,6 +35,22 @@ enum ContainerControlRoutes {
             )
             return try accepted(operation)
         }
+        router.post("/api/v1/containers/:containerId/delete") { request, context in
+            let id = try validContainerID(context.parameters.require("containerId"))
+            let key = try idempotencyKey(request)
+            let body: ConfirmedTargetRequest
+            do {
+                body = try await request.decode(as: ConfirmedTargetRequest.self, context: context)
+            } catch {
+                throw ProblemDetail(code: .validationFailed, fieldErrors: ["confirmationTarget": "必须提供确认目标"])
+            }
+            let operation = try await service.submitDelete(
+                id: id,
+                confirmationTarget: body.confirmationTarget,
+                idempotencyKey: key
+            )
+            return try accepted(operation)
+        }
     }
 
     static func registerLogs<Reader: ContainerLogReading>(

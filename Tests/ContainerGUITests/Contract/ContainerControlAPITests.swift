@@ -90,6 +90,87 @@ final class ContainerControlAPITests: XCTestCase {
         }
     }
 
+    func testDeleteRequiresStoppedStateExactConfirmationAndAbsenceReadback() async throws {
+        let controller = StubController(state: .stopped)
+        let app = makeApplication(controller: controller)
+        let expectedOrigin = origin
+        let headerName = idempotencyName
+
+        try await app.test(.router) { client in
+            let headers: HTTPFields = [.origin: expectedOrigin, .contentType: "application/json", headerName: UUID().uuidString]
+            let operation: ContainerGUI.Operation = try await client.execute(
+                uri: "/api/v1/containers/demo/delete",
+                method: .post,
+                headers: headers,
+                body: ByteBuffer(string: "{\"confirmationTarget\":\"demo\"}")
+            ) { response in
+                XCTAssertEqual(response.status, .accepted)
+                return try JSONDecoder.containerGUI.decode(ContainerGUI.Operation.self, from: response.body)
+            }
+
+            try await Task.sleep(for: .milliseconds(120))
+            try await client.execute(uri: "/api/v1/operations/\(operation.id.uuidString)", method: .get) { response in
+                XCTAssertEqual(response.status, .ok)
+                let completed = try JSONDecoder.containerGUI.decode(ContainerGUI.Operation.self, from: response.body)
+                XCTAssertEqual(completed.kind, .deleteContainer)
+                XCTAssertEqual(completed.state, .succeeded)
+                XCTAssertEqual(completed.readback?.expectationMatched, true)
+                XCTAssertEqual(completed.readback?.targetAbsent, true)
+            }
+        }
+
+        let deleteCount = await controller.deleteCount
+        XCTAssertEqual(deleteCount, 1)
+    }
+
+    func testDeleteRejectsRunningContainerWithoutCallingCLI() async throws {
+        let controller = StubController(state: .running)
+        let app = makeApplication(controller: controller)
+        let expectedOrigin = origin
+        let headerName = idempotencyName
+
+        try await app.test(.router) { client in
+            let headers: HTTPFields = [.origin: expectedOrigin, .contentType: "application/json", headerName: UUID().uuidString]
+            try await client.execute(
+                uri: "/api/v1/containers/demo/delete",
+                method: .post,
+                headers: headers,
+                body: ByteBuffer(string: "{\"confirmationTarget\":\"demo\"}")
+            ) { response in
+                XCTAssertEqual(response.status, .conflict)
+                let problem = try JSONDecoder.containerGUI.decode(ProblemDetail.self, from: response.body)
+                XCTAssertEqual(problem.code, .stateConflict)
+            }
+        }
+
+        let deleteCount = await controller.deleteCount
+        XCTAssertEqual(deleteCount, 0)
+    }
+
+    func testDeleteRejectsMismatchedConfirmation() async throws {
+        let controller = StubController(state: .stopped)
+        let app = makeApplication(controller: controller)
+        let expectedOrigin = origin
+        let headerName = idempotencyName
+
+        try await app.test(.router) { client in
+            let headers: HTTPFields = [.origin: expectedOrigin, .contentType: "application/json", headerName: UUID().uuidString]
+            try await client.execute(
+                uri: "/api/v1/containers/demo/delete",
+                method: .post,
+                headers: headers,
+                body: ByteBuffer(string: "{\"confirmationTarget\":\"wrong\"}")
+            ) { response in
+                XCTAssertEqual(response.status, .unprocessableContent)
+                let problem = try JSONDecoder.containerGUI.decode(ProblemDetail.self, from: response.body)
+                XCTAssertEqual(problem.code, .confirmationMismatch)
+            }
+        }
+
+        let deleteCount = await controller.deleteCount
+        XCTAssertEqual(deleteCount, 0)
+    }
+
     private func makeApplication(controller: some ContainerControlling) -> Application<RouterResponder<BasicRequestContext>> {
         let router = Router()
         router.middlewares.add(ErrorMiddleware())
@@ -104,6 +185,8 @@ final class ContainerControlAPITests: XCTestCase {
 
 private actor StubController: ContainerControlling {
     private var state: ContainerState
+    private var isPresent = true
+    private(set) var deleteCount = 0
     private let delay: Duration
 
     init(state: ContainerState, delay: Duration = .zero) {
@@ -112,7 +195,7 @@ private actor StubController: ContainerControlling {
     }
 
     func listContainers() async throws -> ContainerList {
-        ContainerList(items: [summary()], observedAt: Date())
+        ContainerList(items: isPresent ? [summary()] : [], observedAt: Date())
     }
 
     func startContainer(id _: String) async throws -> ContainerControlOutcome {
@@ -125,6 +208,13 @@ private actor StubController: ContainerControlling {
         try await Task.sleep(for: delay)
         state = .stopped
         return ContainerControlOutcome(exitCode: 0, observedContainer: summary(), matchedExpectation: true)
+    }
+
+    func deleteContainer(id _: String) async throws -> ContainerDeleteOutcome {
+        try await Task.sleep(for: delay)
+        deleteCount += 1
+        isPresent = false
+        return ContainerDeleteOutcome(exitCode: 0, targetAbsent: true, observedAt: Date())
     }
 
     private func summary() -> ContainerSummary {

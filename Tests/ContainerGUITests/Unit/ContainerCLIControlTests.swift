@@ -42,6 +42,53 @@ final class ContainerCLIControlTests: XCTestCase {
         XCTAssertFalse(mutation.arguments.contains("--force"))
     }
 
+    func testDeleteUsesExactIdentifierWithoutForceAndRequiresAbsenceReadback() async throws {
+        let executor = ScriptedCommandExecutor(steps: [
+            .success(versionResult()), .success(listResult(id: "demo", state: "stopped")),
+            .success(emptySuccess()),
+            .success(emptyListResult()),
+        ])
+
+        let outcome = try await makeClient(executor).deleteContainer(id: "demo")
+
+        XCTAssertEqual(outcome.exitCode, 0)
+        XCTAssertTrue(outcome.targetAbsent)
+        let requests = await executor.requests
+        let mutation = try XCTUnwrap(requests.first(where: { $0.arguments.first == "delete" }))
+        XCTAssertEqual(mutation.arguments, ["delete", "demo"])
+        XCTAssertFalse(mutation.arguments.contains("--all"))
+        XCTAssertFalse(mutation.arguments.contains("--force"))
+    }
+
+    func testDeleteRejectsRunningContainerBeforeMutation() async {
+        let executor = ScriptedCommandExecutor(steps: [
+            .success(versionResult()), .success(listResult(id: "demo", state: "running")),
+        ])
+
+        do {
+            _ = try await makeClient(executor).deleteContainer(id: "demo")
+            XCTFail("Expected state conflict")
+        } catch {
+            XCTAssertEqual((error as? ProblemDetail)?.code, .stateConflict)
+        }
+
+        let requests = await executor.requests
+        XCTAssertFalse(requests.contains(where: { $0.arguments.first == "delete" }))
+    }
+
+    func testDeleteExitZeroWithoutAbsenceReadbackIsNotSuccess() async throws {
+        let executor = ScriptedCommandExecutor(steps: [
+            .success(versionResult()), .success(listResult(id: "demo", state: "created")),
+            .success(emptySuccess()),
+            .success(listResult(id: "demo", state: "created")),
+        ])
+
+        let outcome = try await makeClient(executor).deleteContainer(id: "demo")
+
+        XCTAssertEqual(outcome.exitCode, 0)
+        XCTAssertFalse(outcome.targetAbsent)
+    }
+
     func testExitZeroWithoutStateChangeIsNotSuccess() async throws {
         let executor = ScriptedCommandExecutor(steps: [
             .success(versionResult()), .success(listResult(id: "demo", state: "stopped")),
@@ -188,6 +235,10 @@ private func versionResult() -> CommandResult {
 
 private func emptySuccess() -> CommandResult {
     CommandResult(stdout: Data(), stderr: Data(), exitCode: 0, duration: .zero)
+}
+
+private func emptyListResult() -> CommandResult {
+    CommandResult(stdout: Data("[]".utf8), stderr: Data(), exitCode: 0, duration: .zero)
 }
 
 private func listResult(id: String, state: String) -> CommandResult {

@@ -2,7 +2,7 @@
 
 ## Safety boundary
 
-- 自动化验证不得真实拉取镜像、创建容器或启动容器。
+- 自动化验证不得真实拉取镜像、创建、启动、停止或删除容器。
 - 远程注册表自动化只允许 GET，并使用固定夹具完成默认测试。
 - 远程搜索仅访问 Docker Hub；其他 OCI 注册表通过完整镜像地址进入拉取流程。
 - 真实写操作只在用户单独明确授权、目标和参数均已展示后执行。
@@ -11,7 +11,7 @@
 ## Prerequisites
 
 ```bash
-cd "/Volumes/LaCie/Container Gui"
+cd /path/to/ContainerGui
 /usr/local/bin/container --version
 /usr/local/bin/container system status --format json
 ```
@@ -35,6 +35,8 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun swift test
 - 环境变量值不出现在 Operation、ProblemDetail 或浏览器状态中。
 - 拉取后缺少镜像、创建后缺少容器、可选启动后未运行均不能显示成功。
 - 现有容器读取、指标、启停和日志测试保持通过。
+- 删除测试必须证明只接受停止/已创建目标、精确确认、固定 `delete <id>` 参数，以及目标缺失回读；
+  不得出现 `--all` 或 `--force`。
 - Docker Hub 搜索、仓库规范化、标签分页和下一页判断使用固定 JSON 夹具。
 - 非 Docker Hub 平台值、超长响应、无效页码和上游错误都不会变成不受控请求。
 - 选择远程标签只回填拉取表单，不会自动提交写请求。
@@ -85,6 +87,8 @@ xcrun swift run ContainerGUI
 11. 本地镜像名称可用于创建表单建议。
 12. 无效输入显示逐字段中文错误，未发出写请求。
 13. 不提交任何真实拉取或创建操作。
+14. 停止或已创建容器的详情显示“删除容器”；运行中容器不显示删除入口。浏览器验证只检查可见状态，
+    不确认删除对话框中的最终按钮，也不发送真实删除请求。
 
 ## Mutation acceptance with explicit authorization only
 

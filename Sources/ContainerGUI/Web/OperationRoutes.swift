@@ -51,6 +51,28 @@ final class ContainerControlService<Controller: ContainerControlling>: Sendable 
         return operation
     }
 
+    func submitDelete(id: String, confirmationTarget: String, idempotencyKey: String) async throws -> Operation {
+        guard confirmationTarget == id else { throw ProblemDetail(code: .confirmationMismatch) }
+        let fingerprint = "deleteContainer:\(id)"
+        if let existing = try await coordinator.existing(
+            idempotencyKey: idempotencyKey,
+            fingerprint: fingerprint
+        ) { return existing }
+        let current = try await currentContainer(id: id)
+        guard current.state == .stopped || current.state == .created else {
+            throw ProblemDetail(code: .stateConflict)
+        }
+        let operation = try await coordinator.create(
+            idempotencyKey: idempotencyKey,
+            fingerprint: fingerprint,
+            kind: .deleteContainer,
+            target: .container(id: id),
+            safeRequestSummary: ["containerId": .string(id)]
+        )
+        Task { await executeDelete(operation: operation) }
+        return operation
+    }
+
     private func execute(operation: Operation, expectedState: ContainerState) async {
         do {
             try await coordinator.markRunning(operation.id)
@@ -66,6 +88,36 @@ final class ContainerControlService<Controller: ContainerControlling>: Sendable 
             try await coordinator.markVerifying(operation.id, exitCode: outcome.exitCode)
             let readback = try makeReadback(outcome)
             if outcome.matchedExpectation && outcome.observedContainer.state == expectedState {
+                _ = try await coordinator.succeed(operation.id, readback: readback)
+            } else {
+                _ = try await coordinator.fail(
+                    operation.id,
+                    problem: ProblemDetail(code: .stateConflict, operationID: operation.id),
+                    readback: readback
+                )
+            }
+        } catch {
+            _ = try? await coordinator.fail(
+                operation.id,
+                problem: ProblemDetail(
+                    code: error.containerGUIProblem.code,
+                    operationID: operation.id
+                )
+            )
+        }
+    }
+
+    private func executeDelete(operation: Operation) async {
+        do {
+            try await coordinator.markRunning(operation.id)
+            let outcome = try await controller.deleteContainer(id: operation.target.id)
+            try await coordinator.markVerifying(operation.id, exitCode: outcome.exitCode)
+            let readback = OperationReadback(
+                expectationMatched: outcome.targetAbsent,
+                targetAbsent: outcome.targetAbsent,
+                observedAt: outcome.observedAt
+            )
+            if outcome.targetAbsent {
                 _ = try await coordinator.succeed(operation.id, readback: readback)
             } else {
                 _ = try await coordinator.fail(

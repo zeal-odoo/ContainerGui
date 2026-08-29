@@ -61,6 +61,7 @@ protocol ContainerControlling: Sendable {
     func listContainers() async throws -> ContainerList
     func startContainer(id: String) async throws -> ContainerControlOutcome
     func stopContainer(id: String) async throws -> ContainerControlOutcome
+    func deleteContainer(id: String) async throws -> ContainerDeleteOutcome
 }
 
 protocol ContainerLogReading: Sendable {
@@ -319,6 +320,24 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
             exitCode: result.exitCode,
             observedContainer: observed,
             matchedExpectation: observed.state == .stopped
+        )
+    }
+
+    func deleteContainer(id: String) async throws -> ContainerDeleteOutcome {
+        let current = try await requireContainer(id: id)
+        guard current.state == .stopped || current.state == .created else {
+            throw ProblemDetail(code: .stateConflict)
+        }
+        let result = try await execute(["delete", id], timeout: mutationTimeout)
+        guard result.exitCode == 0 else { throw ContainerCLIError.nonZeroExit(result.exitCode) }
+        let readback = try await listContainers()
+        let targetAbsent = !readback.items.contains {
+            $0.id == id || $0.displayName == id
+        }
+        return ContainerDeleteOutcome(
+            exitCode: result.exitCode,
+            targetAbsent: targetAbsent,
+            observedAt: readback.observedAt
         )
     }
 

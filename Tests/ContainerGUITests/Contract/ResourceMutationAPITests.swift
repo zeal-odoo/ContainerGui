@@ -315,6 +315,10 @@ private actor StubImageManager: ImageReading, ResourceMutating, ContainerControl
         return ContainerControlOutcome(exitCode: 0, observedContainer: summary, matchedExpectation: true)
     }
 
+    func deleteContainer(id _: String) async throws -> ContainerDeleteOutcome {
+        ContainerDeleteOutcome(exitCode: 0, targetAbsent: true, observedAt: observedAt)
+    }
+
     func createContainer(_ request: ContainerCreateRequest) async throws -> ContainerCreateOutcome {
         createCount += 1
         if mode == .missingCreateReadback {

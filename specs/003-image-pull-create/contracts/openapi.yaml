@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Container GUI Image Browse, Pull and Container Create API
-  version: 2.1.0
-  description: Feature contract for local image reads, remote registry browsing, image pulls and container creation.
+  version: 2.3.0
+  description: Feature contract for local image reads, remote registry browsing, image pulls, container creation and safe container deletion.
 servers:
   - url: http://127.0.0.1:8787/api/v1
 security: []
@@ -159,6 +159,37 @@ paths:
         "503":
           $ref: "#/components/responses/ProblemResponse"
         "504":
+          $ref: "#/components/responses/ProblemResponse"
+
+  /containers/{containerId}/delete:
+    post:
+      tags: [Containers]
+      operationId: deleteContainer
+      summary: Delete a stopped or created container and verify its absence
+      description: Requires exact confirmation. Bulk and force deletion are not available.
+      parameters:
+        - name: containerId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 256
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmedTargetRequest"
+      responses:
+        "202":
+          $ref: "#/components/responses/OperationAccepted"
+        "404":
+          $ref: "#/components/responses/ProblemResponse"
+        "409":
+          $ref: "#/components/responses/ProblemResponse"
+        "422":
           $ref: "#/components/responses/ProblemResponse"
 
   /operations/{operationId}:
@@ -463,6 +494,15 @@ components:
           type: boolean
           default: false
 
+    ConfirmedTargetRequest:
+      type: object
+      additionalProperties: false
+      required: [confirmationTarget]
+      properties:
+        confirmationTarget:
+          type: string
+          description: Must exactly equal the current container identifier.
+
     OperationTarget:
       type: object
       additionalProperties: false
@@ -504,7 +544,7 @@ components:
           format: uuid
         kind:
           type: string
-          enum: [pullImage, createContainer]
+          enum: [pullImage, createContainer, deleteContainer]
         target:
           $ref: "#/components/schemas/OperationTarget"
         state:
