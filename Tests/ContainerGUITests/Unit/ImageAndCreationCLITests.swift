@@ -413,6 +413,44 @@ final class ImageAndCreationCLITests: XCTestCase {
         XCTAssertEqual(requests[3].arguments, ["start", "ssh-demo"])
     }
 
+    func testRootSSHCreateUsesExplicitRootIdentityAndFixedBootstrap() async throws {
+        let publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhY fixture@example"
+        let executor = ResourceScriptedCommandExecutor(steps: [
+            .success(resourceVersionResult()),
+            .success(resourceEmptySuccess()),
+            .success(resourceContainerListResult(id: "root-ssh-demo", state: "created")),
+            .success(resourceEmptySuccess()),
+            .success(resourceContainerListResult(id: "root-ssh-demo", state: "running")),
+        ])
+        let request = ContainerCreateRequest(
+            name: "root-ssh-demo",
+            image: "docker.io/library/ubuntu:26.04",
+            startAfterCreate: true,
+            ssh: SSHCreateConfiguration(
+                hostPort: 2001,
+                username: "root",
+                publicKey: publicKey,
+                loginAsRoot: true
+            )
+        )
+
+        _ = try await resourceClient(executor).createContainer(request)
+
+        let requests = await executor.requests
+        XCTAssertEqual(requests[1].arguments, [
+            "create", "--name", "root-ssh-demo",
+            "--publish", "127.0.0.1:2001:22/tcp",
+            "--label", "\(SSHContainerLabels.enabled)=true",
+            "--label", "\(SSHContainerLabels.hostPort)=2001",
+            "--label", "\(SSHContainerLabels.username)=root",
+            "--env", "\(SSHCreateConfiguration.userEnvironmentName)=root",
+            "--env", "\(SSHCreateConfiguration.publicKeyEnvironmentName)=\(publicKey)",
+            "--init", "--entrypoint", "/bin/sh",
+            "--", "docker.io/library/ubuntu:26.04", "-c", SSHContainerBootstrap.script,
+        ])
+        XCTAssertFalse(requests[1].arguments.contains(where: { $0.contains("CONTAINER_GUI_SSH_ROOT_PASSWORD") }))
+    }
+
     func testInvalidCreateDoesNotExecuteCLI() async {
         let executor = ResourceScriptedCommandExecutor(steps: [])
 

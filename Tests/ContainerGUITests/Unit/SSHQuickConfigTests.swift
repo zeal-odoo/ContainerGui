@@ -27,6 +27,78 @@ final class SSHQuickConfigTests: XCTestCase {
         XCTAssertFalse(encoded.contains(publicKey))
     }
 
+    func testExplicitRootConfigurationUsesOnlyPublicKeyLogin() throws {
+        let configuration = SSHCreateConfiguration(
+            hostPort: 2001,
+            username: "root",
+            publicKey: publicKey,
+            loginAsRoot: true
+        )
+
+        XCTAssertEqual(try configuration.validated(), configuration)
+        XCTAssertEqual(configuration.safeRequestSummary["username"], .string("root"))
+        XCTAssertEqual(configuration.safeRequestSummary["loginAsRoot"], .bool(true))
+
+        let connection = try XCTUnwrap(ContainerSSHConnection(labels: [
+            SSHContainerLabels.enabled: .string("true"),
+            SSHContainerLabels.hostPort: .string("2001"),
+            SSHContainerLabels.username: .string("root"),
+        ]))
+        XCTAssertEqual(connection.connectionCommand, "ssh -p 2001 root@127.0.0.1")
+
+        XCTAssertTrue(SSHContainerBootstrap.script.contains(#"if [ "$ssh_user" = "root" ]; then"#))
+        XCTAssertTrue(SSHContainerBootstrap.script.contains("ssh_home=/root"))
+        XCTAssertTrue(SSHContainerBootstrap.script.contains("usermod --password 'NP' root"))
+        XCTAssertTrue(SSHContainerBootstrap.script.contains("PermitRootLogin prohibit-password"))
+        XCTAssertTrue(SSHContainerBootstrap.script.contains("PasswordAuthentication no"))
+        XCTAssertFalse(SSHContainerBootstrap.script.contains("CONTAINER_GUI_SSH_ROOT_PASSWORD"))
+    }
+
+    func testRootIdentityRequiresExplicitMatchingSelection() {
+        assertValidationError(
+            try SSHCreateConfiguration(
+                hostPort: 2001,
+                username: "root",
+                publicKey: publicKey
+            ).validated(),
+            fields: ["ssh.username"]
+        )
+        assertValidationError(
+            try SSHCreateConfiguration(
+                hostPort: 2001,
+                username: "dev",
+                publicKey: publicKey,
+                loginAsRoot: true
+            ).validated(),
+            fields: ["ssh.username"]
+        )
+    }
+
+    func testOmittedRootSelectionKeepsStandardUserCompatibility() throws {
+        let data = Data(#"{"hostPort":2222,"username":"dev","publicKey":"\#(publicKey)"}"#.utf8)
+        let configuration = try JSONDecoder.containerGUI.decode(SSHCreateConfiguration.self, from: data)
+
+        XCTAssertFalse(configuration.loginAsRoot)
+        XCTAssertEqual(configuration.username, "dev")
+        XCTAssertNoThrow(try configuration.validated())
+    }
+
+    func testRootMetadataAndBootstrapRemainStableAcrossRestarts() throws {
+        let labels: [String: JSONValue] = [
+            SSHContainerLabels.enabled: .string("true"),
+            SSHContainerLabels.hostPort: .string("2001"),
+            SSHContainerLabels.username: .string("root"),
+        ]
+
+        let beforeRestart = try XCTUnwrap(ContainerSSHConnection(labels: labels))
+        let afterRestart = try XCTUnwrap(ContainerSSHConnection(labels: labels))
+        XCTAssertEqual(afterRestart, beforeRestart)
+        XCTAssertEqual(afterRestart.connectionCommand, "ssh -p 2001 root@127.0.0.1")
+        XCTAssertTrue(SSHContainerBootstrap.script.contains("printf '%s\\n' \"$CONTAINER_GUI_SSH_AUTHORIZED_KEY\" > \"$ssh_home/.ssh/authorized_keys\""))
+        XCTAssertTrue(SSHContainerBootstrap.script.contains("ssh-keygen -A"))
+        XCTAssertFalse(SSHContainerBootstrap.script.contains("rm -f /etc/ssh/ssh_host_"))
+    }
+
     func testSSHConnectionOnlyAcceptsCompleteTrustedLabels() throws {
         let connection = try XCTUnwrap(ContainerSSHConnection(labels: [
             SSHContainerLabels.enabled: .string("true"),

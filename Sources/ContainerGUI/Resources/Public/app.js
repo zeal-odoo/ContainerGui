@@ -35,7 +35,7 @@ const elements = Object.fromEntries([
   "createName", "createImage", "createCPUs", "createMemory", "createPorts", "createEnvironment",
   "createArguments", "createStartAfter", "createNameError", "createImageError", "createCPUsError",
   "createMemoryError", "createPortsError", "createEnvironmentError", "createArgumentsError",
-  "createSSHEnabled", "createSSHFields", "createSSHHostPort", "createSSHUsername",
+  "createSSHEnabled", "createSSHFields", "createSSHLoginAsRoot", "createSSHHostPort", "createSSHUsername",
   "createSSHPublicKey", "createSSHPublicKeyFile", "createSSHHostPortError",
   "createSSHUsernameError", "createSSHPublicKeyError", "generateSSHKeyPairButton",
   "generatedSSHKeyStatus", "createKeepAlive",
@@ -1153,6 +1153,9 @@ function updateSSHFields() {
   const enabled = elements.createSSHEnabled.checked;
   elements.createSSHFields.hidden = !enabled;
   elements.createSSHEnabled.setAttribute("aria-expanded", String(enabled));
+  if (!enabled) elements.createSSHLoginAsRoot.checked = false;
+  elements.createSSHLoginAsRoot.disabled = !enabled;
+  updateSSHRootMode();
   if (enabled) {
     elements.createStartAfter.checked = true;
     elements.createStartAfter.disabled = true;
@@ -1160,6 +1163,20 @@ function updateSSHFields() {
     elements.createStartAfter.disabled = false;
   }
   updateProcessModeFields();
+}
+
+function updateSSHRootMode() {
+  const sshEnabled = elements.createSSHEnabled.checked;
+  const loginAsRoot = sshEnabled && elements.createSSHLoginAsRoot.checked;
+  if (loginAsRoot) {
+    if (elements.createSSHUsername.value !== "root") {
+      elements.createSSHUsername.dataset.standardUsername = elements.createSSHUsername.value || "dev";
+    }
+    elements.createSSHUsername.value = "root";
+  } else if (elements.createSSHUsername.value === "root") {
+    elements.createSSHUsername.value = elements.createSSHUsername.dataset.standardUsername || "dev";
+  }
+  elements.createSSHUsername.disabled = !sshEnabled || loginAsRoot;
 }
 
 function updateProcessModeFields() {
@@ -1261,6 +1278,7 @@ function buildCreateRequest() {
   };
   if (elements.createSSHEnabled.checked) {
     const hostPort = Number(elements.createSSHHostPort.value);
+    const loginAsRoot = elements.createSSHLoginAsRoot.checked;
     const username = elements.createSSHUsername.value.trim();
     const publicKey = elements.createSSHPublicKey.value.trim();
     if (!Number.isInteger(hostPort) || hostPort < 1024 || hostPort > 65535) {
@@ -1268,8 +1286,10 @@ function buildCreateRequest() {
     } else if (ports.some((mapping) => mapping.hostPort === hostPort)) {
       errors["ssh.hostPort"] = "SSH 主机端口不能与其他端口映射重复";
     }
-    if (username === "root" || !/^[a-z_][a-z0-9_-]{0,31}$/.test(username)) {
-      errors["ssh.username"] = "SSH 用户名必须为 1...32 位小写安全名称，且不能为 root";
+    if (loginAsRoot ? username !== "root" : username === "root" || !/^[a-z_][a-z0-9_-]{0,31}$/.test(username)) {
+      errors["ssh.username"] = loginAsRoot
+        ? "选择 root 登录时，SSH 用户名必须为 root"
+        : "SSH 用户名必须为 1...32 位小写安全名称；root 需使用专用选项";
     }
     const publicKeyError = validateSSHPublicKey(publicKey);
     if (publicKeyError) errors["ssh.publicKey"] = publicKeyError;
@@ -1287,7 +1307,7 @@ function buildCreateRequest() {
       return null;
     }
     request.startAfterCreate = true;
-    request.ssh = { hostPort, username, publicKey };
+    request.ssh = { hostPort, username, publicKey, loginAsRoot };
   }
   if (cpus !== null) request.cpus = cpus;
   if (memoryMiB !== null) request.memoryMiB = memoryMiB;
@@ -1480,6 +1500,7 @@ elements.loadMoreTagsButton.addEventListener("click", loadMoreRemoteTags);
 elements.openCreateContainerButton.addEventListener("click", openCreateContainerDialog);
 elements.cancelCreateContainerButton.addEventListener("click", () => elements.createContainerDialog.close());
 elements.createSSHEnabled.addEventListener("change", updateSSHFields);
+elements.createSSHLoginAsRoot.addEventListener("change", updateSSHRootMode);
 elements.createSSHPublicKeyFile.addEventListener("change", readSSHPublicKeyFile);
 elements.generateSSHKeyPairButton.addEventListener("click", generateAndDownloadSSHKeyPair);
 elements.createKeepAlive.addEventListener("change", updateProcessModeFields);

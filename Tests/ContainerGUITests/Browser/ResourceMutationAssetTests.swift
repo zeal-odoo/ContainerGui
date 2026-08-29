@@ -136,7 +136,7 @@ final class ResourceMutationAssetTests: XCTestCase {
         XCTAssertTrue(html.contains("id=\"createSSHPublicKeyFile\""))
         XCTAssertTrue(html.contains("accept=\".pub,text/plain\""))
         XCTAssertTrue(html.contains("只绑定到 127.0.0.1"))
-        XCTAssertTrue(html.contains("不启用密码或 root 登录"))
+        XCTAssertTrue(html.contains("密码登录始终禁用"))
 
         XCTAssertTrue(script.contains("updateSSHFields"))
         XCTAssertTrue(script.contains("readSSHPublicKeyFile"))
@@ -148,6 +148,44 @@ final class ResourceMutationAssetTests: XCTestCase {
         XCTAssertTrue(builder.contains("publicKey"))
         XCTAssertFalse(builder.contains("entrypoint"))
         XCTAssertFalse(builder.contains("sshd -D"))
+    }
+
+    func testCreateDialogOffersExplicitRootPublicKeyMode() throws {
+        let html = try asset("index.html")
+        let script = try asset("app.js")
+
+        XCTAssertTrue(html.contains("id=\"createSSHLoginAsRoot\""))
+        XCTAssertTrue(html.contains("使用 root 登录（仅公钥）"))
+        XCTAssertTrue(html.contains("高权限"))
+        XCTAssertTrue(html.contains("密码登录保持禁用"))
+
+        let rootUpdater = try functionBody("updateSSHRootMode", in: script)
+        XCTAssertTrue(rootUpdater.contains("elements.createSSHLoginAsRoot.checked"))
+        XCTAssertTrue(rootUpdater.contains("elements.createSSHUsername.value = \"root\""))
+        XCTAssertTrue(rootUpdater.contains("elements.createSSHUsername.disabled = !sshEnabled || loginAsRoot"))
+
+        let builder = try functionBody("buildCreateRequest", in: script)
+        XCTAssertTrue(builder.contains("loginAsRoot"))
+        XCTAssertTrue(builder.contains("elements.createSSHLoginAsRoot.checked"))
+        XCTAssertFalse(builder.localizedCaseInsensitiveContains("rootPassword"))
+        XCTAssertFalse(builder.contains("privateKey"))
+    }
+
+    func testRootModeIsDefaultOffAndRestoresStandardUsername() throws {
+        let html = try asset("index.html")
+        let script = try asset("app.js")
+
+        XCTAssertTrue(html.contains("id=\"createSSHLoginAsRoot\" name=\"sshLoginAsRoot\" type=\"checkbox\" disabled"))
+        XCTAssertFalse(html.contains("id=\"createSSHLoginAsRoot\" name=\"sshLoginAsRoot\" type=\"checkbox\" checked"))
+
+        let sshUpdater = try functionBody("updateSSHFields", in: script)
+        XCTAssertTrue(sshUpdater.contains("if (!enabled) elements.createSSHLoginAsRoot.checked = false"))
+        XCTAssertTrue(sshUpdater.contains("elements.createSSHLoginAsRoot.disabled = !enabled"))
+
+        let rootUpdater = try functionBody("updateSSHRootMode", in: script)
+        XCTAssertTrue(rootUpdater.contains("dataset.standardUsername"))
+        XCTAssertTrue(rootUpdater.contains("elements.createSSHUsername.dataset.standardUsername || \"dev\""))
+        XCTAssertTrue(script.contains("createSSHLoginAsRoot.addEventListener(\"change\", updateSSHRootMode)"))
     }
 
     func testCreateDialogCanGenerateLocalSSHKeyPair() throws {

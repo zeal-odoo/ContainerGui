@@ -1,0 +1,109 @@
+openapi: 3.1.0
+info:
+  title: Container GUI Root Public-Key SSH API
+  version: 2.7.0
+  description: Explicit root public-key login mode for the existing new-container SSH preset.
+servers:
+  - url: http://127.0.0.1:8787/api/v1
+security: []
+
+paths:
+  /containers:
+    post:
+      operationId: createContainer
+      summary: Create a container with an optional key-only SSH preset
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContainerCreateRequest"
+      responses:
+        "202":
+          description: Operation accepted
+        "422":
+          description: Validation failed before any container mutation
+
+components:
+  schemas:
+    SSHCreateConfiguration:
+      type: object
+      additionalProperties: false
+      required: [hostPort, username, publicKey]
+      properties:
+        hostPort:
+          type: integer
+          minimum: 1024
+          maximum: 65535
+          default: 2222
+        username:
+          type: string
+          minLength: 1
+          maxLength: 32
+        publicKey:
+          type: string
+          minLength: 1
+          maxLength: 4096
+          writeOnly: true
+        loginAsRoot:
+          type: boolean
+          default: false
+      allOf:
+        - if:
+            required: [loginAsRoot]
+            properties:
+              loginAsRoot:
+                const: true
+          then:
+            properties:
+              username:
+                const: root
+          else:
+            properties:
+              username:
+                pattern: "^(?!root$)[a-z_][a-z0-9_-]{0,31}$"
+
+    ContainerCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [name, image]
+      properties:
+        name:
+          type: string
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        image:
+          type: string
+          minLength: 1
+          maxLength: 512
+        startAfterCreate:
+          type: boolean
+          default: false
+        ssh:
+          oneOf:
+            - $ref: "#/components/schemas/SSHCreateConfiguration"
+            - type: "null"
+
+    ContainerSSHConnection:
+      type: object
+      additionalProperties: false
+      required: [host, hostPort, username, connectionCommand]
+      properties:
+        host:
+          type: string
+          const: 127.0.0.1
+        hostPort:
+          type: integer
+          minimum: 1024
+          maximum: 65535
+        username:
+          type: string
+          pattern: "^(root|[a-z_][a-z0-9_-]{0,31})$"
+        connectionCommand:
+          type: string

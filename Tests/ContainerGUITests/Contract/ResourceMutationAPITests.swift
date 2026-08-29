@@ -301,6 +301,75 @@ final class ResourceMutationAPITests: XCTestCase {
         XCTAssertEqual(received.ssh?.publicKey, publicKey)
     }
 
+    func testCreateExplicitRootSSHPresetNeverReturnsThePublicKey() async throws {
+        let manager = StubImageManager()
+        let app = makeImageApplication(manager: manager)
+        let publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhY fixture@example"
+        let rawBody = #"{"name":"root-ssh-demo","image":"ubuntu:26.04","startAfterCreate":true,"ssh":{"hostPort":2001,"username":"root","publicKey":"\#(publicKey)","loginAsRoot":true}}"#
+        let expectedOrigin = origin
+        let headerName = idempotencyName
+
+        try await app.test(.router) { client in
+            let headers: HTTPFields = [
+                .origin: expectedOrigin,
+                .contentType: "application/json",
+                headerName: UUID().uuidString,
+            ]
+            try await client.execute(
+                uri: "/api/v1/containers",
+                method: .post,
+                headers: headers,
+                body: ByteBuffer(string: rawBody)
+            ) { response in
+                XCTAssertEqual(response.status, .accepted)
+                let encoded = String(decoding: response.body.readableBytesView, as: UTF8.self)
+                XCTAssertFalse(encoded.contains(publicKey))
+                let operation = try JSONDecoder.containerGUI.decode(ContainerGUI.Operation.self, from: response.body)
+                let ssh = try XCTUnwrap(operation.safeRequestSummary["ssh"]?.objectValue)
+                XCTAssertEqual(ssh["username"], .string("root"))
+                XCTAssertEqual(ssh["loginAsRoot"], .bool(true))
+            }
+        }
+
+        let capturedRequest = await manager.lastCreateRequest
+        let received = try XCTUnwrap(capturedRequest)
+        XCTAssertEqual(received.ssh?.username, "root")
+        XCTAssertEqual(received.ssh?.loginAsRoot, true)
+        XCTAssertEqual(received.ssh?.publicKey, publicKey)
+    }
+
+    func testCreateRejectsImplicitRootSSHBeforeMutation() async throws {
+        let manager = StubImageManager()
+        let app = makeImageApplication(manager: manager)
+        let publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhY fixture@example"
+        let body = #"{"name":"root-ssh-demo","image":"ubuntu:26.04","startAfterCreate":true,"ssh":{"hostPort":2001,"username":"root","publicKey":"\#(publicKey)"}}"#
+        let expectedOrigin = origin
+        let headerName = idempotencyName
+
+        try await app.test(.router) { client in
+            let headers: HTTPFields = [
+                .origin: expectedOrigin,
+                .contentType: "application/json",
+                headerName: UUID().uuidString,
+            ]
+            try await client.execute(
+                uri: "/api/v1/containers",
+                method: .post,
+                headers: headers,
+                body: ByteBuffer(string: body)
+            ) { response in
+                XCTAssertEqual(response.status, .unprocessableContent)
+                let problem = try JSONDecoder.containerGUI.decode(ProblemDetail.self, from: response.body)
+                XCTAssertEqual(problem.fieldErrors, [
+                    FieldError(field: "ssh.username", message: "SSH 用户名必须为 1...32 位小写安全名称；root 需使用专用选项")
+                ])
+            }
+        }
+
+        let createCount = await manager.createCount
+        XCTAssertEqual(createCount, 0)
+    }
+
     func testCreateRejectsExistingNameBeforeMutation() async throws {
         let manager = StubImageManager(mode: .existingContainer)
         let app = makeImageApplication(manager: manager)

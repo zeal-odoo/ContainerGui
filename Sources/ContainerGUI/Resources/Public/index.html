@@ -248,7 +248,12 @@
           <span>启用 SSH（仅公钥登录）</span>
         </label>
         <div id="createSSHFields" hidden>
-          <p class="ssh-preset-note">自动安装并启动 SSH，只绑定到 127.0.0.1；不启用密码或 root 登录。容器重启后会自动恢复。</p>
+          <p class="ssh-preset-note">自动安装并启动 SSH，只绑定到 127.0.0.1；密码登录始终禁用。容器重启后会自动恢复。</p>
+          <label class="checkbox-field">
+            <input id="createSSHLoginAsRoot" name="sshLoginAsRoot" type="checkbox" disabled>
+            <span>使用 root 登录（仅公钥）</span>
+          </label>
+          <p class="ssh-preset-note">高权限选项：公钥将授权给 root，密码登录保持禁用；未勾选时继续创建普通用户。</p>
           <div class="form-grid">
             <label class="form-field">
               <span>宿主机端口</span>

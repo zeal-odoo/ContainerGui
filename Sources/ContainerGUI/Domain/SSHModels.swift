@@ -17,14 +17,41 @@ struct SSHCreateConfiguration: Codable, Equatable, Sendable {
     let hostPort: Int
     let username: String
     let publicKey: String
+    let loginAsRoot: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case hostPort, username, publicKey, loginAsRoot
+    }
+
+    init(
+        hostPort: Int,
+        username: String,
+        publicKey: String,
+        loginAsRoot: Bool = false
+    ) {
+        self.hostPort = hostPort
+        self.username = username
+        self.publicKey = publicKey
+        self.loginAsRoot = loginAsRoot
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        hostPort = try container.decode(Int.self, forKey: .hostPort)
+        username = try container.decode(String.self, forKey: .username)
+        publicKey = try container.decode(String.self, forKey: .publicKey)
+        loginAsRoot = try container.decodeIfPresent(Bool.self, forKey: .loginAsRoot) ?? false
+    }
 
     func validated() throws -> Self {
         var errors: [String: String] = [:]
         if !(1_024...65_535).contains(hostPort) {
             errors["ssh.hostPort"] = "SSH 主机端口必须在 1024...65535 之间"
         }
-        if !Self.isValidUsername(username) {
-            errors["ssh.username"] = "SSH 用户名必须为 1...32 位小写安全名称，且不能为 root"
+        if loginAsRoot ? username != "root" : !Self.isValidStandardUsername(username) {
+            errors["ssh.username"] = loginAsRoot
+                ? "选择 root 登录时，SSH 用户名必须为 root"
+                : "SSH 用户名必须为 1...32 位小写安全名称；root 需使用专用选项"
         }
         if parsedPublicKey == nil {
             errors["ssh.publicKey"] = "SSH 公钥格式无效，请粘贴单行公钥或选择 .pub 文件"
@@ -51,16 +78,21 @@ struct SSHCreateConfiguration: Codable, Equatable, Sendable {
             "host": .string(Self.fixedHost),
             "hostPort": .number(Double(hostPort)),
             "username": .string(username),
+            "loginAsRoot": .bool(loginAsRoot),
             "publicKeyType": .string(publicKeyType),
             "publicKeyFingerprint": .string(publicKeyFingerprint),
         ]
     }
 
-    static func isValidUsername(_ value: String) -> Bool {
+    static func isValidStandardUsername(_ value: String) -> Bool {
         value != "root" && value.range(
             of: #"^[a-z_][a-z0-9_-]{0,31}$"#,
             options: .regularExpression
         ) != nil
+    }
+
+    static func isValidConnectionUsername(_ value: String) -> Bool {
+        value == "root" || isValidStandardUsername(value)
     }
 
     private var parsedPublicKey: (type: String, data: Data)? {
@@ -121,7 +153,7 @@ struct ContainerSSHConnection: Codable, Equatable, Sendable {
               let hostPort = Int(rawPort),
               (1_024...65_535).contains(hostPort),
               let username = labels[SSHContainerLabels.username]?.stringValue,
-              SSHCreateConfiguration.isValidUsername(username) else {
+              SSHCreateConfiguration.isValidConnectionUsername(username) else {
             return nil
         }
         self.init(hostPort: hostPort, username: username)
@@ -134,7 +166,7 @@ struct ContainerSSHConnection: Codable, Equatable, Sendable {
         let username = try container.decode(String.self, forKey: .username)
         guard host == SSHCreateConfiguration.fixedHost,
               (1_024...65_535).contains(hostPort),
-              SSHCreateConfiguration.isValidUsername(username) else {
+              SSHCreateConfiguration.isValidConnectionUsername(username) else {
             throw DecodingError.dataCorruptedError(
                 forKey: .host,
                 in: container,
@@ -189,13 +221,23 @@ enum SSHContainerBootstrap {
     fi
 
     ssh_user="$CONTAINER_GUI_SSH_USER"
-    if ! id "$ssh_user" >/dev/null 2>&1; then
-      useradd --create-home --shell /bin/sh "$ssh_user"
-    fi
-    ssh_home="$(getent passwd "$ssh_user" | cut -d: -f6)"
-    if [ -z "$ssh_home" ]; then
-      echo "Container GUI SSH could not resolve the user home directory." >&2
-      exit 65
+    if [ "$ssh_user" = "root" ]; then
+      ssh_home=/root
+      usermod --password 'NP' root
+      permit_root_login='PermitRootLogin prohibit-password'
+    else
+      if ! id "$ssh_user" >/dev/null 2>&1; then
+        useradd --create-home --shell /bin/sh "$ssh_user"
+      fi
+      ssh_home="$(getent passwd "$ssh_user" | cut -d: -f6)"
+      if [ -z "$ssh_home" ]; then
+        echo "Container GUI SSH could not resolve the user home directory." >&2
+        exit 65
+      fi
+      random_password="$(head -c 48 /dev/urandom | base64 | tr -d '\n')"
+      printf '%s:%s\n' "$ssh_user" "$random_password" | chpasswd
+      unset random_password
+      permit_root_login='PermitRootLogin no'
     fi
 
     install -d -m 0700 -o "$ssh_user" -g "$ssh_user" "$ssh_home/.ssh"
@@ -203,10 +245,6 @@ enum SSHContainerBootstrap {
     printf '%s\n' "$CONTAINER_GUI_SSH_AUTHORIZED_KEY" > "$ssh_home/.ssh/authorized_keys"
     chown "$ssh_user:$ssh_user" "$ssh_home/.ssh/authorized_keys"
     chmod 0600 "$ssh_home/.ssh/authorized_keys"
-
-    random_password="$(head -c 48 /dev/urandom | base64 | tr -d '\n')"
-    printf '%s:%s\n' "$ssh_user" "$random_password" | chpasswd
-    unset random_password
 
     install -d -m 0755 /run/sshd /etc/ssh/sshd_config.d
     ssh-keygen -A
@@ -216,10 +254,10 @@ enum SSHContainerBootstrap {
         'KbdInteractiveAuthentication no' \
         'ChallengeResponseAuthentication no' \
         'PermitEmptyPasswords no' \
-        'PermitRootLogin no' \
         'PubkeyAuthentication yes' \
         'UsePAM no' \
         'X11Forwarding no'
+      printf '%s\n' "$permit_root_login"
       printf 'AllowUsers %s\n' "$ssh_user"
     } > /etc/ssh/sshd_config.d/99-container-gui.conf
     /usr/sbin/sshd -t
