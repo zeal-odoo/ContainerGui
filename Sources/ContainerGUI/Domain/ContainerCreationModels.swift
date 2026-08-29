@@ -94,8 +94,8 @@ struct ContainerCreateRequest: Codable, Equatable, Sendable {
         if !isValidImageReference(image) {
             errors["image"] = "镜像引用格式无效"
         }
-        if let cpus, !cpus.isFinite || cpus <= 0 || cpus > 1024 {
-            errors["cpus"] = "CPU 必须大于 0 且不超过 1024"
+        if let cpus, !cpus.isFinite || cpus.rounded() != cpus || cpus < 1 || cpus > 1024 {
+            errors["cpus"] = "CPU 必须为 1...1024 的整数"
         }
         if let memoryMiB, !(1...1_048_576).contains(memoryMiB) {
             errors["memoryMiB"] = "内存必须在 1...1048576 MiB 之间"

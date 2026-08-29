@@ -1234,8 +1234,8 @@ function buildCreateRequest() {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(name)) errors.name = "容器名称格式无效";
   if (!/^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,511}$/.test(image)) errors.image = "镜像引用格式无效";
   const cpus = elements.createCPUs.value === "" ? null : Number(elements.createCPUs.value);
-  if (cpus !== null && (!Number.isFinite(cpus) || cpus <= 0 || cpus > 1024)) {
-    errors.cpus = "CPU 必须大于 0 且不超过 1024";
+  if (cpus !== null && (!Number.isInteger(cpus) || cpus < 1 || cpus > 1024)) {
+    errors.cpus = "CPU 必须为 1...1024 的整数";
   }
   const memoryMiB = elements.createMemory.value === "" ? null : Number(elements.createMemory.value);
   if (memoryMiB !== null && (!Number.isInteger(memoryMiB) || memoryMiB < 1 || memoryMiB > 1048576)) {

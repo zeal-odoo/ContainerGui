@@ -276,7 +276,7 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
         try await requireSupportedInstallation()
         var arguments = ["create", "--name", request.name]
         if let cpus = request.cpus {
-            arguments += ["--cpus", String(cpus)]
+            arguments += ["--cpus", String(Int(cpus))]
         }
         if let memoryMiB = request.memoryMiB {
             arguments += ["--memory", "\(memoryMiB)M"]

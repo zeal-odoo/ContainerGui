@@ -85,6 +85,25 @@ final class ImageAndCreationCLITests: XCTestCase {
         }
     }
 
+    func testContainerCreateRejectsFractionalCPUCount() throws {
+        let request = ContainerCreateRequest(
+            name: "ubuntu-test",
+            image: "ubuntu:26.04",
+            cpus: 2.5
+        )
+
+        XCTAssertThrowsError(try request.validated()) { error in
+            guard let problem = error as? ProblemDetail else {
+                return XCTFail("Expected ProblemDetail")
+            }
+            XCTAssertEqual(problem.code, .validationFailed)
+            XCTAssertEqual(
+                problem.fieldErrors,
+                [FieldError(field: "cpus", message: "CPU 必须为 1...1024 的整数")]
+            )
+        }
+    }
+
     func testParsesImageListAndInspectFixtures() throws {
         let list = try CLIOutputParser.parseImageList(
             data: fixture("images-list.json"),
@@ -299,7 +318,7 @@ final class ImageAndCreationCLITests: XCTestCase {
         let request = ContainerCreateRequest(
             name: "demo",
             image: "postgres:latest",
-            cpus: 2.5,
+            cpus: 2,
             memoryMiB: 2048,
             ports: [
                 PortMapping(hostPort: 15432, containerPort: 5432),
@@ -316,7 +335,7 @@ final class ImageAndCreationCLITests: XCTestCase {
         let requests = await executor.requests
         XCTAssertEqual(requests[1].arguments, [
             "create", "--name", "demo",
-            "--cpus", "2.5",
+            "--cpus", "2",
             "--memory", "2048M",
             "--publish", "127.0.0.1:15432:5432/tcp",
             "--publish", "127.0.0.1:15353:53/udp",
