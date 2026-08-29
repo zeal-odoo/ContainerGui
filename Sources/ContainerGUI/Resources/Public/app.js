@@ -31,8 +31,7 @@ const elements = Object.fromEntries([
   "createArguments", "createStartAfter", "createNameError", "createImageError", "createCPUsError",
   "createMemoryError", "createPortsError", "createEnvironmentError", "createArgumentsError",
   "createFormStatus", "cancelCreateContainerButton", "submitCreateContainerButton",
-  "remoteRegistrySection", "remoteRegistryForm", "remoteRegistryProvider", "dockerHubSearchFields",
-  "ghcrSearchFields", "remoteSearchQuery", "ghcrOwnerType", "ghcrOwner",
+  "remoteRegistrySection", "remoteRegistryForm", "remoteSearchQuery",
   "searchRemoteRepositoriesButton", "remoteRepositoryCount", "remoteRepositoryStatus",
   "remoteRepositoryError", "remoteRepositoryResults", "loadMoreRepositoriesButton",
   "remoteTagPanel", "remoteTagCount", "remoteTagStatus", "remoteTagError", "remoteTagResults",
@@ -445,10 +444,6 @@ async function loadRemoteTagPage(page) {
       repository: repository.repository,
       page: String(page)
     });
-    if (repository.registry === "ghcr") {
-      parameters.set("ownerType", state.remoteSearchParameters.ownerType);
-      parameters.set("owner", state.remoteSearchParameters.owner);
-    }
     const result = await fetchJSON(`${ENDPOINTS.registryTags}?${parameters}`);
     state.remoteTags = appendUniqueBy(state.remoteTags, result.items || [], "reference");
     state.remoteTagPage = result.page;
@@ -467,26 +462,13 @@ async function loadRemoteTagPage(page) {
 async function searchRemoteRepositories(event) {
   event.preventDefault();
   if (state.remoteRepositoryLoading) return;
-  const registry = elements.remoteRegistryProvider.value;
-  const parameters = { registry };
-  if (registry === "dockerHub") {
-    const query = elements.remoteSearchQuery.value.trim();
-    if (!query) {
-      elements.remoteRepositoryStatus.textContent = "请输入 Docker Hub 搜索关键词。";
-      elements.remoteSearchQuery.focus();
-      return;
-    }
-    parameters.query = query;
-  } else {
-    const owner = elements.ghcrOwner.value.trim();
-    if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/.test(owner) || owner.includes("--")) {
-      elements.remoteRepositoryStatus.textContent = "请输入有效的 GitHub 用户或组织名称。";
-      elements.ghcrOwner.focus();
-      return;
-    }
-    parameters.ownerType = elements.ghcrOwnerType.value;
-    parameters.owner = owner;
+  const query = elements.remoteSearchQuery.value.trim();
+  if (!query) {
+    elements.remoteRepositoryStatus.textContent = "请输入 Docker Hub 搜索关键词。";
+    elements.remoteSearchQuery.focus();
+    return;
   }
+  const parameters = { registry: "dockerHub", query };
   resetRemoteRepositories("正在搜索远程镜像…");
   state.remoteSearchParameters = parameters;
   await loadRemoteRepositoryPage(1);
@@ -515,15 +497,6 @@ function selectRemoteTag(tag) {
   elements.pullFormStatus.textContent = `已选择标签 ${tag.name}；确认后再开始拉取。`;
   elements.pullImageDialog.showModal();
   elements.pullImageReference.focus();
-}
-
-function updateRemoteRegistryFields() {
-  const isGHCR = elements.remoteRegistryProvider.value === "ghcr";
-  elements.dockerHubSearchFields.hidden = isGHCR;
-  elements.ghcrSearchFields.hidden = !isGHCR;
-  elements.remoteSearchQuery.required = !isGHCR;
-  elements.ghcrOwner.required = isGHCR;
-  resetRemoteRepositories();
 }
 
 async function refreshDashboard({ announce = false } = {}) {
@@ -783,8 +756,8 @@ function isRegistryQualified(reference) {
 
 function resolveImageReference(reference, registry) {
   if (!registry) return reference;
-  const host = registry === "dockerHub" ? "docker.io/" : registry === "ghcr" ? "ghcr.io/" : null;
-  if (!host) return null;
+  if (registry !== "dockerHub") return null;
+  const host = "docker.io/";
   if (reference.startsWith(host)) return reference;
   if (isRegistryQualified(reference)) return null;
   if (registry === "dockerHub" && !reference.includes("/")) {
@@ -794,12 +767,9 @@ function resolveImageReference(reference, registry) {
 }
 
 function updatePullRegistryHint() {
-  const placeholders = {
-    dockerHub: "postgres:latest 或 owner/image:tag",
-    ghcr: "owner/repository:tag"
-  };
+  const placeholders = { dockerHub: "postgres:latest 或 owner/image:tag" };
   elements.pullImageReference.placeholder = placeholders[elements.pullImageRegistry.value]
-    || "postgres:latest 或 ghcr.io/owner/image:tag";
+    || "registry.example.com/owner/image:tag";
 }
 
 function validateImagePull(reference, platform, registry) {
@@ -807,15 +777,10 @@ function validateImagePull(reference, platform, registry) {
   if (!/^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,511}$/.test(reference)) {
     errors.push({ field: "reference", message: "镜像引用格式无效" });
   }
-  if (registry && !["dockerHub", "ghcr"].includes(registry)) {
+  if (registry && registry !== "dockerHub") {
     errors.push({ field: "registry", message: "镜像仓库无效" });
   } else if (reference && resolveImageReference(reference, registry) === null) {
     errors.push({ field: "registry", message: "镜像地址与所选仓库不一致" });
-  } else if (registry === "ghcr") {
-    const repository = reference.startsWith("ghcr.io/") ? reference.slice("ghcr.io/".length) : reference;
-    if (!repository.includes("/")) {
-      errors.push({ field: "reference", message: "GHCR 镜像必须包含 owner/repository" });
-    }
   }
   if (platform && !/^linux\/(arm64|amd64)(\/[A-Za-z0-9._-]+)?$/.test(platform)) {
     errors.push({ field: "platform", message: "目标架构必须为 Linux ARM64 或 AMD64" });
@@ -1008,7 +973,6 @@ function formatProblem(error) {
   if (code === "OPERATION_IN_PROGRESS") return "该容器已有操作进行中，请等待完成。";
   if (code === "STATE_CONFLICT") return "目标状态已变化，请刷新后重试。";
   if (code === "CLI_TIMEOUT") return "CLI 执行超时，页面将保留当前状态。";
-  if (code === "REGISTRY_AUTHENTICATION_REQUIRED") return "GHCR 只读凭据未配置或无效，请在服务环境中设置后重试。";
   if (code === "REGISTRY_RATE_LIMITED") return "镜像平台请求过于频繁，请稍后重试。";
   if (code === "REGISTRY_UNAVAILABLE") return "镜像平台当前不可用，本机镜像不受影响。";
   return code ? `${error.message}（${code}）` : error.message;
@@ -1141,7 +1105,6 @@ elements.cancelPullImageButton.addEventListener("click", () => elements.pullImag
 elements.pullImageRegistry.addEventListener("change", updatePullRegistryHint);
 elements.pullImageForm.addEventListener("submit", submitImagePull);
 elements.remoteRegistryForm.addEventListener("submit", searchRemoteRepositories);
-elements.remoteRegistryProvider.addEventListener("change", updateRemoteRegistryFields);
 elements.loadMoreRepositoriesButton.addEventListener("click", loadMoreRemoteRepositories);
 elements.loadMoreTagsButton.addEventListener("click", loadMoreRemoteTags);
 elements.openCreateContainerButton.addEventListener("click", openCreateContainerDialog);
@@ -1153,6 +1116,5 @@ document.addEventListener("visibilitychange", () => {
 window.setInterval(() => {
   if (document.visibilityState === "visible") refreshDashboard();
 }, REFRESH_INTERVAL_MS);
-updateRemoteRegistryFields();
 loadApplicationVersion();
 refreshDashboard();

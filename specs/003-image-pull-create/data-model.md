@@ -40,8 +40,8 @@
 | platform | String? | 空或 `linux/arm64`、`linux/amd64`，可带安全 variant |
 
 浏览器中的仓库快捷选择不是 API 字段。选择 Docker Hub 时，短官方镜像补全为
-`docker.io/library/<image>`，带命名空间的镜像补全为 `docker.io/<namespace>/<image>`；选择 GHCR 时，
-要求输入 `owner/repository` 并补全为 `ghcr.io/<owner>/<repository>`。未选择快捷仓库时，引用原样提交。
+`docker.io/library/<image>`，带命名空间的镜像补全为 `docker.io/<namespace>/<image>`。未选择快捷仓库时，
+完整 OCI 引用原样提交。
 若输入已含与所选项不同的仓库主机，页面在发出请求前拒绝。
 
 ### State transition
@@ -139,11 +139,6 @@
 远程镜像来源枚举：
 
 - `dockerHub`
-- `ghcr`
-
-## GHCRNamespaceType
-
-GHCR 枚举范围：`user` 或 `organization`。只有 GHCR 请求使用。
 
 ## RemoteRepositorySummary
 
@@ -151,11 +146,11 @@ GHCR 枚举范围：`user` 或 `organization`。只有 GHCR 请求使用。
 |---|---|---|
 | registry | RemoteRegistry | 必填 |
 | repository | String | 注册表内规范路径；Docker 官方镜像包含 `library/` |
-| reference | String | 不含标签的完整 `docker.io/...` 或 `ghcr.io/...` 引用 |
+| reference | String | 不含标签的完整 `docker.io/...` 引用 |
 | name | String | 用于显示的仓库或 package 名称 |
-| namespace | String | Docker 命名空间或 GHCR owner |
+| namespace | String | Docker 命名空间 |
 | description | String? | 可选；净化为纯文本，最多 2048 字符 |
-| isOfficial | Bool? | Docker Hub 可用；GHCR 为 null |
+| isOfficial | Bool? | Docker Hub 可用 |
 | starCount | Int? | 上游可用时返回，非负 |
 | pullCount | Int? | 上游可用时返回，非负 |
 | updatedAt | Date? | 上游可用时返回 |
@@ -177,15 +172,14 @@ GHCR 枚举范围：`user` 或 `organization`。只有 GHCR 请求使用。
 | items | [RemoteRepositorySummary] | 最多 20 项 |
 | page | Int | 1...500 |
 | pageSize | Int | 固定 20 |
-| totalCount | Int? | Docker Hub 可用；GHCR 可为空 |
+| totalCount | Int? | Docker Hub 可用 |
 | hasNextPage | Bool | 由计数或受信 Link header 推导；客户端自行构造下一页 URL |
 | observedAt | Date | 本次远程读取时间 |
 
 ## RemoteTagPage
 
-字段与 `RemoteRepositoryPage` 相同，但 `items` 为 `[RemoteTagSummary]`。`pageSize=20` 表示来源 API
-每页的 tag（Docker Hub）或 package version（GHCR）数量；一个 GHCR version 可含多个标签，因此
-`items` 可超过 20，但整个上游响应仍受 2 MiB 上限约束。
+字段与 `RemoteRepositoryPage` 相同，但 `items` 为 `[RemoteTagSummary]`。`pageSize=20` 表示 Docker Hub
+每页的 tag 数量，整个上游响应受 2 MiB 上限约束。
 
 ## Remote query validation
 
@@ -197,25 +191,15 @@ GHCR 枚举范围：`user` 或 `organization`。只有 GHCR 请求使用。
 | query | 去除首尾空白后 1...128；不得包含控制符 |
 | page | 可选，默认 1，范围 1...500 |
 
-### GHCR package browse
-
-| Field | Rules |
-|---|---|
-| registry | 必须为 `ghcr` |
-| ownerType | `user` 或 `organization` |
-| owner | 1...39；GitHub login 允许的字母、数字和单短横线结构 |
-| page | 可选，默认 1，范围 1...500 |
-
 ### Tag browse
 
-Docker Hub 要求规范的 `<namespace>/<repository>`；GHCR 额外要求 `ownerType`、`owner` 和 package 路径。
+Docker Hub 要求规范的 `<namespace>/<repository>`。
 所有值只参与固定路径模板和百分号编码，调用方不能传入主机、scheme 或完整 URL。
 
 ## Remote error mapping
 
 | Code | HTTP | Retryable | Meaning |
 |---|---:|---|---|
-| REGISTRY_AUTHENTICATION_REQUIRED | 503 | false | GHCR Token 未配置或无效；响应不包含 Token |
 | REGISTRY_RATE_LIMITED | 429 | true | 上游限流；保留安全的重试提示 |
 | REGISTRY_UNAVAILABLE | 502 | true | 上游超时、不可达或返回无效 JSON |
 

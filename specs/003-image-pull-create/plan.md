@@ -10,8 +10,8 @@
 后端只调用 Apple Container CLI 1.3.1 的固定参数数组：结构化读取镜像列表/详情，拉取后按
 请求引用检查镜像详情，创建后按名称回读容器；可选启动只在创建回读成功后执行。现有操作协调器
 扩展镜像目标和两种操作类型，环境变量值只进入子进程参数，不进入操作摘要、响应或错误。远程浏览
-使用固定允许列表中的 Docker Hub 和 GitHub REST API：Docker Hub 按关键词分页搜索，GHCR 按明确的
-用户或组织范围分页读取 Token 有权访问的容器包；标签由用户分页浏览并明确选择，选择只回填拉取表单，不触发写操作。
+使用固定允许列表中的 Docker Hub REST API 按关键词分页搜索公开仓库；标签由用户分页浏览并明确选择，
+选择只回填拉取表单，不触发写操作。其他 OCI 注册表保留完整镜像地址拉取，不提供专用搜索集成。
 
 ## Technical Context
 
@@ -22,7 +22,7 @@
 **Target Platform**: Apple Silicon，macOS 15+（当前验证环境 macOS 26）
 **Project Type**: 单 Swift B/S 服务与无构建步骤的静态浏览器界面
 **Performance Goals**: 写请求 1 秒内返回可轮询操作；底层命令结束后 2 秒内显示回读；只读列表不被写操作阻塞；远程页固定 20 项且 5 秒内成功或给出可恢复错误
-**Constraints**: 仅绑定 `127.0.0.1`；不执行 shell；端口只发布到回环地址；秘密值不进入可见状态；自动化不得执行真实写操作；远程请求只允许 `hub.docker.com` 和 `api.github.com`，响应最大 2 MiB
+**Constraints**: 仅绑定 `127.0.0.1`；不执行 shell；端口只发布到回环地址；秘密值不进入可见状态；自动化不得执行真实写操作；远程请求只允许 `hub.docker.com`，响应最大 2 MiB
 **Scale/Scope**: 单用户本机管理、数十个容器和镜像；每个请求最多 32 个端口、64 个环境变量和 64 个进程参数
 
 ## Constitution Check
@@ -38,8 +38,8 @@
 | 简洁、可观察、可兼容 | 复用单服务、静态页面、执行器和操作协调器；不增加存储或前端工具链 | PASS |
 
 Phase 1 复查：接口仅增加镜像读取及两种白名单变更；秘密字段为只写且安全摘要只保留变量名；
-数据模型不持久化；所有成功路径要求权威回读。远程浏览通过可注入的只读 HTTP 适配器访问固定主机，
-GHCR Token 只从环境读取且不会进入页面、日志或问题响应。全部门禁继续通过，无宪章例外。
+数据模型不持久化；所有成功路径要求权威回读。远程浏览通过可注入的只读 HTTP 适配器访问固定的
+Docker Hub 主机。全部门禁继续通过，无宪章例外。
 
 ## Project Structure
 
@@ -91,8 +91,7 @@ Tests/ContainerGUITests/
 ├── Integration/ReadOnlyCLISmokeTests.swift
 ├── Fixtures/CLI/1.3.1/resources/
 └── Fixtures/Registry/
-    ├── docker-hub/
-    └── github/
+    └── docker-hub/
 ```
 
 **Structure Decision**: 保留现有单 Swift Package 和 CLI、Domain、Operations、Web、静态资源分层；

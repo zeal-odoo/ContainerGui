@@ -18,13 +18,10 @@ enum RegistrySearchRoutes {
     private static func repositoryRequest(_ request: Request) throws -> RemoteRepositorySearchRequest {
         let parameters = request.uri.queryParameters
         let registry = try registry(parameters["registry"].map(String.init))
-        let ownerType = try ownerType(parameters["ownerType"].map(String.init))
         let page = try page(parameters["page"].map(String.init))
         return try RemoteRepositorySearchRequest(
             registry: registry,
             query: parameters["query"].map(String.init),
-            ownerType: ownerType,
-            owner: parameters["owner"].map(String.init),
             page: page
         ).validated()
     }
@@ -32,13 +29,10 @@ enum RegistrySearchRoutes {
     private static func tagRequest(_ request: Request) throws -> RemoteTagListRequest {
         let parameters = request.uri.queryParameters
         let registry = try registry(parameters["registry"].map(String.init))
-        let ownerType = try ownerType(parameters["ownerType"].map(String.init))
         let page = try page(parameters["page"].map(String.init))
         return try RemoteTagListRequest(
             registry: registry,
             repository: parameters["repository"].map(String.init) ?? "",
-            ownerType: ownerType,
-            owner: parameters["owner"].map(String.init),
             page: page
         ).validated()
     }
@@ -47,18 +41,7 @@ enum RegistrySearchRoutes {
         guard let raw, let value = RemoteRegistry(rawValue: raw) else {
             throw ProblemDetail(
                 code: .validationFailed,
-                fieldErrors: ["registry": "镜像平台必须为 Docker Hub 或 GHCR"]
-            )
-        }
-        return value
-    }
-
-    private static func ownerType(_ raw: String?) throws -> GHCRNamespaceType? {
-        guard let raw else { return nil }
-        guard let value = GHCRNamespaceType(rawValue: raw) else {
-            throw ProblemDetail(
-                code: .validationFailed,
-                fieldErrors: ["ownerType": "GHCR 范围必须为用户或组织"]
+                fieldErrors: ["registry": "镜像平台必须为 Docker Hub"]
             )
         }
         return value

@@ -10,7 +10,6 @@ final class RegistryReadOnlySmokeTests: XCTestCase {
         }
         let client = RegistrySearchClient(
             transport: FoundationRegistryHTTPTransport(timeoutSeconds: 5),
-            githubToken: nil,
             maximumResponseBytes: 2 * 1024 * 1024
         )
 

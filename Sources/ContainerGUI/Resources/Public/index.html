@@ -147,35 +147,13 @@
         <span class="quiet">只读浏览，不会自动拉取</span>
       </div>
       <form id="remoteRegistryForm" class="remote-search-form" autocomplete="off">
-        <label class="form-field compact-field">
-          <span>镜像平台</span>
-          <select id="remoteRegistryProvider" name="registry">
-            <option value="dockerHub">Docker Hub</option>
-            <option value="ghcr">GitHub Container Registry (GHCR)</option>
-          </select>
+        <label class="form-field remote-search-fields">
+          <span>Docker Hub 搜索关键词</span>
+          <input id="remoteSearchQuery" name="query" maxlength="128" required placeholder="例如 postgres">
         </label>
-        <div id="dockerHubSearchFields" class="remote-search-fields">
-          <label class="form-field compact-field">
-            <span>搜索关键词</span>
-            <input id="remoteSearchQuery" name="query" maxlength="128" required placeholder="例如 postgres">
-          </label>
-        </div>
-        <div id="ghcrSearchFields" class="remote-search-fields ghcr-fields" hidden>
-          <label class="form-field compact-field">
-            <span>范围</span>
-            <select id="ghcrOwnerType" name="ownerType">
-              <option value="organization">组织</option>
-              <option value="user">用户</option>
-            </select>
-          </label>
-          <label class="form-field compact-field">
-            <span>用户或组织</span>
-            <input id="ghcrOwner" name="owner" maxlength="39" placeholder="例如 apple">
-          </label>
-        </div>
         <button id="searchRemoteRepositoriesButton" class="button remote-search-button" type="submit">搜索镜像</button>
       </form>
-      <p class="remote-search-help">Docker Hub 按关键词搜索公开仓库；GHCR 按用户或组织分页读取，凭据只从服务环境变量读取。</p>
+      <p class="remote-search-help">Docker Hub 按关键词搜索公开仓库并分页读取标签。</p>
 
       <div class="remote-browser">
         <section class="remote-column" aria-labelledby="remoteRepositoriesTitle">
@@ -270,14 +248,13 @@
         <select id="pullImageRegistry" name="registry" aria-describedby="pullRegistryHelp pullRegistryError">
           <option value="">完整地址 / 自动识别</option>
           <option value="dockerHub">Docker Hub</option>
-          <option value="ghcr">GitHub Container Registry (GHCR)</option>
         </select>
-        <small id="pullRegistryHelp">Docker Hub 可输入 postgres:latest；GHCR 请输入 owner/repository:tag。</small>
+        <small id="pullRegistryHelp">Docker Hub 可输入 postgres:latest；其他仓库请使用完整镜像地址。</small>
         <span id="pullRegistryError" class="field-error" aria-live="polite"></span>
       </label>
       <label class="form-field">
         <span>镜像引用</span>
-        <input id="pullImageReference" name="reference" required maxlength="512" autocomplete="off" placeholder="postgres:latest 或 ghcr.io/owner/image:tag" aria-describedby="pullReferenceError">
+        <input id="pullImageReference" name="reference" required maxlength="512" autocomplete="off" placeholder="postgres:latest 或 registry.example.com/owner/image:tag" aria-describedby="pullReferenceError">
         <span id="pullReferenceError" class="field-error" aria-live="polite"></span>
       </label>
       <label class="form-field">

@@ -40,7 +40,7 @@ final class RegistrySearchAPITests: XCTestCase {
         ])
     }
 
-    func testGHCRRouteRequiresNamespaceAndPassesOwnerType() async throws {
+    func testGHCRProviderIsRejectedWithoutCallingSearcher() async throws {
         let searcher = StubRegistrySearcher()
         let app = makeApplication(searcher: searcher)
 
@@ -49,19 +49,15 @@ final class RegistrySearchAPITests: XCTestCase {
                 uri: "/api/v1/registry-search/repositories?registry=ghcr&ownerType=organization&owner=apple&page=1",
                 method: .get
             ) { response in
-                XCTAssertEqual(response.status, .ok)
+                XCTAssertEqual(response.status, .unprocessableContent)
+                let problem = try JSONDecoder.containerGUI.decode(ProblemDetail.self, from: response.body)
+                XCTAssertEqual(problem.code, .validationFailed)
+                XCTAssertEqual(problem.fieldErrors?.map(\.field), ["registry"])
             }
         }
 
         let requests = await searcher.requests
-        XCTAssertEqual(requests, [
-            .repositories(RemoteRepositorySearchRequest(
-                registry: .ghcr,
-                ownerType: .organization,
-                owner: "apple",
-                page: 1
-            )),
-        ])
+        XCTAssertTrue(requests.isEmpty)
     }
 
     func testInvalidQueriesReturnFieldErrorsWithoutCallingSearcher() async throws {
@@ -71,7 +67,6 @@ final class RegistrySearchAPITests: XCTestCase {
         try await app.test(.router) { client in
             for (uri, expectedField) in [
                 ("/api/v1/registry-search/repositories?registry=dockerHub", "query"),
-                ("/api/v1/registry-search/repositories?registry=ghcr&ownerType=user", "owner"),
                 ("/api/v1/registry-search/repositories?registry=unknown&query=x", "registry"),
                 ("/api/v1/registry-search/tags?registry=dockerHub&repository=postgres&page=0", "page"),
             ] {

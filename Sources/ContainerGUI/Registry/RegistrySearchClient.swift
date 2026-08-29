@@ -61,40 +61,27 @@ struct RegistrySearchClient<Transport: RegistryHTTPTransport>: RegistrySearching
     private static var pageSize: Int { 20 }
 
     private let transport: Transport
-    private let githubToken: String?
     private let maximumResponseBytes: Int
     private let now: @Sendable () -> Date
 
     init(
         transport: Transport,
-        githubToken: String?,
         maximumResponseBytes: Int,
         now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.transport = transport
-        self.githubToken = githubToken
         self.maximumResponseBytes = maximumResponseBytes
         self.now = now
     }
 
     func searchRepositories(_ unvalidated: RemoteRepositorySearchRequest) async throws -> RemoteRepositoryPage {
         let request = try unvalidated.validated()
-        switch request.registry {
-        case .dockerHub:
-            return try await searchDockerHub(request)
-        case .ghcr:
-            return try await listGHCRPackages(request)
-        }
+        return try await searchDockerHub(request)
     }
 
     func listTags(_ unvalidated: RemoteTagListRequest) async throws -> RemoteTagPage {
         let request = try unvalidated.validated()
-        switch request.registry {
-        case .dockerHub:
-            return try await listDockerHubTags(request)
-        case .ghcr:
-            return try await listGHCRTags(request)
-        }
+        return try await listDockerHubTags(request)
     }
 
     private func searchDockerHub(_ request: RemoteRepositorySearchRequest) async throws -> RemoteRepositoryPage {
@@ -110,7 +97,7 @@ struct RegistrySearchClient<Transport: RegistryHTTPTransport>: RegistrySearching
         let response = try await response(for: RegistryHTTPRequest(
             url: url,
             headers: ["Accept": "application/json"]
-        ), registry: .dockerHub)
+        ))
         let decoded: DockerHubRepositoryPage
         do {
             decoded = try JSONDecoder().decode(DockerHubRepositoryPage.self, from: response.body)
@@ -158,7 +145,7 @@ struct RegistrySearchClient<Transport: RegistryHTTPTransport>: RegistrySearching
         let response = try await response(for: RegistryHTTPRequest(
             url: url,
             headers: ["Accept": "application/json"]
-        ), registry: .dockerHub)
+        ))
         let decoded: DockerHubTagPage
         do {
             decoded = try JSONDecoder().decode(DockerHubTagPage.self, from: response.body)
@@ -187,106 +174,7 @@ struct RegistrySearchClient<Transport: RegistryHTTPTransport>: RegistrySearching
         )
     }
 
-    private func listGHCRPackages(_ request: RemoteRepositorySearchRequest) async throws -> RemoteRepositoryPage {
-        let owner = request.owner!
-        let url = try githubURL(
-            ownerType: request.ownerType!,
-            owner: owner,
-            suffix: "/packages",
-            queryItems: [
-                URLQueryItem(name: "package_type", value: "container"),
-                URLQueryItem(name: "per_page", value: String(Self.pageSize)),
-                URLQueryItem(name: "page", value: String(request.page)),
-            ]
-        )
-        let response = try await response(
-            for: RegistryHTTPRequest(url: url, headers: try githubHeaders()),
-            registry: .ghcr
-        )
-        let decoded: [GitHubPackage]
-        do {
-            decoded = try JSONDecoder().decode([GitHubPackage].self, from: response.body)
-        } catch {
-            throw ProblemDetail(code: .registryUnavailable)
-        }
-
-        var seen = Set<String>()
-        let items = decoded.compactMap { package -> RemoteRepositorySummary? in
-            guard package.packageType == "container",
-                  isValidRepositoryPath(package.name),
-                  seen.insert(package.name).inserted else { return nil }
-            return RemoteRepositorySummary(
-                registry: .ghcr,
-                repository: package.name,
-                reference: "ghcr.io/\(owner)/\(package.name)",
-                name: package.name,
-                namespace: owner,
-                description: safeDescription(package.description),
-                isOfficial: nil,
-                starCount: nil,
-                pullCount: nil,
-                updatedAt: parseDate(package.updatedAt)
-            )
-        }
-        return RemoteRepositoryPage(
-            items: items,
-            page: request.page,
-            pageSize: Self.pageSize,
-            totalCount: nil,
-            hasNextPage: hasNextLink(response.headers),
-            observedAt: now()
-        )
-    }
-
-    private func listGHCRTags(_ request: RemoteTagListRequest) async throws -> RemoteTagPage {
-        let url = try githubURL(
-            ownerType: request.ownerType!,
-            owner: request.owner!,
-            suffix: "/packages/container/\(encodedPathSegment(request.repository))/versions",
-            queryItems: [
-                URLQueryItem(name: "per_page", value: String(Self.pageSize)),
-                URLQueryItem(name: "page", value: String(request.page)),
-            ]
-        )
-        let response = try await response(
-            for: RegistryHTTPRequest(url: url, headers: try githubHeaders()),
-            registry: .ghcr
-        )
-        let decoded: [GitHubPackageVersion]
-        do {
-            decoded = try JSONDecoder().decode([GitHubPackageVersion].self, from: response.body)
-        } catch {
-            throw ProblemDetail(code: .registryUnavailable)
-        }
-
-        var seen = Set<String>()
-        var items: [RemoteTagSummary] = []
-        for version in decoded where version.metadata?.packageType == "container" {
-            for tag in version.metadata?.container?.tags ?? []
-                where isValidRemoteTag(tag) && seen.insert(tag).inserted {
-                items.append(RemoteTagSummary(
-                    name: tag,
-                    reference: "ghcr.io/\(request.owner!)/\(request.repository):\(tag)",
-                    digest: validDigest(version.name),
-                    sizeBytes: nil,
-                    updatedAt: parseDate(version.updatedAt)
-                ))
-            }
-        }
-        return RemoteTagPage(
-            items: items,
-            page: request.page,
-            pageSize: Self.pageSize,
-            totalCount: nil,
-            hasNextPage: hasNextLink(response.headers),
-            observedAt: now()
-        )
-    }
-
-    private func response(
-        for request: RegistryHTTPRequest,
-        registry: RemoteRegistry
-    ) async throws -> RegistryHTTPResponse {
+    private func response(for request: RegistryHTTPRequest) async throws -> RegistryHTTPResponse {
         let response: RegistryHTTPResponse
         do {
             response = try await transport.get(request)
@@ -301,9 +189,6 @@ struct RegistrySearchClient<Transport: RegistryHTTPTransport>: RegistrySearching
         switch response.statusCode {
         case 200..<300:
             return response
-        case 401 where registry == .ghcr,
-             403 where registry == .ghcr:
-            throw ProblemDetail(code: .registryAuthenticationRequired)
         case 429:
             throw ProblemDetail(code: .registryRateLimited)
         default:
@@ -311,17 +196,6 @@ struct RegistrySearchClient<Transport: RegistryHTTPTransport>: RegistrySearching
         }
     }
 
-    private func githubHeaders() throws -> [String: String] {
-        guard let githubToken, !githubToken.isEmpty else {
-            throw ProblemDetail(code: .registryAuthenticationRequired)
-        }
-        return [
-            "Accept": "application/vnd.github+json",
-            "Authorization": "Bearer \(githubToken)",
-            "X-GitHub-Api-Version": "2026-03-10",
-            "User-Agent": "ContainerGUI",
-        ]
-    }
 }
 
 private final class RegistryNoRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
@@ -381,44 +255,6 @@ private struct DockerHubTag: Decodable {
     }
 }
 
-private struct GitHubPackage: Decodable {
-    let name: String
-    let packageType: String
-    let description: String?
-    let updatedAt: String?
-
-    enum CodingKeys: String, CodingKey {
-        case name, description
-        case packageType = "package_type"
-        case updatedAt = "updated_at"
-    }
-}
-
-private struct GitHubPackageVersion: Decodable {
-    let name: String
-    let updatedAt: String?
-    let metadata: GitHubPackageMetadata?
-
-    enum CodingKeys: String, CodingKey {
-        case name, metadata
-        case updatedAt = "updated_at"
-    }
-}
-
-private struct GitHubPackageMetadata: Decodable {
-    let packageType: String
-    let container: GitHubContainerMetadata?
-
-    enum CodingKeys: String, CodingKey {
-        case container
-        case packageType = "package_type"
-    }
-}
-
-private struct GitHubContainerMetadata: Decodable {
-    let tags: [String]
-}
-
 private func fixedURL(host: String, path: String, queryItems: [URLQueryItem]) throws -> URL {
     var components = URLComponents()
     components.scheme = "https"
@@ -427,25 +263,6 @@ private func fixedURL(host: String, path: String, queryItems: [URLQueryItem]) th
     components.queryItems = queryItems
     guard let url = components.url else { throw ProblemDetail(code: .registryUnavailable) }
     return url
-}
-
-private func githubURL(
-    ownerType: GHCRNamespaceType,
-    owner: String,
-    suffix: String,
-    queryItems: [URLQueryItem]
-) throws -> URL {
-    let scope = ownerType == .organization ? "orgs" : "users"
-    return try fixedURL(
-        host: "api.github.com",
-        path: "/\(scope)/\(owner)\(suffix)",
-        queryItems: queryItems
-    )
-}
-
-private func encodedPathSegment(_ value: String) -> String {
-    let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
-    return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
 }
 
 private func normalizeDockerRepository(_ value: String) -> (repository: String, namespace: String, name: String)? {
@@ -480,9 +297,4 @@ private func parseDate(_ value: String?) -> Date? {
     let fractional = ISO8601DateFormatter()
     fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     return fractional.date(from: value) ?? ISO8601DateFormatter().date(from: value)
-}
-
-private func hasNextLink(_ headers: [String: String]) -> Bool {
-    headers.first { $0.key.caseInsensitiveCompare("Link") == .orderedSame }?
-        .value.contains(#"rel="next""#) == true
 }

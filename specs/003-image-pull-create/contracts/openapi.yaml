@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Container GUI Image Browse, Pull and Container Create API
-  version: 0.4.0
+  version: 1.0.0
   description: Feature contract for local image reads, remote registry browsing, image pulls and container creation.
 servers:
   - url: http://127.0.0.1:8787/api/v1
@@ -59,7 +59,7 @@ paths:
     get:
       tags: [RegistrySearch]
       operationId: searchRemoteRepositories
-      summary: Search Docker Hub or browse token-readable GHCR packages in an explicit owner scope
+      summary: Search public Docker Hub repositories
       parameters:
         - name: registry
           in: query
@@ -68,26 +68,12 @@ paths:
             $ref: "#/components/schemas/RemoteRegistry"
         - name: query
           in: query
-          required: false
-          description: Required for Docker Hub and ignored for GHCR.
+          required: true
+          description: Docker Hub repository search keyword.
           schema:
             type: string
             minLength: 1
             maxLength: 128
-        - name: ownerType
-          in: query
-          required: false
-          description: Required for GHCR.
-          schema:
-            $ref: "#/components/schemas/GHCRNamespaceType"
-        - name: owner
-          in: query
-          required: false
-          description: Required for GHCR.
-          schema:
-            type: string
-            minLength: 1
-            maxLength: 39
         - name: page
           in: query
           required: false
@@ -109,8 +95,6 @@ paths:
           $ref: "#/components/responses/ProblemResponse"
         "502":
           $ref: "#/components/responses/ProblemResponse"
-        "503":
-          $ref: "#/components/responses/ProblemResponse"
 
   /registry-search/tags:
     get:
@@ -130,20 +114,6 @@ paths:
             type: string
             minLength: 1
             maxLength: 255
-        - name: ownerType
-          in: query
-          required: false
-          description: Required for GHCR.
-          schema:
-            $ref: "#/components/schemas/GHCRNamespaceType"
-        - name: owner
-          in: query
-          required: false
-          description: Required for GHCR.
-          schema:
-            type: string
-            minLength: 1
-            maxLength: 39
         - name: page
           in: query
           required: false
@@ -164,8 +134,6 @@ paths:
         "429":
           $ref: "#/components/responses/ProblemResponse"
         "502":
-          $ref: "#/components/responses/ProblemResponse"
-        "503":
           $ref: "#/components/responses/ProblemResponse"
 
   /containers:
@@ -246,11 +214,7 @@ components:
   schemas:
     RemoteRegistry:
       type: string
-      enum: [dockerHub, ghcr]
-
-    GHCRNamespaceType:
-      type: string
-      enum: [user, organization]
+      enum: [dockerHub]
 
     RemoteRepositorySummary:
       type: object
@@ -263,7 +227,7 @@ components:
           type: string
         reference:
           type: string
-          pattern: "^(docker\\.io|ghcr\\.io)/[A-Za-z0-9][A-Za-z0-9._/-]*$"
+          pattern: "^docker\\.io/[A-Za-z0-9][A-Za-z0-9._/-]*$"
         name:
           type: string
         namespace:
@@ -294,7 +258,7 @@ components:
           maxLength: 256
         reference:
           type: string
-          pattern: "^(docker\\.io|ghcr\\.io)/[A-Za-z0-9][A-Za-z0-9._/-]*:[A-Za-z0-9][A-Za-z0-9._-]*$"
+          pattern: "^docker\\.io/[A-Za-z0-9][A-Za-z0-9._/-]*:[A-Za-z0-9][A-Za-z0-9._-]*$"
         digest:
           type: [string, "null"]
           pattern: "^sha256:[0-9a-f]{64}$"
@@ -417,7 +381,7 @@ components:
           minLength: 1
           maxLength: 512
           pattern: "^[A-Za-z0-9][A-Za-z0-9._:/@-]*$"
-          description: Complete image reference after any Docker Hub or GHCR browser shortcut is resolved.
+          description: Complete image reference after the optional Docker Hub browser shortcut is resolved.
         platform:
           type: [string, "null"]
           pattern: "^linux/(arm64|amd64)(/[A-Za-z0-9._-]+)?$"

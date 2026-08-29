@@ -18,7 +18,6 @@ enum ProblemCode: String, Codable, CaseIterable, Sendable {
     case requestTooLarge = "REQUEST_TOO_LARGE"
     case logSessionLimit = "LOG_SESSION_LIMIT"
     case outputLimitExceeded = "OUTPUT_LIMIT_EXCEEDED"
-    case registryAuthenticationRequired = "REGISTRY_AUTHENTICATION_REQUIRED"
     case registryRateLimited = "REGISTRY_RATE_LIMITED"
     case registryUnavailable = "REGISTRY_UNAVAILABLE"
     case internalError = "INTERNAL_ERROR"
@@ -32,8 +31,7 @@ enum ProblemCode: String, Codable, CaseIterable, Sendable {
         case .logSessionLimit, .registryRateLimited: 429
         case .validationFailed, .confirmationMismatch: 422
         case .cliTimeout: 504
-        case .cliNotFound, .cliNotExecutable, .cliVersionUnsupported, .serviceUnavailable,
-             .registryAuthenticationRequired: 503
+        case .cliNotFound, .cliNotExecutable, .cliVersionUnsupported, .serviceUnavailable: 503
         case .registryUnavailable: 502
         case .cliExitNonzero, .cliOutputInvalid, .internalError: 500
         }
@@ -58,7 +56,6 @@ enum ProblemCode: String, Codable, CaseIterable, Sendable {
         case .requestTooLarge: "请求内容超过允许大小。"
         case .logSessionLimit: "实时日志连接数已达到上限。"
         case .outputLimitExceeded: "容器命令输出超过安全上限。"
-        case .registryAuthenticationRequired: "GHCR 只读凭据未配置或无效。"
         case .registryRateLimited: "镜像平台请求过于频繁，请稍后重试。"
         case .registryUnavailable: "镜像平台当前不可用，请稍后重试。"
         case .internalError: "发生内部错误。"

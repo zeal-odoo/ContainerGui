@@ -52,7 +52,6 @@ enum AppFactory {
                 transport: FoundationRegistryHTTPTransport(
                     timeoutSeconds: configuration.registryTimeoutSeconds
                 ),
-                githubToken: configuration.githubToken,
                 maximumResponseBytes: configuration.maximumRegistryResponseBytes
             )
         )

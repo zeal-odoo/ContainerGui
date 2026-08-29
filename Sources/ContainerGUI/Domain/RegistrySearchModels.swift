@@ -2,32 +2,20 @@ import Foundation
 
 enum RemoteRegistry: String, Codable, CaseIterable, Sendable {
     case dockerHub
-    case ghcr
-}
-
-enum GHCRNamespaceType: String, Codable, CaseIterable, Sendable {
-    case user
-    case organization
 }
 
 struct RemoteRepositorySearchRequest: Equatable, Sendable {
     let registry: RemoteRegistry
     let query: String?
-    let ownerType: GHCRNamespaceType?
-    let owner: String?
     let page: Int
 
     init(
         registry: RemoteRegistry,
         query: String? = nil,
-        ownerType: GHCRNamespaceType? = nil,
-        owner: String? = nil,
         page: Int = 1
     ) {
         self.registry = registry
         self.query = query
-        self.ownerType = ownerType
-        self.owner = owner
         self.page = page
     }
 
@@ -38,19 +26,8 @@ struct RemoteRepositorySearchRequest: Equatable, Sendable {
         }
 
         let normalizedQuery = query?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let normalizedOwner = owner?.trimmingCharacters(in: .whitespacesAndNewlines)
-        switch registry {
-        case .dockerHub:
-            if !isValidSearchQuery(normalizedQuery) {
-                errors["query"] = "Docker Hub 搜索词必须为 1...128 个可见字符"
-            }
-        case .ghcr:
-            if ownerType == nil {
-                errors["ownerType"] = "GHCR 必须选择用户或组织"
-            }
-            if !isValidGitHubOwner(normalizedOwner) {
-                errors["owner"] = "GitHub 用户或组织名称格式无效"
-            }
+        if !isValidSearchQuery(normalizedQuery) {
+            errors["query"] = "Docker Hub 搜索词必须为 1...128 个可见字符"
         }
 
         guard errors.isEmpty else {
@@ -59,8 +36,6 @@ struct RemoteRepositorySearchRequest: Equatable, Sendable {
         return Self(
             registry: registry,
             query: normalizedQuery,
-            ownerType: ownerType,
-            owner: normalizedOwner,
             page: page
         )
     }
@@ -69,21 +44,15 @@ struct RemoteRepositorySearchRequest: Equatable, Sendable {
 struct RemoteTagListRequest: Equatable, Sendable {
     let registry: RemoteRegistry
     let repository: String
-    let ownerType: GHCRNamespaceType?
-    let owner: String?
     let page: Int
 
     init(
         registry: RemoteRegistry,
         repository: String,
-        ownerType: GHCRNamespaceType? = nil,
-        owner: String? = nil,
         page: Int = 1
     ) {
         self.registry = registry
         self.repository = repository
-        self.ownerType = ownerType
-        self.owner = owner
         self.page = page
     }
 
@@ -94,18 +63,8 @@ struct RemoteTagListRequest: Equatable, Sendable {
         }
         let normalizedRepository = repository.trimmingCharacters(in: .whitespacesAndNewlines)
         if !isValidRepositoryPath(normalizedRepository)
-            || (registry == .dockerHub && normalizedRepository.split(separator: "/").count != 2) {
+            || normalizedRepository.split(separator: "/").count != 2 {
             errors["repository"] = "镜像仓库路径格式无效"
-        }
-
-        let normalizedOwner = owner?.trimmingCharacters(in: .whitespacesAndNewlines)
-        if registry == .ghcr {
-            if ownerType == nil {
-                errors["ownerType"] = "GHCR 必须选择用户或组织"
-            }
-            if !isValidGitHubOwner(normalizedOwner) {
-                errors["owner"] = "GitHub 用户或组织名称格式无效"
-            }
         }
 
         guard errors.isEmpty else {
@@ -114,8 +73,6 @@ struct RemoteTagListRequest: Equatable, Sendable {
         return Self(
             registry: registry,
             repository: normalizedRepository,
-            ownerType: ownerType,
-            owner: normalizedOwner,
             page: page
         )
     }
@@ -163,14 +120,6 @@ struct RemoteTagPage: Codable, Equatable, Sendable {
 private func isValidSearchQuery(_ value: String?) -> Bool {
     guard let value, (1...128).contains(value.count) else { return false }
     return !value.unicodeScalars.contains { CharacterSet.controlCharacters.contains($0) }
-}
-
-private func isValidGitHubOwner(_ value: String?) -> Bool {
-    guard let value, (1...39).contains(value.count), !value.contains("--") else { return false }
-    return value.range(
-        of: #"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$"#,
-        options: .regularExpression
-    ) != nil
 }
 
 func isValidRepositoryPath(_ value: String) -> Bool {

@@ -22,18 +22,20 @@ final class ResourceMutationAssetTests: XCTestCase {
         XCTAssertTrue(script.contains("Idempotency-Key"))
     }
 
-    func testPullDialogOffersDockerHubAndGHCRRegistryShortcuts() throws {
+    func testPullDialogOffersFullAddressAndDockerHubWithoutGHCR() throws {
         let html = try asset("index.html")
         let script = try asset("app.js")
 
         XCTAssertTrue(html.contains("id=\"pullImageRegistry\""))
         XCTAssertTrue(html.contains("name=\"registry\""))
+        XCTAssertTrue(html.contains("<option value=\"\">完整地址 / 自动识别</option>"))
         XCTAssertTrue(html.contains("<option value=\"dockerHub\">Docker Hub</option>"))
-        XCTAssertTrue(html.contains("<option value=\"ghcr\">GitHub Container Registry (GHCR)</option>"))
+        XCTAssertFalse(html.contains("GitHub Container Registry"))
+        XCTAssertFalse(html.contains("<option value=\"ghcr\""))
         XCTAssertTrue(html.contains("目标架构（可选）"))
         XCTAssertTrue(script.contains("resolveImageReference"))
         XCTAssertTrue(script.contains("docker.io/library/"))
-        XCTAssertTrue(script.contains("ghcr.io/"))
+        XCTAssertFalse(script.contains("registry === \"ghcr\""))
         XCTAssertTrue(script.contains("body.reference = resolvedReference"))
     }
 
@@ -65,9 +67,11 @@ final class ResourceMutationAssetTests: XCTestCase {
 
         XCTAssertTrue(html.contains("id=\"remoteRegistrySection\""))
         XCTAssertTrue(html.contains("id=\"remoteRegistryForm\""))
-        XCTAssertTrue(html.contains("id=\"remoteRegistryProvider\""))
-        XCTAssertTrue(html.contains("id=\"dockerHubSearchFields\""))
-        XCTAssertTrue(html.contains("id=\"ghcrSearchFields\""))
+        XCTAssertTrue(html.contains("Docker Hub 搜索关键词"))
+        XCTAssertFalse(html.contains("id=\"remoteRegistryProvider\""))
+        XCTAssertFalse(html.contains("id=\"dockerHubSearchFields\""))
+        XCTAssertFalse(html.contains("id=\"ghcrSearchFields\""))
+        XCTAssertFalse(html.contains("id=\"ghcrOwner\""))
         XCTAssertTrue(html.contains("id=\"remoteRepositoryResults\""))
         XCTAssertTrue(html.contains("id=\"remoteTagResults\""))
         XCTAssertTrue(html.contains("id=\"loadMoreRepositoriesButton\""))

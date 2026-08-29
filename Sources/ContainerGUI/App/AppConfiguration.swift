@@ -20,7 +20,6 @@ struct AppConfiguration: Sendable, Equatable {
 
     let port: Int
     let explicitCLIPath: String?
-    let githubToken: String?
 
     let maximumRequestBodyBytes = 64 * 1024
     let maximumCommandOutputBytes = 16 * 1024 * 1024
@@ -51,8 +50,5 @@ struct AppConfiguration: Sendable, Equatable {
 
         self.port = port
         self.explicitCLIPath = rawPath
-        let token = environment["CONTAINER_GUI_GITHUB_TOKEN"]?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        self.githubToken = token?.isEmpty == false ? token : nil
     }
 }

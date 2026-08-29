@@ -64,7 +64,6 @@ h3 { font-size: 15px; }
 .remote-search-form .form-field { margin-top: 0; }
 .compact-field { min-width: 190px; }
 .remote-search-fields { flex: 1; }
-.ghcr-fields { display: grid; grid-template-columns: 150px minmax(180px, 1fr); gap: 12px; }
 .remote-search-button { margin-bottom: 1px; white-space: nowrap; }
 .remote-search-help { margin: 10px 22px 18px; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .remote-browser { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); border-top: 1px solid var(--line); }
@@ -179,7 +178,6 @@ dialog code { display: block; padding: 12px; background: #edf0f4; border-radius:
   .workspace { gap: 12px; }
   .panel-header { align-items: stretch; flex-direction: column; }
   .panel-actions, .form-grid { display: grid; grid-template-columns: 1fr; }
-  .ghcr-fields { grid-template-columns: 1fr; }
   .remote-search-button { width: 100%; }
   .search input { width: 100%; }
   table { min-width: 560px; }
