@@ -352,6 +352,48 @@ final class ImageAndCreationCLITests: XCTestCase {
         XCTAssertEqual(requests[4].arguments, ["list", "--all", "--format", "json"])
     }
 
+    func testSSHCreateUsesOnlyFixedBootstrapArgumentsAndStartsAfterReadback() async throws {
+        let publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhY fixture@example"
+        let executor = ResourceScriptedCommandExecutor(steps: [
+            .success(resourceVersionResult()),
+            .success(resourceEmptySuccess()),
+            .success(resourceContainerListResult(id: "ssh-demo", state: "created")),
+            .success(resourceEmptySuccess()),
+            .success(resourceContainerListResult(id: "ssh-demo", state: "running")),
+        ])
+        let request = ContainerCreateRequest(
+            name: "ssh-demo",
+            image: "docker.io/library/ubuntu:26.04",
+            ports: [PortMapping(hostPort: 8080, containerPort: 80)],
+            environment: [EnvironmentEntry(name: "APP_MODE", value: "development")],
+            startAfterCreate: true,
+            ssh: SSHCreateConfiguration(hostPort: 2222, username: "dev", publicKey: publicKey)
+        )
+
+        let outcome = try await resourceClient(executor).createContainer(request)
+
+        XCTAssertTrue(outcome.matchedExpectation)
+        XCTAssertEqual(outcome.observedContainer?.state, .running)
+        let requests = await executor.requests
+        XCTAssertEqual(requests[1].arguments, [
+            "create", "--name", "ssh-demo",
+            "--publish", "127.0.0.1:8080:80/tcp",
+            "--publish", "127.0.0.1:2222:22/tcp",
+            "--label", "\(SSHContainerLabels.enabled)=true",
+            "--label", "\(SSHContainerLabels.hostPort)=2222",
+            "--label", "\(SSHContainerLabels.username)=dev",
+            "--env", "APP_MODE=development",
+            "--env", "\(SSHCreateConfiguration.userEnvironmentName)=dev",
+            "--env", "\(SSHCreateConfiguration.publicKeyEnvironmentName)=\(publicKey)",
+            "--init", "--entrypoint", "/bin/sh",
+            "--", "docker.io/library/ubuntu:26.04", "-c", SSHContainerBootstrap.script,
+        ])
+        XCTAssertFalse(SSHContainerBootstrap.script.contains(publicKey))
+        XCTAssertFalse(SSHContainerBootstrap.script.contains("fixture@example"))
+        XCTAssertFalse(SSHContainerBootstrap.script.contains("Subsystem sftp"))
+        XCTAssertEqual(requests[3].arguments, ["start", "ssh-demo"])
+    }
+
     func testInvalidCreateDoesNotExecuteCLI() async {
         let executor = ResourceScriptedCommandExecutor(steps: [])
 

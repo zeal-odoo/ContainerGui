@@ -20,6 +20,7 @@ const elements = Object.fromEntries([
   "totalCount", "runningCount", "stoppedCount", "observedAt", "searchInput",
   "loadingState", "emptyState", "errorState", "tableWrap", "containerRows",
   "detailPanel", "detailPlaceholder", "detailContent", "detailTitle", "detailFacts",
+  "sshConnectionPanel", "sshStatusLabel", "sshConnectionCommand", "copySSHCommandButton",
   "containerActions", "operationStatus", "closeDetailButton", "loadLogsButton", "followLogsButton",
   "logStatus", "logOutput", "rawDetail", "confirmDialog", "confirmTitle", "confirmMessage",
   "confirmTarget", "confirmActionButton", "toast", "imagesSection", "toggleImagesButton",
@@ -33,6 +34,9 @@ const elements = Object.fromEntries([
   "createName", "createImage", "createCPUs", "createMemory", "createPorts", "createEnvironment",
   "createArguments", "createStartAfter", "createNameError", "createImageError", "createCPUsError",
   "createMemoryError", "createPortsError", "createEnvironmentError", "createArgumentsError",
+  "createSSHEnabled", "createSSHFields", "createSSHHostPort", "createSSHUsername",
+  "createSSHPublicKey", "createSSHPublicKeyFile", "createSSHHostPortError",
+  "createSSHUsernameError", "createSSHPublicKeyError",
   "createFormStatus", "cancelCreateContainerButton", "submitCreateContainerButton",
   "remoteRegistrySection", "remoteRegistryForm", "remoteSearchQuery",
   "searchRemoteRepositoriesButton", "remoteRepositoryCount", "remoteRepositoryStatus",
@@ -42,7 +46,7 @@ const elements = Object.fromEntries([
 ].map((id) => [id, document.getElementById(id)]));
 
 const state = {
-  containers: [], selectedID: null, selectedDetail: null, detailController: null,
+  containers: [], selectedID: null, selectedDetail: null, selectedSSHStatus: null, detailController: null,
   refreshing: false, submitting: false, eventSource: null,
   reconnectAttempts: 0, reconnectTimer: null, metricsByID: new Map(), metricsStatus: "loading",
   images: [], imagesLoaded: false, containersLoaded: false, imageSubmitting: false, createSubmitting: false,
@@ -625,13 +629,16 @@ async function loadDetail(id, { quiet = false } = {}) {
     elements.detailTitle.textContent = detail.summary.displayName;
     state.selectedDetail = detail;
     renderFacts(detail.summary);
+    renderSSHStatus(null, detail.summary);
     elements.rawDetail.textContent = JSON.stringify(detail.raw, null, 2);
     renderActions(detail.summary);
     elements.loadLogsButton.disabled = false;
     elements.followLogsButton.disabled = false;
+    await loadSSHStatus(id, { signal: controller.signal });
   } catch (error) {
     if (!controller.signal.aborted) {
       elements.detailTitle.textContent = "详情读取失败";
+      elements.sshConnectionPanel.hidden = true;
       elements.detailFacts.replaceChildren();
       const message = document.createElement("dd");
       message.textContent = error.message;
@@ -639,6 +646,65 @@ async function loadDetail(id, { quiet = false } = {}) {
     }
   } finally {
     if (!controller.signal.aborted) elements.detailPanel.setAttribute("aria-busy", "false");
+  }
+}
+
+const sshStateLabels = {
+  notConfigured: "未配置",
+  stopped: "容器已停止",
+  initializing: "初始化中",
+  ready: "可连接",
+  failed: "启动失败"
+};
+
+function renderSSHStatus(status, summary = state.selectedDetail?.summary) {
+  const connection = status?.connection || summary?.ssh;
+  if (!connection) {
+    state.selectedSSHStatus = null;
+    elements.sshConnectionPanel.hidden = true;
+    return;
+  }
+  const pendingState = summary?.state === "running" ? "initializing"
+    : summary?.state === "error" ? "failed" : "stopped";
+  const currentState = status?.state || pendingState;
+  const command = connection.connectionCommand
+    || `ssh -p ${connection.hostPort} ${connection.username}@127.0.0.1`;
+  state.selectedSSHStatus = status;
+  elements.sshConnectionPanel.hidden = false;
+  elements.sshConnectionPanel.dataset.state = currentState;
+  elements.sshStatusLabel.textContent = sshStateLabels[currentState] || "状态未知";
+  elements.sshConnectionCommand.textContent = command;
+  elements.copySSHCommandButton.disabled = !command;
+}
+
+async function loadSSHStatus(id, { signal } = {}) {
+  const summary = state.selectedDetail?.summary;
+  if (!summary?.ssh || state.selectedID !== id) {
+    renderSSHStatus(null, summary);
+    return;
+  }
+  try {
+    const status = await fetchJSON(
+      `${ENDPOINTS.containers}/${encodeURIComponent(id)}/ssh`,
+      { signal }
+    );
+    if (!signal?.aborted && state.selectedID === id) renderSSHStatus(status, summary);
+  } catch (error) {
+    if (!signal?.aborted && state.selectedID === id) {
+      renderSSHStatus({ state: "failed", connection: summary.ssh }, summary);
+      elements.sshStatusLabel.textContent = "状态读取失败";
+    }
+  }
+}
+
+async function copySSHCommand() {
+  const command = elements.sshConnectionCommand.textContent.trim();
+  if (!command) return;
+  try {
+    await navigator.clipboard.writeText(command);
+    showToast("SSH 连接命令已复制");
+  } catch {
+    showToast("无法自动复制，请手动选择命令");
   }
 }
 
@@ -697,6 +763,8 @@ function closeDetail() {
   stopFollowingLogs("已停止跟随");
   state.selectedID = null;
   state.selectedDetail = null;
+  state.selectedSSHStatus = null;
+  elements.sshConnectionPanel.hidden = true;
   elements.detailContent.hidden = true;
   elements.detailPlaceholder.hidden = false;
 }
@@ -994,6 +1062,7 @@ async function submitImagePull(event) {
 function openCreateContainerDialog() {
   clearCreateErrors();
   elements.createFormStatus.textContent = "";
+  updateSSHFields();
   elements.createContainerDialog.showModal();
   elements.createName.focus();
 }
@@ -1005,7 +1074,10 @@ const createFieldTargets = {
   memoryMiB: [elements.createMemory, elements.createMemoryError],
   ports: [elements.createPorts, elements.createPortsError],
   environment: [elements.createEnvironment, elements.createEnvironmentError],
-  arguments: [elements.createArguments, elements.createArgumentsError]
+  arguments: [elements.createArguments, elements.createArgumentsError],
+  "ssh.hostPort": [elements.createSSHHostPort, elements.createSSHHostPortError],
+  "ssh.username": [elements.createSSHUsername, elements.createSSHUsernameError],
+  "ssh.publicKey": [elements.createSSHPublicKey, elements.createSSHPublicKeyError]
 };
 
 function clearCreateErrors() {
@@ -1060,6 +1132,54 @@ function parseEnvironmentLines(value) {
   return entries;
 }
 
+function validateSSHPublicKey(value) {
+  if (!value || value.length > 4096 || /[\r\n\0]/.test(value)) {
+    return "SSH 公钥必须是单行且不超过 4096 个字符";
+  }
+  const match = /^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(?:256|384|521)|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com)[ \t]+([A-Za-z0-9+/]+={0,2})(?:[ \t]+.*)?$/.exec(value);
+  if (!match) return "SSH 公钥格式无效，请粘贴单行公钥或选择 .pub 文件";
+  try {
+    const decoded = atob(match[2]);
+    if (decoded.length < 16) throw new Error("short key");
+  } catch {
+    return "SSH 公钥的 Base64 内容无效";
+  }
+  return null;
+}
+
+function updateSSHFields() {
+  const enabled = elements.createSSHEnabled.checked;
+  elements.createSSHFields.hidden = !enabled;
+  elements.createSSHEnabled.setAttribute("aria-expanded", String(enabled));
+  if (enabled) {
+    elements.createArguments.value = "";
+    elements.createArguments.disabled = true;
+    elements.createStartAfter.checked = true;
+    elements.createStartAfter.disabled = true;
+  } else {
+    elements.createArguments.disabled = false;
+    elements.createStartAfter.disabled = false;
+  }
+}
+
+async function readSSHPublicKeyFile() {
+  const file = elements.createSSHPublicKeyFile.files?.[0];
+  if (!file) return;
+  elements.createSSHPublicKeyError.textContent = "";
+  if (file.size > 16 * 1024) {
+    elements.createSSHPublicKeyError.textContent = "公钥文件过大";
+    elements.createSSHPublicKeyFile.value = "";
+    return;
+  }
+  try {
+    elements.createSSHPublicKey.value = (await file.text()).trim();
+    const error = validateSSHPublicKey(elements.createSSHPublicKey.value);
+    if (error) elements.createSSHPublicKeyError.textContent = error;
+  } catch {
+    elements.createSSHPublicKeyError.textContent = "无法读取公钥文件";
+  }
+}
+
 function buildCreateRequest() {
   const errors = {};
   const name = elements.createName.value.trim();
@@ -1090,6 +1210,36 @@ function buildCreateRequest() {
     name, image, ports, environment, arguments: argumentsList,
     startAfterCreate: elements.createStartAfter.checked
   };
+  if (elements.createSSHEnabled.checked) {
+    const hostPort = Number(elements.createSSHHostPort.value);
+    const username = elements.createSSHUsername.value.trim();
+    const publicKey = elements.createSSHPublicKey.value.trim();
+    if (!Number.isInteger(hostPort) || hostPort < 1024 || hostPort > 65535) {
+      errors["ssh.hostPort"] = "SSH 主机端口必须在 1024...65535 之间";
+    } else if (ports.some((mapping) => mapping.hostPort === hostPort)) {
+      errors["ssh.hostPort"] = "SSH 主机端口不能与其他端口映射重复";
+    }
+    if (username === "root" || !/^[a-z_][a-z0-9_-]{0,31}$/.test(username)) {
+      errors["ssh.username"] = "SSH 用户名必须为 1...32 位小写安全名称，且不能为 root";
+    }
+    const publicKeyError = validateSSHPublicKey(publicKey);
+    if (publicKeyError) errors["ssh.publicKey"] = publicKeyError;
+    const reservedEnvironmentNames = new Set([
+      "CONTAINER_GUI_SSH_USER", "CONTAINER_GUI_SSH_AUTHORIZED_KEY"
+    ]);
+    if (environment.some((entry) => reservedEnvironmentNames.has(entry.name))) {
+      errors.environment = "环境变量使用了 SSH 快速配置的保留名称";
+    }
+    if (argumentsList.length) {
+      errors.arguments = "启用 SSH 时不能同时填写进程参数";
+    }
+    if (Object.keys(errors).length) {
+      renderCreateErrors(errors);
+      return null;
+    }
+    request.startAfterCreate = true;
+    request.ssh = { hostPort, username, publicKey };
+  }
   if (cpus !== null) request.cpus = cpus;
   if (memoryMiB !== null) request.memoryMiB = memoryMiB;
   return request;
@@ -1123,6 +1273,7 @@ async function createContainer(event) {
     showOperationStatus("容器创建已排队", false, elements.imageOperationStatus);
     await pollOperation(operation.id, elements.imageOperationStatus);
     elements.createContainerForm.reset();
+    updateSSHFields();
   } catch (error) {
     const errors = Object.fromEntries((error.problem?.fieldErrors || []).map((item) => [item.field, item.message]));
     renderCreateErrors(errors);
@@ -1260,6 +1411,7 @@ function showToast(message) {
 
 elements.searchInput.addEventListener("input", renderContainers);
 elements.closeDetailButton.addEventListener("click", closeDetail);
+elements.copySSHCommandButton.addEventListener("click", copySSHCommand);
 elements.loadLogsButton.addEventListener("click", loadRecentLogs);
 elements.followLogsButton.addEventListener("click", () => {
   if (state.eventSource) stopFollowingLogs("已停止跟随");
@@ -1277,6 +1429,8 @@ elements.loadMoreRepositoriesButton.addEventListener("click", loadMoreRemoteRepo
 elements.loadMoreTagsButton.addEventListener("click", loadMoreRemoteTags);
 elements.openCreateContainerButton.addEventListener("click", openCreateContainerDialog);
 elements.cancelCreateContainerButton.addEventListener("click", () => elements.createContainerDialog.close());
+elements.createSSHEnabled.addEventListener("change", updateSSHFields);
+elements.createSSHPublicKeyFile.addEventListener("change", readSSHPublicKeyFile);
 elements.createContainerForm.addEventListener("submit", createContainer);
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") refreshDashboard();
@@ -1285,4 +1439,5 @@ window.setInterval(() => {
   if (document.visibilityState === "visible") refreshDashboard();
 }, REFRESH_INTERVAL_MS);
 loadApplicationVersion();
+updateSSHFields();
 refreshDashboard();

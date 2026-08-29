@@ -225,6 +225,7 @@ enum CLIOutputParser {
         let configuration = object["configuration"]?.objectValue ?? [:]
         let status = object["status"]?.objectValue ?? [:]
         let image = configuration["image"]?.objectValue
+        let labels = configuration["labels"]?.objectValue ?? [:]
         let rawState = status["state"]?.stringValue
         let network = status["networks"]?.arrayValue?.first?.objectValue
         return ContainerSummary(
@@ -236,6 +237,7 @@ enum CLIOutputParser {
             ipv4Address: network?["ipv4Address"]?.stringValue,
             ipv6Address: network?["ipv6Address"]?.stringValue,
             createdAt: configuration["creationDate"]?.stringValue.flatMap(parseDate),
+            ssh: ContainerSSHConnection(labels: labels),
             observedAt: observedAt
         )
     }

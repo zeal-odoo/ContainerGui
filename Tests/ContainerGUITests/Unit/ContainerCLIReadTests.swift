@@ -93,6 +93,28 @@ final class ContainerCLIReadTests: XCTestCase {
         XCTAssertFalse(encoded.contains("fixture-secret-must-not-leak"))
     }
 
+    func testRedactsSSHPublicKeyEmbeddedInEnvironmentArray() throws {
+        let detail = try CLIOutputParser.parseContainerDetail(
+            data: fixture("ssh-container-detail.json"),
+            expectedID: "ssh-demo",
+            observedAt: observedAt
+        )
+        let encoded = String(decoding: try JSONEncoder.containerGUI.encode(detail), as: UTF8.self)
+
+        XCTAssertTrue(encoded.contains(SSHCreateConfiguration.publicKeyEnvironmentName))
+        XCTAssertTrue(encoded.contains("[REDACTED]"))
+        XCTAssertFalse(encoded.contains("AAAAC3NzaC1lZDI1NTE5AAAAIFhY"))
+        XCTAssertFalse(encoded.contains("fixture@example"))
+
+        let keyedEnvironment = JSONValue.object([
+            SSHCreateConfiguration.publicKeyEnvironmentName: .string("ssh-ed25519 AAAA keyed@example")
+        ]).redacted()
+        XCTAssertEqual(
+            keyedEnvironment.objectValue?[SSHCreateConfiguration.publicKeyEnvironmentName],
+            .string("[REDACTED]")
+        )
+    }
+
     private func fixture(_ name: String) throws -> Data {
         let url = try XCTUnwrap(
             Bundle.module.url(

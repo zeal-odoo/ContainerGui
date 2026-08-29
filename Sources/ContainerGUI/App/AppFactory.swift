@@ -35,6 +35,11 @@ enum AppFactory {
             reader: reader,
             timeout: configuration.queryTimeout
         )
+        SSHStatusRoutes.register(
+            on: router,
+            reader: reader,
+            checker: LoopbackSSHReadinessChecker()
+        )
         let coordinator = OperationCoordinator(
             maximumConcurrentMutations: configuration.maximumConcurrentMutations,
             maximumOperationRecords: configuration.maximumOperationRecords,

@@ -257,6 +257,50 @@ final class ResourceMutationAPITests: XCTestCase {
         XCTAssertEqual(optionalStartCount, 1)
     }
 
+    func testCreateSSHPresetIsStructuredAndNeverReturnsThePublicKey() async throws {
+        let manager = StubImageManager()
+        let app = makeImageApplication(manager: manager)
+        let publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhY fixture@example"
+        let rawBody = #"{"name":"ssh-demo","image":"ubuntu:26.04","startAfterCreate":true,"ssh":{"hostPort":2222,"username":"dev","publicKey":"\#(publicKey)"}}"#
+        let expectedOrigin = origin
+        let headerName = idempotencyName
+
+        try await app.test(.router) { client in
+            let headers: HTTPFields = [
+                .origin: expectedOrigin,
+                .contentType: "application/json",
+                headerName: UUID().uuidString,
+            ]
+            let operation: ContainerGUI.Operation = try await client.execute(
+                uri: "/api/v1/containers",
+                method: .post,
+                headers: headers,
+                body: ByteBuffer(string: rawBody)
+            ) { response in
+                XCTAssertEqual(response.status, .accepted)
+                let encoded = String(decoding: response.body.readableBytesView, as: UTF8.self)
+                XCTAssertFalse(encoded.contains(publicKey))
+                let operation = try JSONDecoder.containerGUI.decode(ContainerGUI.Operation.self, from: response.body)
+                let ssh = try XCTUnwrap(operation.safeRequestSummary["ssh"]?.objectValue)
+                XCTAssertEqual(ssh["hostPort"], .number(2222))
+                XCTAssertEqual(ssh["username"], .string("dev"))
+                XCTAssertEqual(ssh["publicKeyType"], .string("ssh-ed25519"))
+                XCTAssertTrue(ssh["publicKeyFingerprint"]?.stringValue?.hasPrefix("SHA256:") == true)
+                return operation
+            }
+            try await Task.sleep(for: .milliseconds(80))
+            try await client.execute(uri: "/api/v1/operations/\(operation.id.uuidString)", method: .get) { response in
+                XCTAssertFalse(String(decoding: response.body.readableBytesView, as: UTF8.self).contains(publicKey))
+            }
+        }
+
+        let capturedRequest = await manager.lastCreateRequest
+        let received = try XCTUnwrap(capturedRequest)
+        XCTAssertEqual(received.ssh?.hostPort, 2222)
+        XCTAssertEqual(received.ssh?.username, "dev")
+        XCTAssertEqual(received.ssh?.publicKey, publicKey)
+    }
+
     func testCreateRejectsExistingNameBeforeMutation() async throws {
         let manager = StubImageManager(mode: .existingContainer)
         let app = makeImageApplication(manager: manager)
@@ -307,6 +351,37 @@ final class ResourceMutationAPITests: XCTestCase {
                 XCTAssertEqual(problem.code, .validationFailed)
                 XCTAssertEqual(problem.fieldErrors, [
                     FieldError(field: "ports", message: "主机端口必须使用 1024...65535；1024 以下需要 root 权限")
+                ])
+            }
+        }
+        let createCount = await manager.createCount
+        XCTAssertEqual(createCount, 0)
+    }
+
+    func testCreateRejectsSSHConflictsBeforeMutation() async throws {
+        let manager = StubImageManager()
+        let app = makeImageApplication(manager: manager)
+        let publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhY fixture@example"
+        let body = #"{"name":"ssh-demo","image":"ubuntu:26.04","ports":[{"hostPort":2222,"containerPort":8080}],"environment":[{"name":"CONTAINER_GUI_SSH_AUTHORIZED_KEY","value":"override"}],"arguments":["sleep"],"startAfterCreate":false,"ssh":{"hostPort":2222,"username":"dev","publicKey":"\#(publicKey)"}}"#
+        let expectedOrigin = origin
+        let headerName = idempotencyName
+
+        try await app.test(.router) { client in
+            let headers: HTTPFields = [
+                .origin: expectedOrigin,
+                .contentType: "application/json",
+                headerName: UUID().uuidString,
+            ]
+            try await client.execute(
+                uri: "/api/v1/containers",
+                method: .post,
+                headers: headers,
+                body: ByteBuffer(string: body)
+            ) { response in
+                XCTAssertEqual(response.status, .unprocessableContent)
+                let problem = try JSONDecoder.containerGUI.decode(ProblemDetail.self, from: response.body)
+                XCTAssertEqual(Set(problem.fieldErrors?.map(\.field) ?? []), [
+                    "arguments", "environment", "ssh.hostPort", "startAfterCreate",
                 ])
             }
         }
@@ -376,6 +451,7 @@ private actor StubImageManager: ImageReading, ResourceMutating, ContainerControl
     private(set) var createCount = 0
     private(set) var optionalStartCount = 0
     private(set) var deleteImageCount = 0
+    private(set) var lastCreateRequest: ContainerCreateRequest?
     private let mode: Mode
     private let observedAt = Date(timeIntervalSince1970: 1_787_987_200)
 
@@ -438,6 +514,7 @@ private actor StubImageManager: ImageReading, ResourceMutating, ContainerControl
 
     func createContainer(_ request: ContainerCreateRequest) async throws -> ContainerCreateOutcome {
         createCount += 1
+        lastCreateRequest = request
         if mode == .missingCreateReadback {
             return ContainerCreateOutcome(exitCode: 0, observedContainer: nil, matchedExpectation: false)
         }

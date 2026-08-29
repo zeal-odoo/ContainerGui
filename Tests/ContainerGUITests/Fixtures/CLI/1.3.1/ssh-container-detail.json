@@ -1,0 +1,39 @@
+[
+  {
+    "id": "ssh-demo",
+    "configuration": {
+      "id": "ssh-demo",
+      "creationDate": "2026-08-30T01:02:03Z",
+      "image": {
+        "reference": "docker.io/library/ubuntu:26.04"
+      },
+      "labels": {
+        "io.github.zeal-odoo.container-gui.ssh.enabled": "true",
+        "io.github.zeal-odoo.container-gui.ssh.host-port": "2222",
+        "io.github.zeal-odoo.container-gui.ssh.username": "dev"
+      },
+      "initProcess": {
+        "executable": "/bin/sh",
+        "arguments": ["-c", "fixed-container-gui-bootstrap"],
+        "environment": [
+          "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+          "CONTAINER_GUI_SSH_USER=dev",
+          "CONTAINER_GUI_SSH_AUTHORIZED_KEY=ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhY fixture@example"
+        ]
+      },
+      "publishedPorts": [
+        {
+          "containerPort": 22,
+          "count": 1,
+          "hostAddress": "127.0.0.1",
+          "hostPort": 2222,
+          "proto": "tcp"
+        }
+      ]
+    },
+    "status": {
+      "state": "running",
+      "networks": []
+    }
+  }
+]

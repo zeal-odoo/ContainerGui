@@ -42,9 +42,10 @@ struct ContainerCreateRequest: Codable, Equatable, Sendable {
     let environment: [EnvironmentEntry]
     let arguments: [String]
     let startAfterCreate: Bool
+    let ssh: SSHCreateConfiguration?
 
     private enum CodingKeys: String, CodingKey {
-        case name, image, cpus, memoryMiB, ports, environment, arguments, startAfterCreate
+        case name, image, cpus, memoryMiB, ports, environment, arguments, startAfterCreate, ssh
     }
 
     init(
@@ -55,7 +56,8 @@ struct ContainerCreateRequest: Codable, Equatable, Sendable {
         ports: [PortMapping] = [],
         environment: [EnvironmentEntry] = [],
         arguments: [String] = [],
-        startAfterCreate: Bool = false
+        startAfterCreate: Bool = false,
+        ssh: SSHCreateConfiguration? = nil
     ) {
         self.name = name
         self.image = image
@@ -65,6 +67,7 @@ struct ContainerCreateRequest: Codable, Equatable, Sendable {
         self.environment = environment
         self.arguments = arguments
         self.startAfterCreate = startAfterCreate
+        self.ssh = ssh
     }
 
     init(from decoder: Decoder) throws {
@@ -77,6 +80,7 @@ struct ContainerCreateRequest: Codable, Equatable, Sendable {
         environment = try container.decodeIfPresent([EnvironmentEntry].self, forKey: .environment) ?? []
         arguments = try container.decodeIfPresent([String].self, forKey: .arguments) ?? []
         startAfterCreate = try container.decodeIfPresent(Bool.self, forKey: .startAfterCreate) ?? false
+        ssh = try container.decodeIfPresent(SSHCreateConfiguration.self, forKey: .ssh)
     }
 
     func validated() throws -> Self {
@@ -119,6 +123,34 @@ struct ContainerCreateRequest: Codable, Equatable, Sendable {
         if arguments.count > 64 || arguments.contains(where: { $0.count > 4096 || $0.contains("\0") }) {
             errors["arguments"] = "进程参数数量或内容无效"
         }
+        if let ssh {
+            do {
+                _ = try ssh.validated()
+            } catch let problem as ProblemDetail {
+                for error in problem.fieldErrors ?? [] {
+                    errors[error.field] = error.message
+                }
+            }
+            if ports.contains(where: { $0.hostPort == ssh.hostPort }) {
+                errors["ssh.hostPort"] = "SSH 主机端口不能与其他端口映射重复"
+            }
+            if ports.count >= 32 {
+                errors["ports"] = "启用 SSH 后端口映射总数不能超过 32"
+            }
+            if !arguments.isEmpty {
+                errors["arguments"] = "启用 SSH 时不能同时填写进程参数"
+            }
+            if !startAfterCreate {
+                errors["startAfterCreate"] = "启用 SSH 时必须创建并启动容器"
+            }
+            let reservedEnvironmentNames = [
+                SSHCreateConfiguration.userEnvironmentName,
+                SSHCreateConfiguration.publicKeyEnvironmentName,
+            ]
+            if environment.contains(where: { reservedEnvironmentNames.contains($0.name) }) {
+                errors["environment"] = "环境变量使用了 SSH 快速配置的保留名称"
+            }
+        }
         guard errors.isEmpty else {
             throw ProblemDetail(code: .validationFailed, fieldErrors: errors)
         }
@@ -136,6 +168,7 @@ struct ContainerCreateRequest: Codable, Equatable, Sendable {
         ]
         if let cpus { summary["cpus"] = .number(cpus) }
         if let memoryMiB { summary["memoryMiB"] = .number(Double(memoryMiB)) }
+        if let ssh { summary["ssh"] = .object(ssh.safeRequestSummary) }
         return summary
     }
 }

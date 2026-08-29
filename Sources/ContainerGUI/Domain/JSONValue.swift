@@ -64,6 +64,8 @@ enum JSONValue: Codable, Equatable, Sendable {
             )
         case .array(let values):
             return .array(values.map { $0.redacted() })
+        case .string(let value):
+            return .string(Self.redactedEmbeddedAssignment(value) ?? value)
         default:
             return self
         }
@@ -71,8 +73,23 @@ enum JSONValue: Codable, Equatable, Sendable {
 
     private static func isSensitive(_ key: String) -> Bool {
         let normalized = key.lowercased().replacingOccurrences(of: "-", with: "_")
+        if normalized == SSHCreateConfiguration.publicKeyEnvironmentName.lowercased() {
+            return true
+        }
         return ["password", "passwd", "secret", "token", "api_key", "apikey", "authorization", "credential", "private_key"]
             .contains { normalized == $0 || normalized.hasSuffix("_\($0)") }
+    }
+
+    private static func redactedEmbeddedAssignment(_ value: String) -> String? {
+        guard let separator = value.firstIndex(of: "="), separator != value.startIndex else {
+            return nil
+        }
+        let name = String(value[..<separator])
+        guard isSensitive(name)
+                || name == SSHCreateConfiguration.publicKeyEnvironmentName else {
+            return nil
+        }
+        return "\(name)=[REDACTED]"
     }
 }
 

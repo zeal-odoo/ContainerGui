@@ -88,6 +88,17 @@
             <button id="closeDetailButton" class="icon-button" type="button" aria-label="关闭详情">×</button>
           </div>
           <dl id="detailFacts" class="facts"></dl>
+          <section id="sshConnectionPanel" class="ssh-connection-panel" aria-labelledby="sshConnectionTitle" aria-live="polite" hidden>
+            <div class="ssh-connection-head">
+              <h3 id="sshConnectionTitle">SSH 连接</h3>
+              <strong id="sshStatusLabel">正在读取</strong>
+            </div>
+            <div class="ssh-command-row">
+              <code id="sshConnectionCommand"></code>
+              <button id="copySSHCommandButton" class="button secondary small" type="button">复制命令</button>
+            </div>
+            <p>首次启动会安装 SSH；显示“可连接”后再使用对应私钥登录。</p>
+          </section>
           <div class="action-row" id="containerActions"></div>
           <div id="operationStatus" class="operation-status" role="status" aria-live="polite" hidden></div>
           <section class="logs" aria-labelledby="logsTitle">
@@ -230,6 +241,39 @@
         <small id="createPortsHelp">格式为“主机端口:容器端口[/tcp|udp]”，主机地址固定为 127.0.0.1；主机端口范围为 1024...65535。</small>
         <span id="createPortsError" class="field-error" aria-live="polite"></span>
       </label>
+      <fieldset class="ssh-config">
+        <legend class="sr-only">SSH 快速配置</legend>
+        <label class="checkbox-field">
+          <input id="createSSHEnabled" name="sshEnabled" type="checkbox" aria-controls="createSSHFields">
+          <span>启用 SSH（仅公钥登录）</span>
+        </label>
+        <div id="createSSHFields" hidden>
+          <p class="ssh-preset-note">自动安装并启动 SSH，只绑定到 127.0.0.1；不启用密码或 root 登录。容器重启后会自动恢复。</p>
+          <div class="form-grid">
+            <label class="form-field">
+              <span>宿主机端口</span>
+              <input id="createSSHHostPort" name="sshHostPort" type="number" min="1024" max="65535" step="1" value="2222" aria-describedby="createSSHHostPortError">
+              <span id="createSSHHostPortError" class="field-error" aria-live="polite"></span>
+            </label>
+            <label class="form-field">
+              <span>登录用户名</span>
+              <input id="createSSHUsername" name="sshUsername" maxlength="32" value="dev" autocomplete="off" spellcheck="false" aria-describedby="createSSHUsernameError">
+              <span id="createSSHUsernameError" class="field-error" aria-live="polite"></span>
+            </label>
+          </div>
+          <label class="form-field">
+            <span>SSH 公钥</span>
+            <textarea id="createSSHPublicKey" name="sshPublicKey" rows="3" maxlength="4096" data-sensitive="true" spellcheck="false" placeholder="ssh-ed25519 AAAA... you@example" aria-describedby="createSSHPublicKeyHelp createSSHPublicKeyError"></textarea>
+            <small id="createSSHPublicKeyHelp">只粘贴 `.pub` 公钥；私钥不会也不应发送到本工具。</small>
+            <span id="createSSHPublicKeyError" class="field-error" aria-live="polite"></span>
+          </label>
+          <label class="form-field ssh-key-file">
+            <span>或选择公钥文件</span>
+            <input id="createSSHPublicKeyFile" name="sshPublicKeyFile" type="file" accept=".pub,text/plain">
+            <small>读取结果会显示在上方，提交前仍可检查和修改。</small>
+          </label>
+        </div>
+      </fieldset>
       <label class="form-field">
         <span>环境变量（每行一项）</span>
         <textarea id="createEnvironment" name="environment" rows="4" data-sensitive="true" spellcheck="false" placeholder="POSTGRES_PASSWORD=仅用于本次请求" aria-describedby="createEnvironmentHelp createEnvironmentError"></textarea>

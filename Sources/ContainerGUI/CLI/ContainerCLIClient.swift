@@ -284,11 +284,26 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
         for port in request.ports {
             arguments += ["--publish", port.normalizedSpec]
         }
+        if let ssh = request.ssh {
+            arguments += ["--publish", PortMapping(hostPort: ssh.hostPort, containerPort: 22).normalizedSpec]
+            arguments += ["--label", "\(SSHContainerLabels.enabled)=true"]
+            arguments += ["--label", "\(SSHContainerLabels.hostPort)=\(ssh.hostPort)"]
+            arguments += ["--label", "\(SSHContainerLabels.username)=\(ssh.username)"]
+        }
         for environment in request.environment {
             arguments += ["--env", "\(environment.name)=\(environment.value)"]
         }
+        if let ssh = request.ssh {
+            arguments += ["--env", "\(SSHCreateConfiguration.userEnvironmentName)=\(ssh.username)"]
+            arguments += ["--env", "\(SSHCreateConfiguration.publicKeyEnvironmentName)=\(ssh.publicKey)"]
+            arguments += ["--init", "--entrypoint", "/bin/sh"]
+        }
         arguments += ["--", request.image]
-        arguments += request.arguments
+        if request.ssh != nil {
+            arguments += ["-c", SSHContainerBootstrap.script]
+        } else {
+            arguments += request.arguments
+        }
 
         let createResult = try await execute(arguments, timeout: mutationTimeout)
         guard createResult.exitCode == 0 else {

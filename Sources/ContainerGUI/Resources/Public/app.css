@@ -126,6 +126,15 @@ tbody tr:hover { background: color-mix(in srgb, var(--accent-soft) 55%, transpar
 .facts { padding: 18px 22px; display: grid; grid-template-columns: 110px 1fr; gap: 10px; margin: 0; font-size: 12px; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; overflow-wrap: anywhere; }
+.ssh-connection-panel { margin: 0 22px 18px; padding: 13px; border: 1px solid var(--line); border-radius: 12px;
+  background: color-mix(in srgb, var(--accent-soft) 48%, transparent); }
+.ssh-connection-head, .ssh-command-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ssh-connection-head strong { color: var(--warn); font-size: 11px; }
+.ssh-connection-panel[data-state="ready"] .ssh-connection-head strong { color: var(--good); }
+.ssh-connection-panel[data-state="failed"] .ssh-connection-head strong { color: var(--bad); }
+.ssh-command-row { margin-top: 10px; }
+.ssh-command-row code { flex: 1; min-width: 0; padding: 9px; font-size: 11px; }
+.ssh-connection-panel p { margin: 9px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
 .action-row { display: flex; gap: 8px; padding: 0 22px 18px; }
 .operation-status { margin: 0 22px 18px; padding: 11px 13px; border-radius: 10px;
   color: var(--accent); background: var(--accent-soft); font-size: 12px; }
@@ -160,6 +169,12 @@ dialog code { display: block; padding: 12px; background: #edf0f4; border-radius:
 .form-field [aria-invalid="true"] { border-color: var(--bad); }
 .field-error { min-height: 1.2em; color: var(--bad); font-size: 11px; font-weight: 500; }
 .checkbox-field { display: flex; gap: 9px; align-items: center; margin-top: 14px; font-size: 13px; font-weight: 700; }
+.ssh-config { margin: 16px 0 0; padding: 14px; border: 1px solid var(--line); border-radius: 13px;
+  background: color-mix(in srgb, var(--accent-soft) 34%, transparent); }
+.ssh-config > .checkbox-field { margin-top: 0; }
+.ssh-preset-note { margin: 12px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.ssh-key-file input[type="file"] { padding: 8px; font-weight: 500; }
+.form-field input:disabled, .form-field textarea:disabled { opacity: .58; cursor: not-allowed; }
 .dialog-actions { margin-top: 22px; display: flex; justify-content: flex-end; gap: 9px; }
 .toast { position: fixed; right: 24px; bottom: 24px; max-width: 420px; padding: 13px 16px; border-radius: 12px;
   background: #111a27; color: white; box-shadow: var(--shadow); z-index: 30; font-size: 13px; }

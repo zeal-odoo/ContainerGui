@@ -56,7 +56,32 @@ struct ContainerSummary: Codable, Equatable, Sendable {
     let ipv4Address: String?
     let ipv6Address: String?
     let createdAt: Date?
+    let ssh: ContainerSSHConnection?
     let observedAt: Date
+
+    init(
+        id: String,
+        displayName: String,
+        imageReference: String?,
+        state: ContainerState,
+        rawState: String?,
+        ipv4Address: String?,
+        ipv6Address: String?,
+        createdAt: Date?,
+        ssh: ContainerSSHConnection? = nil,
+        observedAt: Date
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.imageReference = imageReference
+        self.state = state
+        self.rawState = rawState
+        self.ipv4Address = ipv4Address
+        self.ipv6Address = ipv6Address
+        self.createdAt = createdAt
+        self.ssh = ssh
+        self.observedAt = observedAt
+    }
 }
 
 struct ContainerList: Codable, Equatable, Sendable {

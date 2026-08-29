@@ -119,6 +119,70 @@ final class ResourceMutationAssetTests: XCTestCase {
         XCTAssertTrue(script.contains("/api/v1/containers"))
     }
 
+    func testCreateDialogOffersSimpleStructuredSSHConfiguration() throws {
+        let html = try asset("index.html")
+        let script = try asset("app.js")
+
+        XCTAssertTrue(html.contains("id=\"createSSHEnabled\""))
+        XCTAssertTrue(html.contains("启用 SSH（仅公钥登录）"))
+        XCTAssertTrue(html.contains("id=\"createSSHFields\""))
+        XCTAssertTrue(html.contains("id=\"createSSHHostPort\""))
+        XCTAssertTrue(html.contains("value=\"2222\""))
+        XCTAssertTrue(html.contains("id=\"createSSHUsername\""))
+        XCTAssertTrue(html.contains("value=\"dev\""))
+        XCTAssertTrue(html.contains("id=\"createSSHPublicKey\""))
+        XCTAssertTrue(html.contains("id=\"createSSHPublicKeyFile\""))
+        XCTAssertTrue(html.contains("accept=\".pub,text/plain\""))
+        XCTAssertTrue(html.contains("只绑定到 127.0.0.1"))
+        XCTAssertTrue(html.contains("不启用密码或 root 登录"))
+
+        XCTAssertTrue(script.contains("updateSSHFields"))
+        XCTAssertTrue(script.contains("readSSHPublicKeyFile"))
+        XCTAssertTrue(script.contains("validateSSHPublicKey"))
+        let builder = try functionBody("buildCreateRequest", in: script)
+        XCTAssertTrue(builder.contains("request.ssh"))
+        XCTAssertTrue(builder.contains("hostPort"))
+        XCTAssertTrue(builder.contains("username"))
+        XCTAssertTrue(builder.contains("publicKey"))
+        XCTAssertFalse(builder.contains("entrypoint"))
+        XCTAssertFalse(builder.contains("sshd -D"))
+    }
+
+    func testContainerDetailShowsDerivedSSHStatusAndCopyableCommand() throws {
+        let html = try asset("index.html")
+        let script = try asset("app.js")
+
+        XCTAssertTrue(html.contains("id=\"sshConnectionPanel\""))
+        XCTAssertTrue(html.contains("id=\"sshStatusLabel\""))
+        XCTAssertTrue(html.contains("id=\"sshConnectionCommand\""))
+        XCTAssertTrue(html.contains("id=\"copySSHCommandButton\""))
+        XCTAssertTrue(html.contains("aria-live=\"polite\""))
+        XCTAssertTrue(script.contains("/ssh"))
+        XCTAssertTrue(script.contains("loadSSHStatus"))
+        XCTAssertTrue(script.contains("renderSSHStatus"))
+        XCTAssertTrue(script.contains("初始化中"))
+        XCTAssertTrue(script.contains("可连接"))
+        XCTAssertTrue(script.contains("navigator.clipboard.writeText"))
+        XCTAssertTrue(try functionBody("loadDetail", in: script).contains("loadSSHStatus"))
+    }
+
+    func testSSHFormPreventsConflictingAdvancedInputsBeforeSubmission() throws {
+        let script = try asset("app.js")
+
+        let toggle = try functionBody("updateSSHFields", in: script)
+        XCTAssertTrue(toggle.contains("elements.createArguments.value = \"\""))
+        XCTAssertTrue(toggle.contains("elements.createArguments.disabled = true"))
+        XCTAssertTrue(toggle.contains("elements.createStartAfter.checked = true"))
+        XCTAssertTrue(toggle.contains("elements.createStartAfter.disabled = true"))
+
+        let builder = try functionBody("buildCreateRequest", in: script)
+        XCTAssertTrue(builder.contains("SSH 主机端口不能与其他端口映射重复"))
+        XCTAssertTrue(builder.contains("username === \"root\""))
+        XCTAssertTrue(builder.contains("CONTAINER_GUI_SSH_USER"))
+        XCTAssertTrue(builder.contains("CONTAINER_GUI_SSH_AUTHORIZED_KEY"))
+        XCTAssertTrue(builder.contains("request.startAfterCreate = true"))
+    }
+
     func testRemoteRegistrySearchIsExplicitAndKeepsAllLocalImagesVisible() throws {
         let html = try asset("index.html")
         let script = try asset("app.js")
