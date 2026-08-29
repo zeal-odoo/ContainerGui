@@ -148,6 +148,44 @@ final class ResourceMutationAssetTests: XCTestCase {
         XCTAssertFalse(builder.contains("sshd -D"))
     }
 
+    func testCreateDialogCanGenerateLocalSSHKeyPair() throws {
+        let html = try asset("index.html")
+        let script = try asset("app.js")
+        let keyGenerator = try asset("ssh-key-generator.js")
+
+        XCTAssertTrue(html.contains("src=\"/ssh-key-generator.js\""))
+        XCTAssertTrue(html.contains("id=\"generateSSHKeyPairButton\""))
+        XCTAssertTrue(html.contains("id=\"generatedSSHKeyStatus\""))
+        XCTAssertTrue(html.contains("只下载一次"))
+        XCTAssertTrue(keyGenerator.contains("crypto.subtle.generateKey"))
+        XCTAssertTrue(keyGenerator.contains("modulusLength: 3072"))
+        XCTAssertTrue(keyGenerator.contains("exportKey(\"pkcs8\""))
+        XCTAssertTrue(keyGenerator.contains("ssh-rsa"))
+        XCTAssertFalse(keyGenerator.contains("fetch("))
+        XCTAssertTrue(script.contains("generateAndDownloadSSHKeyPair"))
+        XCTAssertTrue(script.contains("ContainerGUIKeyGenerator.generateOpenSSHKeyPair"))
+        XCTAssertTrue(script.contains("downloadPrivateKey"))
+        XCTAssertTrue(script.contains("elements.createSSHPublicKey.value = publicKey"))
+        XCTAssertFalse(try functionBody("buildCreateRequest", in: script).contains("privateKey"))
+    }
+
+    func testCreateDialogOffersKeepAlivePresetWithoutRawTyping() throws {
+        let html = try asset("index.html")
+        let script = try asset("app.js")
+
+        XCTAssertTrue(html.contains("id=\"createKeepAlive\""))
+        XCTAssertTrue(html.contains("保持容器运行"))
+        XCTAssertTrue(html.contains("/bin/bash -lc"))
+        XCTAssertTrue(html.contains("exec sleep infinity"))
+        XCTAssertTrue(script.contains("const KEEP_ALIVE_ARGUMENTS = [\"/bin/bash\", \"-lc\", \"exec sleep infinity\"]"))
+        let updater = try functionBody("updateProcessModeFields", in: script)
+        XCTAssertTrue(updater.contains("elements.createKeepAlive.disabled = sshEnabled"))
+        XCTAssertTrue(updater.contains("elements.createArguments.disabled = sshEnabled || keepAlive"))
+        let builder = try functionBody("buildCreateRequest", in: script)
+        XCTAssertTrue(builder.contains("elements.createKeepAlive.checked"))
+        XCTAssertTrue(builder.contains("KEEP_ALIVE_ARGUMENTS"))
+    }
+
     func testContainerDetailShowsDerivedSSHStatusAndCopyableCommand() throws {
         let html = try asset("index.html")
         let script = try asset("app.js")
@@ -170,8 +208,7 @@ final class ResourceMutationAssetTests: XCTestCase {
         let script = try asset("app.js")
 
         let toggle = try functionBody("updateSSHFields", in: script)
-        XCTAssertTrue(toggle.contains("elements.createArguments.value = \"\""))
-        XCTAssertTrue(toggle.contains("elements.createArguments.disabled = true"))
+        XCTAssertTrue(toggle.contains("updateProcessModeFields"))
         XCTAssertTrue(toggle.contains("elements.createStartAfter.checked = true"))
         XCTAssertTrue(toggle.contains("elements.createStartAfter.disabled = true"))
 

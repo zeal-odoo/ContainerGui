@@ -174,6 +174,10 @@ dialog code { display: block; padding: 12px; background: #edf0f4; border-radius:
 .ssh-config > .checkbox-field { margin-top: 0; }
 .ssh-preset-note { margin: 12px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .ssh-key-file input[type="file"] { padding: 8px; font-weight: 500; }
+.ssh-key-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin-top: 12px; }
+.ssh-key-actions .quiet { flex: 1; min-width: 220px; line-height: 1.45; }
+.process-preset { margin-top: 10px; }
+.process-preset-note { margin: 6px 0 0 24px; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .form-field input:disabled, .form-field textarea:disabled { opacity: .58; cursor: not-allowed; }
 .dialog-actions { margin-top: 22px; display: flex; justify-content: flex-end; gap: 9px; }
 .toast { position: fixed; right: 24px; bottom: 24px; max-width: 420px; padding: 13px 16px; border-radius: 12px;

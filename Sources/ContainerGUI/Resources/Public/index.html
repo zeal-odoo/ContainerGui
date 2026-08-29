@@ -272,6 +272,11 @@
             <input id="createSSHPublicKeyFile" name="sshPublicKeyFile" type="file" accept=".pub,text/plain">
             <small>读取结果会显示在上方，提交前仍可检查和修改。</small>
           </label>
+          <div class="ssh-key-actions">
+            <button id="generateSSHKeyPairButton" class="button secondary small" type="button">生成 SSH 密钥对</button>
+            <span id="generatedSSHKeyStatus" class="quiet" role="status" aria-live="polite"></span>
+          </div>
+          <p class="ssh-preset-note">密钥对只在当前浏览器生成；公钥自动填入，私钥只下载一次且不会上传或保存。</p>
         </div>
       </fieldset>
       <label class="form-field">
@@ -285,6 +290,11 @@
         <textarea id="createArguments" name="arguments" rows="3" spellcheck="false" placeholder="postgres&#10;-c&#10;shared_buffers=256MB" aria-describedby="createArgumentsError"></textarea>
         <span id="createArgumentsError" class="field-error" aria-live="polite"></span>
       </label>
+      <label class="checkbox-field process-preset">
+        <input id="createKeepAlive" name="keepAlive" type="checkbox">
+        <span>保持容器运行</span>
+      </label>
+      <p class="process-preset-note">适用于 Ubuntu 等没有常驻进程的镜像；GUI 固定使用 /bin/bash -lc 和 exec sleep infinity。启用 SSH 时无需选择。</p>
       <label class="checkbox-field">
         <input id="createStartAfter" name="startAfterCreate" type="checkbox">
         <span>创建并验证后启动容器</span>
@@ -347,6 +357,7 @@
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script src="/ssh-key-generator.js" defer></script>
   <script src="/app.js" defer></script>
 </body>
 </html>

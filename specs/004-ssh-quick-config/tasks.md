@@ -117,6 +117,21 @@
 
 ---
 
+## Phase 7: Browser Key Generation & Keep-Alive Preset
+
+**Purpose**: 让没有现成密钥的用户可从 GUI 完成 SSH 准备，并免除普通基础镜像的重复进程参数输入。
+
+- [X] T036 Add failing asset and OpenSSH compatibility tests in `Tests/ContainerGUITests/Browser/ResourceMutationAssetTests.swift` and `Tests/Frontend/SSHKeyGeneratorTests.mjs`
+- [X] T037 Implement dependency-free browser-local RSA-3072 generation in `Sources/ContainerGUI/Resources/Public/ssh-key-generator.js`
+- [X] T038 Add one-click private-key download and public-key autofill to `Sources/ContainerGUI/Resources/Public/index.html` and `Sources/ContainerGUI/Resources/Public/app.js`
+- [X] T039 Add the fixed keep-alive checkbox and SSH conflict behavior in `Sources/ContainerGUI/Resources/Public/index.html` and `Sources/ContainerGUI/Resources/Public/app.js`
+- [X] T040 Update bilingual usage, safety boundaries and feature decisions in `README.md` and `specs/004-ssh-quick-config/`
+- [X] T041 Increment the GUI version and version test to 2.6.0 in `Sources/ContainerGUI/App/AppVersion.swift` and `Tests/ContainerGUITests/Unit/AppVersionTests.swift`
+- [X] T042 Run full Swift, Node, read-only CLI and non-mutating browser verification
+- [X] T043 Commit the complete v2.6.0 update, push `main`, restart the local GUI and read back the deployed version
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -164,7 +179,8 @@ Task T007: Browser asset tests in ResourceMutationAssetTests.swift
 1. Add US1 structured creation.
 2. Add US2 authoritative metadata, readiness and restart-visible status.
 3. Add US3 negative validation and complete redaction.
-4. Finish version, docs, full verification, commit and push as one v2.5.0 logical update.
+4. Finish the original SSH feature as one v2.5.0 logical update.
+5. Add browser-local key generation and the keep-alive GUI preset as one v2.6.0 logical update.
 
 ## Notes
 

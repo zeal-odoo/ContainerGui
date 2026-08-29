@@ -14,6 +14,7 @@ const ENDPOINTS = {
 };
 const REFRESH_INTERVAL_MS = 5000;
 const LOG_DISPLAY_LIMIT = 512 * 1024;
+const KEEP_ALIVE_ARGUMENTS = ["/bin/bash", "-lc", "exec sleep infinity"];
 
 const elements = Object.fromEntries([
   "appVersionBadge", "versionBadge", "healthCard", "healthLabel", "healthDetail",
@@ -36,7 +37,8 @@ const elements = Object.fromEntries([
   "createMemoryError", "createPortsError", "createEnvironmentError", "createArgumentsError",
   "createSSHEnabled", "createSSHFields", "createSSHHostPort", "createSSHUsername",
   "createSSHPublicKey", "createSSHPublicKeyFile", "createSSHHostPortError",
-  "createSSHUsernameError", "createSSHPublicKeyError",
+  "createSSHUsernameError", "createSSHPublicKeyError", "generateSSHKeyPairButton",
+  "generatedSSHKeyStatus", "createKeepAlive",
   "createFormStatus", "cancelCreateContainerButton", "submitCreateContainerButton",
   "remoteRegistrySection", "remoteRegistryForm", "remoteSearchQuery",
   "searchRemoteRepositoriesButton", "remoteRepositoryCount", "remoteRepositoryStatus",
@@ -1152,14 +1154,22 @@ function updateSSHFields() {
   elements.createSSHFields.hidden = !enabled;
   elements.createSSHEnabled.setAttribute("aria-expanded", String(enabled));
   if (enabled) {
-    elements.createArguments.value = "";
-    elements.createArguments.disabled = true;
     elements.createStartAfter.checked = true;
     elements.createStartAfter.disabled = true;
   } else {
-    elements.createArguments.disabled = false;
     elements.createStartAfter.disabled = false;
   }
+  updateProcessModeFields();
+}
+
+function updateProcessModeFields() {
+  const sshEnabled = elements.createSSHEnabled.checked;
+  if (sshEnabled) elements.createKeepAlive.checked = false;
+  const keepAlive = elements.createKeepAlive.checked;
+  elements.createKeepAlive.disabled = sshEnabled;
+  elements.createArguments.disabled = sshEnabled || keepAlive;
+  if (sshEnabled || keepAlive) elements.createArguments.value = "";
+  if (keepAlive) elements.createStartAfter.checked = true;
 }
 
 async function readSSHPublicKeyFile() {
@@ -1173,10 +1183,47 @@ async function readSSHPublicKeyFile() {
   }
   try {
     elements.createSSHPublicKey.value = (await file.text()).trim();
+    elements.generatedSSHKeyStatus.textContent = "";
     const error = validateSSHPublicKey(elements.createSSHPublicKey.value);
     if (error) elements.createSSHPublicKeyError.textContent = error;
   } catch {
     elements.createSSHPublicKeyError.textContent = "无法读取公钥文件";
+  }
+}
+
+function generatedPrivateKeyFilename() {
+  const suffix = elements.createName.value.trim().toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "ssh";
+  return `id_container_gui_${suffix}_${Date.now()}`;
+}
+
+function downloadPrivateKey(privateKey, filename) {
+  const url = URL.createObjectURL(new Blob([privateKey], { type: "application/x-pem-file" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function generateAndDownloadSSHKeyPair() {
+  elements.generateSSHKeyPairButton.disabled = true;
+  elements.generatedSSHKeyStatus.textContent = "正在浏览器中生成密钥…";
+  try {
+    const { publicKey, privateKey } = await ContainerGUIKeyGenerator.generateOpenSSHKeyPair();
+    const filename = generatedPrivateKeyFilename();
+    elements.createSSHPublicKey.value = publicKey;
+    elements.createSSHPublicKeyFile.value = "";
+    elements.createSSHPublicKey.removeAttribute("aria-invalid");
+    elements.createSSHPublicKeyError.textContent = "";
+    downloadPrivateKey(privateKey, filename);
+    elements.generatedSSHKeyStatus.textContent = `公钥已填入，私钥已下载为 ${filename}；使用前请执行 chmod 600。`;
+  } catch (error) {
+    elements.generatedSSHKeyStatus.textContent = error.message || "密钥生成失败";
+  } finally {
+    elements.generateSSHKeyPairButton.disabled = false;
   }
 }
 
@@ -1198,7 +1245,9 @@ function buildCreateRequest() {
   let environment = [];
   try { ports = parsePortLines(elements.createPorts.value); } catch (error) { errors.ports = error.message; }
   try { environment = parseEnvironmentLines(elements.createEnvironment.value); } catch (error) { errors.environment = error.message; }
-  const argumentsList = elements.createArguments.value.split(/\r?\n/).filter((item) => item.length > 0);
+  const argumentsList = elements.createKeepAlive.checked
+    ? [...KEEP_ALIVE_ARGUMENTS]
+    : elements.createArguments.value.split(/\r?\n/).filter((item) => item.length > 0);
   if (argumentsList.length > 64 || argumentsList.some((item) => item.length > 4096)) {
     errors.arguments = "进程参数数量或内容无效";
   }
@@ -1273,6 +1322,7 @@ async function createContainer(event) {
     showOperationStatus("容器创建已排队", false, elements.imageOperationStatus);
     await pollOperation(operation.id, elements.imageOperationStatus);
     elements.createContainerForm.reset();
+    elements.generatedSSHKeyStatus.textContent = "";
     updateSSHFields();
   } catch (error) {
     const errors = Object.fromEntries((error.problem?.fieldErrors || []).map((item) => [item.field, item.message]));
@@ -1431,6 +1481,8 @@ elements.openCreateContainerButton.addEventListener("click", openCreateContainer
 elements.cancelCreateContainerButton.addEventListener("click", () => elements.createContainerDialog.close());
 elements.createSSHEnabled.addEventListener("change", updateSSHFields);
 elements.createSSHPublicKeyFile.addEventListener("change", readSSHPublicKeyFile);
+elements.generateSSHKeyPairButton.addEventListener("click", generateAndDownloadSSHKeyPair);
+elements.createKeepAlive.addEventListener("change", updateProcessModeFields);
 elements.createContainerForm.addEventListener("submit", createContainer);
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") refreshDashboard();

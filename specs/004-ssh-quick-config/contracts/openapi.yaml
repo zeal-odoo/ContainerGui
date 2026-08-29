@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Container GUI SSH Quick Configuration API
-  version: 2.5.0
+  version: 2.6.0
   description: Structured SSH preset for new containers and authoritative loopback readiness status.
 servers:
   - url: http://127.0.0.1:8787/api/v1
