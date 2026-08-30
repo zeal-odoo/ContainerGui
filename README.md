@@ -6,7 +6,7 @@ A lightweight local web interface for Apple [`container`](https://github.com/app
 
 [中文](#中文说明) · [English](#english-guide)
 
-**GUI v2.16.0** · Apple `container` `1.3.x` · `http://127.0.0.1:8787`
+**GUI v2.16.1** · Apple `container` `1.3.x` · `http://127.0.0.1:8787`
 
 > Container GUI is a local, single-user tool. It never listens on the LAN or public Internet and is not a replacement for Docker Desktop, Compose, Kubernetes, or a multi-user remote administration platform.
 >
@@ -68,6 +68,29 @@ http://127.0.0.1:8787/
 ```bash
 CONTAINER_GUI_PORT=9876 swift run ContainerGUI
 ```
+
+### 稳定运行（推荐）
+
+日常使用不要依赖一直打开的终端窗口。安装用户级 LaunchAgent 后，Container GUI 会在登录时启动，异常退出时由 launchd 自动拉起；独立 watchdog 每 30 秒检查两次 GUI 身份接口，遇到“进程仍在但 8787 已失去监听”的假活状态会强制重启服务。
+
+```bash
+./scripts/install-launch-agent.sh
+```
+
+安装程序会构建 release 版本，并复制到 `~/Library/Application Support/ContainerGUI`，因此运行时不依赖项目目录或终端窗口。服务日志位于 `~/Library/Logs/ContainerGUI`。查看当前托管状态：
+
+```bash
+launchctl print "gui/$(id -u)/com.msj.container-gui"
+curl -fsS http://127.0.0.1:8787/api/v1
+```
+
+如需停用自动启动与自愈：
+
+```bash
+./scripts/uninstall-launch-agent.sh
+```
+
+卸载脚本会停止并移除两个 LaunchAgent，但保留已安装的运行版本和日志，便于恢复与排查。
 
 ### 创建普通容器
 
@@ -217,6 +240,29 @@ The service always binds to `127.0.0.1`. To use another local port:
 ```bash
 CONTAINER_GUI_PORT=9876 swift run ContainerGUI
 ```
+
+### Stable operation (recommended)
+
+Do not depend on an open terminal for daily use. Install the user LaunchAgents so launchd starts Container GUI at login and restarts it after an abnormal exit. A separate watchdog probes the GUI identity twice every 30 seconds and force-restarts a stale process that is still present after port 8787 has stopped listening.
+
+```bash
+./scripts/install-launch-agent.sh
+```
+
+The installer builds a release binary and copies it to `~/Library/Application Support/ContainerGUI`, so the runtime does not depend on the repository directory or an open terminal. Logs are stored in `~/Library/Logs/ContainerGUI`. Check the managed service with:
+
+```bash
+launchctl print "gui/$(id -u)/com.msj.container-gui"
+curl -fsS http://127.0.0.1:8787/api/v1
+```
+
+To disable automatic startup and recovery:
+
+```bash
+./scripts/uninstall-launch-agent.sh
+```
+
+The uninstall script stops and removes both LaunchAgents while retaining installed runtime versions and logs for recovery and diagnosis.
 
 ### Create a regular container
 
