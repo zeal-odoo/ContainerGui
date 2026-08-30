@@ -183,7 +183,7 @@
         </label>
         <button id="searchRemoteRepositoriesButton" class="button remote-search-button" type="submit">搜索镜像</button>
       </form>
-      <p class="remote-search-help">Docker Hub 按关键词搜索公开仓库；仓库与标签均每页显示 20 条。</p>
+      <p class="remote-search-help">Docker Hub 按关键词搜索公开仓库；仓库与标签均每页显示 10 条。</p>
 
       <div class="remote-browser">
         <section class="remote-column" aria-labelledby="remoteRepositoriesTitle">
@@ -196,7 +196,7 @@
           <div id="remoteRepositoryResults" class="remote-results" aria-live="polite"></div>
           <nav id="remoteRepositoryPagination" class="pagination" aria-label="仓库结果分页" hidden>
             <button id="previousRepositoriesButton" class="button secondary small" type="button">上一页</button>
-            <span id="remoteRepositoryPageLabel" class="quiet" aria-live="polite">第 1 页</span>
+            <div id="remoteRepositoryPageNumbers" class="pagination-pages" aria-live="polite"></div>
             <button id="nextRepositoriesButton" class="button secondary small" type="button">下一页</button>
           </nav>
         </section>
@@ -211,7 +211,7 @@
           <div id="remoteTagResults" class="remote-results" aria-live="polite"></div>
           <nav id="remoteTagPagination" class="pagination" aria-label="镜像标签分页" hidden>
             <button id="previousTagsButton" class="button secondary small" type="button">上一页</button>
-            <span id="remoteTagPageLabel" class="quiet" aria-live="polite">第 1 页</span>
+            <div id="remoteTagPageNumbers" class="pagination-pages" aria-live="polite"></div>
             <button id="nextTagsButton" class="button secondary small" type="button">下一页</button>
           </nav>
         </section>
@@ -410,6 +410,7 @@
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <script src="/ssh-key-generator.js" defer></script>
   <script src="/odoo-create-form.js" defer></script>
+  <script src="/pagination.js" defer></script>
   <script src="/app.js" defer></script>
 </body>
 </html>

@@ -1042,15 +1042,59 @@ pre {
   display: flex;
   min-height: 40px;
   margin-top: 16px;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
   justify-content: center;
 }
 
-.pagination .quiet {
-  min-width: 92px;
-  text-align: center;
+.pagination-pages {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
   font-variant-numeric: tabular-nums;
+}
+
+.pagination-page {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  font: inherit;
+  font-size: .75rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background-color var(--md-sys-motion-duration-short), color var(--md-sys-motion-duration-short), transform var(--md-sys-motion-duration-short);
+}
+
+.pagination-page:hover:not(:disabled) {
+  background: var(--md-sys-color-surface-container-high);
+}
+
+.pagination-page:active:not(:disabled) {
+  transform: scale(.92);
+}
+
+.pagination-page[aria-current="page"] {
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+}
+
+.pagination-page:disabled {
+  cursor: wait;
+  opacity: .62;
+}
+
+.pagination-ellipsis {
+  width: 20px;
+  color: var(--md-sys-color-on-surface-variant);
+  text-align: center;
 }
 
 dialog {

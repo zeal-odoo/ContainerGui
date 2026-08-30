@@ -4,7 +4,7 @@
 
 A lightweight, local web interface for Apple’s [`container`](https://github.com/apple/container) CLI, built with Swift, Hummingbird, and build-free web technologies.
 
-**当前版本 / Current version:** GUI `v2.13.1` · Apple `container` `1.3.x` 兼容 · `127.0.0.1:8787`
+**当前版本 / Current version:** GUI `v2.14.0` · Apple `container` `1.3.x` 兼容 · `127.0.0.1:8787`
 
 > Container GUI 是单用户、本机回环工具。它不监听局域网或公网，也不是 Docker Desktop、Kubernetes、Compose 或多用户远程控制平台。
 
@@ -54,7 +54,7 @@ CONTAINER_GUI_PORT=9876 swift run ContainerGUI
 | 查看详情 | 同一个“查看详情”按钮可展开或收起详情；支持脱敏原始信息、最近日志和实时日志 |
 | 控制生命周期 | 对合法状态提供启动、正常停止、重启和删除；危险操作必须确认并完成 CLI 状态回读 |
 | 管理镜像 | 展示并折叠全部本机镜像、显示真实拉取进度、安全删除未引用镜像，并保护 Apple `vminit` 系统镜像 |
-| 浏览 Docker Hub | 搜索公开仓库和标签，仓库及标签均按每页 20 条翻页；选择标签只填写拉取表单，不会自动拉取 |
+| 浏览 Docker Hub | 搜索公开仓库和标签，仓库及标签均为每页 10 条并支持数字页码；选择标签只填写拉取表单，不会自动拉取 |
 | 创建容器 | 配置名称、CPU、内存、回环端口、环境变量、进程参数、一个共享目录，以及创建后是否启动 |
 | 快速配置 SSH | 为受支持的 Debian/Ubuntu 镜像配置仅公钥 SSH、自定义本机端口、普通用户或显式 root 登录，并检测真实 SSH 横幅 |
 | 创建 Odoo 容器 | 官方 Odoo 镜像自动显示数据库地址/端口和自定义模块目录，模块目录固定挂载到 `/mnt/extra-addons` |
@@ -196,7 +196,7 @@ Open `http://127.0.0.1:8787/`.
 
 - Live container state plus CPU, memory, root-filesystem capacity, addresses, redacted details, and logs.
 - Confirmed start, graceful stop, restart, and safe deletion with authoritative readback.
-- Local image inventory, real pull progress, protected deletion, and Docker Hub repository/tag pagination at 20 items per page.
+- Local image inventory, real pull progress, protected deletion, and numbered Docker Hub repository/tag pagination at 10 items per page.
 - Structured container creation with CPU, memory, loopback ports, environment variables, process arguments, one shared directory, and optional start.
 - Public-key-only SSH for supported Debian/Ubuntu images, including browser-local key generation, custom ports, normal-user or explicit root mode, and actual SSH-banner readiness checks.
 - Official Odoo image mode with `/mnt/extra-addons` and database host/port fields; other images use a configurable shared directory such as `/workspace`.

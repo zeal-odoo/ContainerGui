@@ -32,7 +32,7 @@ final class RegistrySearchClientTests: XCTestCase {
         ])
         XCTAssertEqual(page.totalCount, 3)
         XCTAssertTrue(page.hasNextPage)
-        XCTAssertEqual(page.pageSize, 20)
+        XCTAssertEqual(page.pageSize, 10)
         let recordedRequests = await transport.requests
         let request = try XCTUnwrap(recordedRequests.first)
         XCTAssertEqual(request.url.scheme, "https")
@@ -41,7 +41,7 @@ final class RegistrySearchClientTests: XCTestCase {
         XCTAssertTrue(request.url.absoluteString.contains("/v2/search/repositories/?"))
         let query = URLComponents(url: request.url, resolvingAgainstBaseURL: false)?.queryItems
         XCTAssertEqual(query?.first(where: { $0.name == "query" })?.value, "postgres")
-        XCTAssertEqual(query?.first(where: { $0.name == "page_size" })?.value, "20")
+        XCTAssertEqual(query?.first(where: { $0.name == "page_size" })?.value, "10")
         XCTAssertEqual(query?.first(where: { $0.name == "page" })?.value, "1")
     }
 
@@ -64,10 +64,13 @@ final class RegistrySearchClientTests: XCTestCase {
         XCTAssertEqual(page.items.first?.reference, "docker.io/library/postgres:latest")
         XCTAssertEqual(page.items.first?.sizeBytes, 161_067_506)
         XCTAssertTrue(page.hasNextPage)
+        XCTAssertEqual(page.pageSize, 10)
         let recordedRequests = await transport.requests
         let request = try XCTUnwrap(recordedRequests.first)
         XCTAssertEqual(request.url.host, "hub.docker.com")
         XCTAssertEqual(request.url.path, "/v2/namespaces/library/repositories/postgres/tags")
+        let query = URLComponents(url: request.url, resolvingAgainstBaseURL: false)?.queryItems
+        XCTAssertEqual(query?.first(where: { $0.name == "page_size" })?.value, "10")
     }
 
     func testRateLimitMapsToSafeProblem() async throws {

@@ -58,9 +58,9 @@ const elements = Object.fromEntries([
   "remoteRegistrySection", "remoteRegistryForm", "remoteSearchQuery",
   "searchRemoteRepositoriesButton", "remoteRepositoryCount", "remoteRepositoryStatus",
   "remoteRepositoryError", "remoteRepositoryResults", "remoteRepositoryPagination",
-  "previousRepositoriesButton", "remoteRepositoryPageLabel", "nextRepositoriesButton",
+  "previousRepositoriesButton", "remoteRepositoryPageNumbers", "nextRepositoriesButton",
   "remoteTagPanel", "remoteTagCount", "remoteTagStatus", "remoteTagError", "remoteTagResults",
-  "remoteTagPagination", "previousTagsButton", "remoteTagPageLabel", "nextTagsButton"
+  "remoteTagPagination", "previousTagsButton", "remoteTagPageNumbers", "nextTagsButton"
 ].map((id) => [id, document.getElementById(id)]));
 
 const state = {
@@ -68,10 +68,10 @@ const state = {
   refreshing: false, submitting: false, eventSource: null,
   reconnectAttempts: 0, reconnectTimer: null, metricsByID: new Map(), metricsStatus: "loading",
   images: [], imagesLoaded: false, containersLoaded: false, imageSubmitting: false, createSubmitting: false,
-  remoteRepositories: [], remoteRepositoryPage: 0, remoteRepositoryPageSize: 20,
+  remoteRepositories: [], remoteRepositoryPage: 0, remoteRepositoryPageSize: 10,
   remoteRepositoryTotalCount: null, remoteRepositoryHasMore: false,
   remoteSearchParameters: null, selectedRemoteRepository: null,
-  remoteTags: [], remoteTagPage: 0, remoteTagPageSize: 20,
+  remoteTags: [], remoteTagPage: 0, remoteTagPageSize: 10,
   remoteTagTotalCount: null, remoteTagHasMore: false,
   remoteRepositoryLoading: false, remoteTagLoading: false
 };
@@ -497,7 +497,7 @@ function resetRemoteTags(message = "选择一个仓库查看可用标签。") {
   state.selectedRemoteRepository = null;
   state.remoteTags = [];
   state.remoteTagPage = 0;
-  state.remoteTagPageSize = 20;
+  state.remoteTagPageSize = 10;
   state.remoteTagTotalCount = null;
   state.remoteTagHasMore = false;
   elements.remoteTagResults.replaceChildren();
@@ -512,7 +512,7 @@ function resetRemoteTags(message = "选择一个仓库查看可用标签。") {
 function resetRemoteRepositories(message = "输入条件后点击“搜索镜像”。") {
   state.remoteRepositories = [];
   state.remoteRepositoryPage = 0;
-  state.remoteRepositoryPageSize = 20;
+  state.remoteRepositoryPageSize = 10;
   state.remoteRepositoryTotalCount = null;
   state.remoteRepositoryHasMore = false;
   state.remoteSearchParameters = null;
@@ -526,19 +526,44 @@ function resetRemoteRepositories(message = "输入条件后点击“搜索镜像
   resetRemoteTags();
 }
 
-function paginationLabel(page, pageSize, totalCount) {
-  if (!Number.isFinite(totalCount)) return `第 ${page} 页`;
-  const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
-  return `第 ${page} / ${pageCount} 页`;
+function renderPaginationPageNumbers(container, page, pageSize, totalCount, loading, loadPage) {
+  container.replaceChildren();
+  const totalPages = Number.isFinite(totalCount)
+    ? ContainerGUIPagination.pageCount(totalCount, pageSize)
+    : page;
+  for (const token of ContainerGUIPagination.visiblePages(page, totalPages)) {
+    if (token === "ellipsis") {
+      const ellipsis = document.createElement("span");
+      ellipsis.className = "pagination-ellipsis";
+      ellipsis.textContent = "…";
+      ellipsis.setAttribute("aria-hidden", "true");
+      container.append(ellipsis);
+      continue;
+    }
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "pagination-page";
+    button.textContent = String(token);
+    button.setAttribute("aria-label", `第 ${token} 页`);
+    if (token === page) button.setAttribute("aria-current", "page");
+    button.disabled = loading;
+    button.addEventListener("click", () => {
+      if (token !== page) loadPage(token);
+    });
+    container.append(button);
+  }
 }
 
 function updateRemoteRepositoryPagination() {
   const hasPage = state.remoteRepositoryPage > 0 && state.remoteRepositories.length > 0;
   elements.remoteRepositoryPagination.hidden = !hasPage;
-  elements.remoteRepositoryPageLabel.textContent = paginationLabel(
+  renderPaginationPageNumbers(
+    elements.remoteRepositoryPageNumbers,
     state.remoteRepositoryPage,
     state.remoteRepositoryPageSize,
-    state.remoteRepositoryTotalCount
+    state.remoteRepositoryTotalCount,
+    state.remoteRepositoryLoading,
+    loadRemoteRepositoryPage
   );
   elements.previousRepositoriesButton.disabled = state.remoteRepositoryLoading || state.remoteRepositoryPage <= 1;
   elements.nextRepositoriesButton.disabled = state.remoteRepositoryLoading || !state.remoteRepositoryHasMore;
@@ -547,10 +572,13 @@ function updateRemoteRepositoryPagination() {
 function updateRemoteTagPagination() {
   const hasPage = state.remoteTagPage > 0 && state.remoteTags.length > 0;
   elements.remoteTagPagination.hidden = !hasPage;
-  elements.remoteTagPageLabel.textContent = paginationLabel(
+  renderPaginationPageNumbers(
+    elements.remoteTagPageNumbers,
     state.remoteTagPage,
     state.remoteTagPageSize,
-    state.remoteTagTotalCount
+    state.remoteTagTotalCount,
+    state.remoteTagLoading,
+    loadRemoteTagPage
   );
   elements.previousTagsButton.disabled = state.remoteTagLoading || state.remoteTagPage <= 1;
   elements.nextTagsButton.disabled = state.remoteTagLoading || !state.remoteTagHasMore;
@@ -667,7 +695,7 @@ async function loadRemoteRepositoryPage(page) {
     const result = await fetchJSON(`${ENDPOINTS.registryRepositories}?${parameters}`);
     state.remoteRepositories = result.items || [];
     state.remoteRepositoryPage = result.page;
-    state.remoteRepositoryPageSize = Number.isFinite(result.pageSize) ? result.pageSize : 20;
+    state.remoteRepositoryPageSize = Number.isFinite(result.pageSize) ? result.pageSize : 10;
     state.remoteRepositoryTotalCount = Number.isFinite(result.totalCount) ? result.totalCount : null;
     state.remoteRepositoryHasMore = Boolean(result.hasNextPage) && result.page < 500;
     renderRemoteRepositories();
@@ -703,7 +731,7 @@ async function loadRemoteTagPage(page) {
     const result = await fetchJSON(`${ENDPOINTS.registryTags}?${parameters}`);
     state.remoteTags = result.items || [];
     state.remoteTagPage = result.page;
-    state.remoteTagPageSize = Number.isFinite(result.pageSize) ? result.pageSize : 20;
+    state.remoteTagPageSize = Number.isFinite(result.pageSize) ? result.pageSize : 10;
     state.remoteTagTotalCount = Number.isFinite(result.totalCount) ? result.totalCount : null;
     state.remoteTagHasMore = Boolean(result.hasNextPage) && result.page < 500;
     renderRemoteTags();

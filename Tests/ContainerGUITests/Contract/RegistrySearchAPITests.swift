@@ -19,6 +19,7 @@ final class RegistrySearchAPITests: XCTestCase {
                 let page = try JSONDecoder.containerGUI.decode(RemoteRepositoryPage.self, from: response.body)
                 XCTAssertEqual(page.items.first?.reference, "docker.io/library/postgres")
                 XCTAssertEqual(page.page, 2)
+                XCTAssertEqual(page.pageSize, 10)
                 XCTAssertTrue(page.hasNextPage)
             }
 
@@ -29,6 +30,7 @@ final class RegistrySearchAPITests: XCTestCase {
                 XCTAssertEqual(response.status, .ok)
                 let page = try JSONDecoder.containerGUI.decode(RemoteTagPage.self, from: response.body)
                 XCTAssertEqual(page.items.first?.reference, "docker.io/library/postgres:17.6")
+                XCTAssertEqual(page.pageSize, 10)
                 XCTAssertFalse(page.hasNextPage)
             }
         }
@@ -118,7 +120,7 @@ private actor StubRegistrySearcher: RegistrySearching {
                 updatedAt: nil
             )],
             page: request.page,
-            pageSize: 20,
+            pageSize: 10,
             totalCount: 3,
             hasNextPage: true,
             observedAt: observedAt
@@ -136,7 +138,7 @@ private actor StubRegistrySearcher: RegistrySearching {
                 updatedAt: observedAt
             )],
             page: request.page,
-            pageSize: 20,
+            pageSize: 10,
             totalCount: 1,
             hasNextPage: false,
             observedAt: observedAt

@@ -58,7 +58,7 @@ struct FoundationRegistryHTTPTransport: RegistryHTTPTransport {
 }
 
 struct RegistrySearchClient<Transport: RegistryHTTPTransport>: RegistrySearching {
-    private static var pageSize: Int { 20 }
+    private static var pageSize: Int { 10 }
 
     private let transport: Transport
     private let maximumResponseBytes: Int
