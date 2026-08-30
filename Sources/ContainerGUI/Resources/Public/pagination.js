@@ -24,5 +24,10 @@
     return Math.min(500, Math.max(1, Math.ceil(totalCount / pageSize)));
   }
 
-  scope.ContainerGUIPagination = Object.freeze({ pageCount, visiblePages });
+  function pageItems(items, page, pageSize) {
+    const start = (page - 1) * pageSize;
+    return items.slice(start, start + pageSize);
+  }
+
+  scope.ContainerGUIPagination = Object.freeze({ pageCount, pageItems, visiblePages });
 })(globalThis);

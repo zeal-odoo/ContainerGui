@@ -38,3 +38,11 @@ test("page count never exposes pages rejected by the API", () => {
   assert.equal(api.pageCount(200, 10), 20);
   assert.equal(api.pageCount(221_586, 10), 500);
 });
+
+test("local image pages contain 10, 10, and 3 items without changing the source", () => {
+  const images = Array.from({ length: 23 }, (_, index) => `image-${index + 1}`);
+  assert.equal(api.pageItems(images, 1, 10).length, 10);
+  assert.equal(api.pageItems(images, 2, 10).length, 10);
+  assert.equal(api.pageItems(images, 3, 10).length, 3);
+  assert.equal(images.length, 23);
+});

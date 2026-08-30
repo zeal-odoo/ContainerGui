@@ -39,7 +39,8 @@ const elements = Object.fromEntries([
   "imageSectionBody", "openPullImageButton",
   "imageOperationStatus", "imagePullProgress", "imagePullProgressLabel", "imagePullProgressValue",
   "imagePullProgressBar", "imageLoadingState",
-  "imageEmptyState", "imageErrorState", "imageTableWrap", "imageTableBody", "pullImageDialog",
+  "imageEmptyState", "imageErrorState", "imageTableWrap", "imageTableBody", "localImagePagination",
+  "previousLocalImagesButton", "localImagePageNumbers", "nextLocalImagesButton", "pullImageDialog",
   "pullImageForm", "pullImageRegistry", "pullImageReference", "pullImagePlatform", "pullRegistryError",
   "pullReferenceError", "pullPlatformError", "pullFormStatus", "cancelPullImageButton", "submitPullImageButton",
   "openCreateContainerButton", "localImageOptions", "createContainerDialog", "createContainerForm",
@@ -67,7 +68,8 @@ const state = {
   containers: [], selectedID: null, selectedDetail: null, selectedSSHStatus: null, detailController: null,
   refreshing: false, submitting: false, eventSource: null,
   reconnectAttempts: 0, reconnectTimer: null, metricsByID: new Map(), metricsStatus: "loading",
-  images: [], imagesLoaded: false, containersLoaded: false, imageSubmitting: false, createSubmitting: false,
+  images: [], imagesLoaded: false, localImagePage: 1, localImagePageSize: 10,
+  containersLoaded: false, imageSubmitting: false, createSubmitting: false,
   remoteRepositories: [], remoteRepositoryPage: 0, remoteRepositoryPageSize: 10,
   remoteRepositoryTotalCount: null, remoteRepositoryHasMore: false,
   remoteSearchParameters: null, selectedRemoteRepository: null,
@@ -358,12 +360,21 @@ function showListError(error) {
 function renderImages(snapshot) {
   state.images = snapshot.items;
   state.imagesLoaded = true;
+  const totalPages = Math.max(1, Math.ceil(state.images.length / state.localImagePageSize));
+  state.localImagePage = Math.min(Math.max(1, state.localImagePage), totalPages);
   elements.imageTableBody.replaceChildren();
   elements.localImageOptions.replaceChildren();
-  for (const image of snapshot.items) {
+  for (const image of state.images) {
     const option = document.createElement("option");
     option.value = image.name;
     elements.localImageOptions.append(option);
+  }
+  const pageItems = ContainerGUIPagination.pageItems(
+    state.images,
+    state.localImagePage,
+    state.localImagePageSize
+  );
+  for (const image of pageItems) {
     const row = document.createElement("tr");
     const nameCell = document.createElement("td");
     const name = document.createElement("span");
@@ -409,6 +420,27 @@ function renderImages(snapshot) {
   elements.imageErrorState.hidden = true;
   elements.imageEmptyState.hidden = snapshot.items.length !== 0;
   elements.imageTableWrap.hidden = snapshot.items.length === 0;
+  updateLocalImagePagination();
+}
+
+function updateLocalImagePagination() {
+  const totalPages = Math.max(1, Math.ceil(state.images.length / state.localImagePageSize));
+  elements.localImagePagination.hidden = state.images.length <= state.localImagePageSize;
+  renderPaginationPageNumbers(
+    elements.localImagePageNumbers,
+    state.localImagePage,
+    state.localImagePageSize,
+    state.images.length,
+    state.imageSubmitting,
+    showLocalImagePage
+  );
+  elements.previousLocalImagesButton.disabled = state.imageSubmitting || state.localImagePage <= 1;
+  elements.nextLocalImagesButton.disabled = state.imageSubmitting || state.localImagePage >= totalPages;
+}
+
+function showLocalImagePage(page) {
+  state.localImagePage = page;
+  renderImages({ items: state.images });
 }
 
 function imageDeletionBlockReason(image) {
@@ -446,6 +478,7 @@ function showImageError(error) {
   elements.imageLoadingState.hidden = true;
   elements.imageEmptyState.hidden = true;
   elements.imageTableWrap.hidden = true;
+  elements.localImagePagination.hidden = true;
   elements.imageErrorState.hidden = false;
   elements.imageErrorState.textContent = formatProblem(error);
 }
@@ -1855,6 +1888,8 @@ elements.followLogsButton.addEventListener("click", () => {
 elements.toggleImagesButton.addEventListener("click", () => {
   setImagesExpanded(elements.toggleImagesButton.getAttribute("aria-expanded") !== "true");
 });
+elements.previousLocalImagesButton.addEventListener("click", () => showLocalImagePage(state.localImagePage - 1));
+elements.nextLocalImagesButton.addEventListener("click", () => showLocalImagePage(state.localImagePage + 1));
 elements.openPullImageButton.addEventListener("click", openPullImageDialog);
 elements.cancelPullImageButton.addEventListener("click", () => closeDialog(elements.pullImageDialog, "cancel"));
 elements.pullImageRegistry.addEventListener("change", updatePullRegistryHint);

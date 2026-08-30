@@ -10,6 +10,10 @@ final class ResourceMutationAssetTests: XCTestCase {
 
         XCTAssertTrue(html.contains("id=\"imagesSection\""))
         XCTAssertTrue(html.contains("id=\"imageTableBody\""))
+        XCTAssertTrue(html.contains("id=\"localImagePagination\""))
+        XCTAssertTrue(html.contains("id=\"previousLocalImagesButton\""))
+        XCTAssertTrue(html.contains("id=\"localImagePageNumbers\""))
+        XCTAssertTrue(html.contains("id=\"nextLocalImagesButton\""))
         XCTAssertTrue(html.contains("id=\"pullImageDialog\""))
         XCTAssertTrue(html.contains("id=\"pullImageForm\""))
         XCTAssertTrue(html.contains("id=\"imagePullProgress\""))
@@ -25,6 +29,10 @@ final class ResourceMutationAssetTests: XCTestCase {
         XCTAssertTrue(script.contains("renderImagePullProgress"))
         XCTAssertTrue(script.contains("operation.progress"))
         XCTAssertTrue(script.contains("Idempotency-Key"))
+        XCTAssertTrue(script.contains("localImagePage: 1, localImagePageSize: 10"))
+        XCTAssertTrue(script.contains("showLocalImagePage"))
+        XCTAssertTrue(try functionBody("renderImages", in: script).contains("pageItems"))
+        XCTAssertTrue(try functionBody("showImageError", in: script).contains("localImagePagination.hidden = true"))
     }
 
     func testLocalImagesCanBeCollapsedAccessibly() throws {
@@ -333,8 +341,7 @@ final class ResourceMutationAssetTests: XCTestCase {
         XCTAssertTrue(script.contains("/api/v1/registry-search/repositories"))
         XCTAssertTrue(script.contains("/api/v1/registry-search/tags"))
         XCTAssertTrue(script.contains("remoteRegistryForm.addEventListener(\"submit\", searchRemoteRepositories)"))
-        XCTAssertTrue(script.contains("for (const image of snapshot.items)"))
-        XCTAssertFalse(html.contains("id=\"localImagePagination\""))
+        XCTAssertTrue(script.contains("for (const image of state.images)"))
     }
 
     func testRemotePaginationReplacesPagesAndExactTagOnlyFillsPullDialog() throws {
