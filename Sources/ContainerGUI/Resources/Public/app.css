@@ -188,6 +188,45 @@ pre:focus-visible {
   font-weight: 700;
 }
 
+.language-switch {
+  display: inline-flex;
+  min-height: 36px;
+  padding: 3px;
+  align-items: center;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-surface-container);
+}
+
+.language-switch button {
+  min-height: 28px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-full);
+  color: var(--md-sys-color-on-surface-variant);
+  background: transparent;
+  font: inherit;
+  font-size: var(--md-sys-typescale-label-small-size);
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.language-switch button:hover {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+}
+
+.language-switch button[aria-pressed="true"] {
+  color: var(--md-sys-color-on-primary-container);
+  background: var(--md-sys-color-primary-container);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-sys-color-primary) 16%, transparent);
+}
+
+.language-switch button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--md-sys-color-primary) 42%, transparent);
+  outline-offset: 2px;
+}
+
 .page {
   width: min(1440px, calc(100% - 48px));
   margin: 0 auto;
@@ -894,7 +933,7 @@ pre {
 
 #logOutput:empty::before {
   color: color-mix(in srgb, var(--md-sys-color-inverse-on-surface) 58%, transparent);
-  content: "日志将在这里显示";
+  content: attr(data-empty-label);
 }
 
 .raw-detail {
@@ -1557,6 +1596,10 @@ dialog code {
 
   #versionBadge {
     display: none;
+  }
+
+  .language-switch button {
+    padding-inline: 8px;
   }
 
   .hero {

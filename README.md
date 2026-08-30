@@ -6,7 +6,7 @@ A lightweight local web interface for Apple [`container`](https://github.com/app
 
 [中文](#中文说明) · [English](#english-guide)
 
-**GUI v2.15.1** · Apple `container` `1.3.x` · `http://127.0.0.1:8787`
+**GUI v2.16.0** · Apple `container` `1.3.x` · `http://127.0.0.1:8787`
 
 > Container GUI is a local, single-user tool. It never listens on the LAN or public Internet and is not a replacement for Docker Desktop, Compose, Kubernetes, or a multi-user remote administration platform.
 >
@@ -30,6 +30,7 @@ Container GUI 为 Apple `container` CLI 提供浏览器管理界面。后端直�
 | 创建容器 | 配置名称、CPU、内存、回环端口、环境变量、进程参数和一个共享目录 |
 | SSH 快速配置 | Debian/Ubuntu 镜像仅公钥登录、自定义本机端口、普通用户或显式 root 模式 |
 | Odoo 快速配置 | 官方 Odoo 镜像显示数据库地址、端口及 `/mnt/extra-addons` 自定义模块目录 |
+| 中英文界面 | 首次访问跟随浏览器语言，顶部可切换中文/English 并记住选择；动态状态和弹窗同步切换 |
 | 现代界面 | Material 3 浅色/深色主题、克制 glass 表面、渐进动效及无障碍回退 |
 
 ### 环境要求
@@ -178,6 +179,7 @@ Key capabilities:
 | Create containers | Configure name, CPU, memory, loopback ports, environment variables, process arguments, and one shared directory |
 | Configure SSH | Bootstrap public-key-only SSH for supported Debian/Ubuntu images with a custom host port and normal-user or explicit root mode |
 | Configure Odoo | Show database host/port and the `/mnt/extra-addons` custom-module directory only for the official Odoo image |
+| Use Chinese or English | Follow the browser language on first visit, switch from the header, remember the choice, and localize dynamic states and dialogs together |
 | Use a modern UI | Material 3 light/dark themes, restrained glass surfaces, progressive motion, and accessibility fallbacks |
 
 ### Requirements

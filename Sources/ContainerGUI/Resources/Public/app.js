@@ -186,11 +186,12 @@ function renderHealth(health) {
 }
 
 function renderContainers() {
-  const query = elements.searchInput.value.trim().toLocaleLowerCase("zh-Hans");
+  const locale = globalThis.ContainerGUII18n?.locale() || "zh-Hans";
+  const query = elements.searchInput.value.trim().toLocaleLowerCase(locale);
   const visible = state.containers.filter((container) =>
     [container.displayName, container.id, container.imageReference]
       .filter(Boolean)
-      .some((value) => value.toLocaleLowerCase("zh-Hans").includes(query))
+      .some((value) => value.toLocaleLowerCase(locale).includes(query))
   );
 
   elements.containerRows.replaceChildren();
@@ -648,8 +649,8 @@ function renderRemoteRepositories() {
     metadata.className = "remote-result-meta";
     const values = [
       repository.isOfficial ? "官方镜像" : null,
-      Number.isFinite(repository.starCount) ? `★ ${repository.starCount.toLocaleString()}` : null,
-      Number.isFinite(repository.pullCount) ? `拉取 ${repository.pullCount.toLocaleString()}` : null,
+      Number.isFinite(repository.starCount) ? `★ ${repository.starCount.toLocaleString(globalThis.ContainerGUII18n?.locale())}` : null,
+      Number.isFinite(repository.pullCount) ? `拉取 ${repository.pullCount.toLocaleString(globalThis.ContainerGUII18n?.locale())}` : null,
       repository.updatedAt ? `更新 ${formatTime(repository.updatedAt)}` : null
     ].filter(Boolean);
     for (const value of values) {
@@ -1832,7 +1833,7 @@ function parseEventMessage(value) {
 function formatTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return new Intl.DateTimeFormat("zh-Hans", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(date);
+  return new Intl.DateTimeFormat(globalThis.ContainerGUII18n?.locale() || "zh-Hans", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(date);
 }
 
 function formatPercent(value) {
@@ -1934,6 +1935,18 @@ for (const dialog of document.querySelectorAll("dialog")) {
 }
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") refreshDashboard();
+});
+document.addEventListener("container-gui-language-change", () => {
+  renderContainers();
+  if (state.imagesLoaded) renderImages({ items: state.images });
+  if (state.remoteSearchParameters) renderRemoteRepositories();
+  if (state.selectedRemoteRepository) renderRemoteTags();
+  if (state.selectedDetail) {
+    renderFacts(state.selectedDetail.summary);
+    renderActions(state.selectedDetail.summary);
+    renderSSHStatus(state.selectedSSHStatus, state.selectedDetail.summary);
+  }
+  globalThis.ContainerGUII18n?.apply(document.body);
 });
 window.setInterval(() => {
   if (document.visibilityState === "visible") refreshDashboard();
