@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 private actor CLIInstallationCache {
@@ -78,8 +79,10 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
     private let mutationTimeout: Duration
     private let imagePullTimeout: Duration
     private let maximumOutputBytes: Int
+    private let maximumConcurrentFilesystemProbes: Int
     private let installationCache = CLIInstallationCache()
     private let metricsSampler = ContainerMetricsSampler()
+    private let metricsRequestCoalescer = ContainerMetricsRequestCoalescer()
 
     init(
         executor: any CommandExecuting,
@@ -88,8 +91,10 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
         queryTimeout: Duration = .seconds(5),
         mutationTimeout: Duration = .seconds(30),
         imagePullTimeout: Duration = .seconds(30 * 60),
-        maximumOutputBytes: Int = 16 * 1024 * 1024
+        maximumOutputBytes: Int = 16 * 1024 * 1024,
+        maximumConcurrentFilesystemProbes: Int = 4
     ) {
+        precondition(maximumConcurrentFilesystemProbes > 0)
         self.executor = executor
         self.executableURL = executableURL
         self.unavailableCompatibility = unavailableCompatibility
@@ -97,6 +102,7 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
         self.mutationTimeout = mutationTimeout
         self.imagePullTimeout = imagePullTimeout
         self.maximumOutputBytes = maximumOutputBytes
+        self.maximumConcurrentFilesystemProbes = maximumConcurrentFilesystemProbes
     }
 
     func installation(now: Date = Date()) async throws -> CLIInstallation {
@@ -193,49 +199,68 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
     }
 
     func containerMetrics() async throws -> ContainerMetricsSnapshot {
-        let snapshot = try await metricsSampler.snapshot { [self] in
-            try await requireSupportedInstallation()
-            let result = try await execute(["stats", "--no-stream", "--format", "json"])
-            guard result.exitCode == 0 else { throw ContainerCLIError.nonZeroExit(result.exitCode) }
-            return try CLIOutputParser.parseContainerResourceSamples(data: result.stdout)
+        try await metricsRequestCoalescer.snapshot { [self] in
+            let snapshot = try await metricsSampler.snapshot { [self] in
+                try await requireSupportedInstallation()
+                let result = try await execute(["stats", "--no-stream", "--format", "json"])
+                guard result.exitCode == 0 else {
+                    throw ContainerCLIError.nonZeroExit(result.exitCode)
+                }
+                return try CLIOutputParser.parseContainerResourceSamples(data: result.stdout)
+            }
+            return await attachRootFilesystemUsage(to: snapshot)
         }
-        return await attachRootFilesystemUsage(to: snapshot)
     }
 
     private func attachRootFilesystemUsage(
         to snapshot: ContainerMetricsSnapshot
     ) async -> ContainerMetricsSnapshot {
-        let filesystems = await withTaskGroup(
-            of: (Int, ContainerRootFilesystemUsage).self,
-            returning: [Int: ContainerRootFilesystemUsage].self
-        ) { group in
-            for (index, item) in snapshot.items.enumerated() {
-                group.addTask { [self] in
-                    guard !item.containerID.isEmpty,
-                          !item.containerID.hasPrefix("-") else {
-                        return (index, .unavailable)
-                    }
-                    do {
-                        let result = try await execute([
-                            "exec", item.containerID, "df", "-kP", "/",
-                        ])
-                        guard result.exitCode == 0 else {
+        var filesystems: [Int: ContainerRootFilesystemUsage] = [:]
+        for batchStart in stride(
+            from: 0,
+            to: snapshot.items.count,
+            by: maximumConcurrentFilesystemProbes
+        ) {
+            let batchEnd = min(
+                batchStart + maximumConcurrentFilesystemProbes,
+                snapshot.items.count
+            )
+            let batch = await withTaskGroup(
+                of: (Int, ContainerRootFilesystemUsage).self,
+                returning: [Int: ContainerRootFilesystemUsage].self
+            ) { group in
+                for index in batchStart..<batchEnd {
+                    let item = snapshot.items[index]
+                    group.addTask { [self] in
+                        guard !item.containerID.isEmpty,
+                              !item.containerID.hasPrefix("-") else {
                             return (index, .unavailable)
                         }
-                        return (
-                            index,
-                            try CLIOutputParser.parseContainerRootFilesystemUsage(data: result.stdout)
-                        )
-                    } catch {
-                        return (index, .unavailable)
+                        do {
+                            let result = try await execute([
+                                "exec", item.containerID, "df", "-kP", "/",
+                            ])
+                            guard result.exitCode == 0 else {
+                                return (index, .unavailable)
+                            }
+                            return (
+                                index,
+                                try CLIOutputParser.parseContainerRootFilesystemUsage(data: result.stdout)
+                            )
+                        } catch {
+                            return (index, .unavailable)
+                        }
                     }
                 }
+                var results: [Int: ContainerRootFilesystemUsage] = [:]
+                for await (index, filesystem) in group {
+                    results[index] = filesystem
+                }
+                return results
             }
-            var results: [Int: ContainerRootFilesystemUsage] = [:]
-            for await (index, filesystem) in group {
-                results[index] = filesystem
+            for (index, filesystem) in batch {
+                filesystems[index] = filesystem
             }
-            return results
         }
         let items = snapshot.items.enumerated().map { index, item in
             ContainerResourceUsage(
@@ -325,6 +350,34 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
     func createContainer(_ request: ContainerCreateRequest) async throws -> ContainerCreateOutcome {
         let request = try request.validated()
         try await requireSupportedInstallation()
+        var environment = request.environment
+        if let odooDatabase = request.odooDatabase {
+            environment.insert(
+                EnvironmentEntry(name: "PORT", value: String(odooDatabase.port)),
+                at: 0
+            )
+            environment.insert(
+                EnvironmentEntry(name: "HOST", value: odooDatabase.host),
+                at: 0
+            )
+        }
+        if let ssh = request.ssh {
+            environment.append(
+                EnvironmentEntry(
+                    name: SSHCreateConfiguration.userEnvironmentName,
+                    value: ssh.username
+                )
+            )
+            environment.append(
+                EnvironmentEntry(
+                    name: SSHCreateConfiguration.publicKeyEnvironmentName,
+                    value: ssh.publicKey
+                )
+            )
+        }
+        let environmentFile = try TemporaryEnvironmentFile(entries: environment)
+        defer { environmentFile?.remove() }
+
         var arguments = ["create", "--name", request.name]
         if let cpus = request.cpus {
             arguments += ["--cpus", String(Int(cpus))]
@@ -344,16 +397,10 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
             arguments += ["--label", "\(SSHContainerLabels.hostPort)=\(ssh.hostPort)"]
             arguments += ["--label", "\(SSHContainerLabels.username)=\(ssh.username)"]
         }
-        if let odooDatabase = request.odooDatabase {
-            arguments += ["--env", "HOST=\(odooDatabase.host)"]
-            arguments += ["--env", "PORT=\(odooDatabase.port)"]
+        if let environmentFile {
+            arguments += ["--env-file", environmentFile.url.path]
         }
-        for environment in request.environment {
-            arguments += ["--env", "\(environment.name)=\(environment.value)"]
-        }
-        if let ssh = request.ssh {
-            arguments += ["--env", "\(SSHCreateConfiguration.userEnvironmentName)=\(ssh.username)"]
-            arguments += ["--env", "\(SSHCreateConfiguration.publicKeyEnvironmentName)=\(ssh.publicKey)"]
+        if request.ssh != nil {
             arguments += ["--init", "--entrypoint", "/bin/sh"]
         }
         arguments += ["--", request.image]
@@ -364,6 +411,7 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
         }
 
         let createResult = try await execute(arguments, timeout: mutationTimeout)
+        environmentFile?.remove()
         guard createResult.exitCode == 0 else {
             throw ContainerCLIError.nonZeroExit(createResult.exitCode)
         }
@@ -572,6 +620,43 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
         case .unsupported, .unrecognized: ProblemDetail(code: .cliVersionUnsupported)
         case .supported: ProblemDetail(code: .internalError)
         }
+    }
+}
+
+private struct TemporaryEnvironmentFile: Sendable {
+    let url: URL
+
+    init?(entries: [EnvironmentEntry]) throws {
+        guard !entries.isEmpty else { return nil }
+        let templateURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("container-gui-environment.XXXXXX")
+        var template = Array(templateURL.path.utf8CString)
+        let descriptor = mkstemp(&template)
+        guard descriptor >= 0 else { throw POSIXError(.EIO) }
+        let path = String(
+            decoding: template.dropLast().map { UInt8(bitPattern: $0) },
+            as: UTF8.self
+        )
+        let url = URL(fileURLWithPath: path)
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        do {
+            let contents = entries.map { "\($0.name)=\($0.value)" }.joined(separator: "\n") + "\n"
+            try handle.write(contentsOf: Data(contents.utf8))
+            try handle.close()
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o600],
+                ofItemAtPath: url.path
+            )
+            self.url = url
+        } catch {
+            try? handle.close()
+            try? FileManager.default.removeItem(at: url)
+            throw error
+        }
+    }
+
+    func remove() {
+        try? FileManager.default.removeItem(at: url)
     }
 }
 

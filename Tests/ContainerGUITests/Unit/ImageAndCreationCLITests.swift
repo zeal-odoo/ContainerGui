@@ -104,6 +104,18 @@ final class ImageAndCreationCLITests: XCTestCase {
         }
     }
 
+    func testContainerCreateRejectsEnvironmentLineBreaks() {
+        let request = ContainerCreateRequest(
+            name: "ubuntu-test",
+            image: "ubuntu:26.04",
+            environment: [
+                EnvironmentEntry(name: "SAFE_NAME", value: "value\nINJECTED=value"),
+            ]
+        )
+
+        assertValidationError(try request.validated(), fields: ["environment"])
+    }
+
     func testContainerCreateDecodesOptionalDirectoryAndOdooDatabaseWithoutLeakingValues() throws {
         let oldBody = Data(#"{"name":"legacy","image":"ubuntu:26.04"}"#.utf8)
         let legacy = try JSONDecoder.containerGUI.decode(ContainerCreateRequest.self, from: oldBody)
@@ -467,17 +479,49 @@ final class ImageAndCreationCLITests: XCTestCase {
         XCTAssertTrue(outcome.matchedExpectation)
         XCTAssertEqual(outcome.observedContainer?.state, .created)
         let requests = await executor.requests
+        let environmentFiles = await executor.environmentFiles
+        let environmentFile = try XCTUnwrap(environmentFiles.first)
         XCTAssertEqual(requests[1].arguments, [
             "create", "--name", "demo",
             "--cpus", "2",
             "--memory", "2048M",
             "--publish", "127.0.0.1:15432:5432/tcp",
             "--publish", "127.0.0.1:15353:53/udp",
-            "--env", "POSTGRES_PASSWORD=secret-value",
+            "--env-file", environmentFile.path,
             "--", "postgres:latest", "postgres", "-c", "shared_buffers=256MB",
         ])
+        XCTAssertEqual(environmentFile.contents, "POSTGRES_PASSWORD=secret-value\n")
+        XCTAssertEqual(environmentFile.permissions, 0o600)
+        XCTAssertFalse(requests[1].arguments.joined(separator: " ").contains("secret-value"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: environmentFile.path))
         XCTAssertEqual(requests[1].timeout, .seconds(30))
         XCTAssertEqual(requests[2].arguments, ["list", "--all", "--format", "json"])
+    }
+
+    func testCreateRemovesEnvironmentFileWhenCLIExecutionFails() async throws {
+        let secret = "failure-path-secret"
+        let executor = ResourceScriptedCommandExecutor(steps: [
+            .success(resourceVersionResult()),
+            .failure(.timedOut),
+        ])
+        let request = ContainerCreateRequest(
+            name: "demo",
+            image: "postgres:latest",
+            environment: [EnvironmentEntry(name: "POSTGRES_PASSWORD", value: secret)]
+        )
+
+        do {
+            _ = try await resourceClient(executor).createContainer(request)
+            XCTFail("Expected command failure")
+        } catch let error as CommandExecutionError {
+            XCTAssertEqual(error, .timedOut)
+        }
+
+        let requests = await executor.requests
+        let environmentFiles = await executor.environmentFiles
+        let environmentFile = try XCTUnwrap(environmentFiles.first)
+        XCTAssertFalse(requests[1].arguments.joined(separator: " ").contains(secret))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: environmentFile.path))
     }
 
     func testCreateAddsOneBindMountAndOdooDatabaseEnvironmentBeforeImage() async throws {
@@ -509,14 +553,18 @@ final class ImageAndCreationCLITests: XCTestCase {
 
         XCTAssertTrue(outcome.matchedExpectation)
         let requests = await executor.requests
+        let environmentFiles = await executor.environmentFiles
+        let environmentFile = try XCTUnwrap(environmentFiles.first)
         XCTAssertEqual(requests[1].arguments, [
             "create", "--name", "odoo-demo",
             "--mount", "type=bind,source=\(directory.path),target=/mnt/extra-addons",
-            "--env", "HOST=postgres-odoo-apple",
-            "--env", "PORT=15432",
-            "--env", "USER=odoo",
+            "--env-file", environmentFile.path,
             "--", "docker.io/library/odoo:19.0",
         ])
+        XCTAssertEqual(
+            environmentFile.contents,
+            "HOST=postgres-odoo-apple\nPORT=15432\nUSER=odoo\n"
+        )
     }
 
     func testCreateOptionallyStartsOnlyAfterCreatedReadback() async throws {
@@ -567,6 +615,8 @@ final class ImageAndCreationCLITests: XCTestCase {
         XCTAssertTrue(outcome.matchedExpectation)
         XCTAssertEqual(outcome.observedContainer?.state, .running)
         let requests = await executor.requests
+        let environmentFiles = await executor.environmentFiles
+        let environmentFile = try XCTUnwrap(environmentFiles.first)
         XCTAssertEqual(requests[1].arguments, [
             "create", "--name", "ssh-demo",
             "--publish", "127.0.0.1:8080:80/tcp",
@@ -574,12 +624,17 @@ final class ImageAndCreationCLITests: XCTestCase {
             "--label", "\(SSHContainerLabels.enabled)=true",
             "--label", "\(SSHContainerLabels.hostPort)=2222",
             "--label", "\(SSHContainerLabels.username)=dev",
-            "--env", "APP_MODE=development",
-            "--env", "\(SSHCreateConfiguration.userEnvironmentName)=dev",
-            "--env", "\(SSHCreateConfiguration.publicKeyEnvironmentName)=\(publicKey)",
+            "--env-file", environmentFile.path,
             "--init", "--entrypoint", "/bin/sh",
             "--", "docker.io/library/ubuntu:26.04", "-c", SSHContainerBootstrap.script,
         ])
+        XCTAssertEqual(
+            environmentFile.contents,
+            "APP_MODE=development\n"
+                + "\(SSHCreateConfiguration.userEnvironmentName)=dev\n"
+                + "\(SSHCreateConfiguration.publicKeyEnvironmentName)=\(publicKey)\n"
+        )
+        XCTAssertFalse(requests[1].arguments.joined(separator: " ").contains(publicKey))
         XCTAssertFalse(SSHContainerBootstrap.script.contains(publicKey))
         XCTAssertFalse(SSHContainerBootstrap.script.contains("fixture@example"))
         XCTAssertFalse(SSHContainerBootstrap.script.contains("Subsystem sftp"))
@@ -610,17 +665,23 @@ final class ImageAndCreationCLITests: XCTestCase {
         _ = try await resourceClient(executor).createContainer(request)
 
         let requests = await executor.requests
+        let environmentFiles = await executor.environmentFiles
+        let environmentFile = try XCTUnwrap(environmentFiles.first)
         XCTAssertEqual(requests[1].arguments, [
             "create", "--name", "root-ssh-demo",
             "--publish", "127.0.0.1:2001:22/tcp",
             "--label", "\(SSHContainerLabels.enabled)=true",
             "--label", "\(SSHContainerLabels.hostPort)=2001",
             "--label", "\(SSHContainerLabels.username)=root",
-            "--env", "\(SSHCreateConfiguration.userEnvironmentName)=root",
-            "--env", "\(SSHCreateConfiguration.publicKeyEnvironmentName)=\(publicKey)",
+            "--env-file", environmentFile.path,
             "--init", "--entrypoint", "/bin/sh",
             "--", "docker.io/library/ubuntu:26.04", "-c", SSHContainerBootstrap.script,
         ])
+        XCTAssertEqual(
+            environmentFile.contents,
+            "\(SSHCreateConfiguration.userEnvironmentName)=root\n"
+                + "\(SSHCreateConfiguration.publicKeyEnvironmentName)=\(publicKey)\n"
+        )
         XCTAssertFalse(requests[1].arguments.contains(where: { $0.contains("CONTAINER_GUI_SSH_ROOT_PASSWORD") }))
     }
 
@@ -698,17 +759,37 @@ private enum ResourceScriptedStep: Sendable {
 private actor ResourceScriptedCommandExecutor: CommandExecuting {
     private var steps: [ResourceScriptedStep]
     private(set) var requests: [CommandRequest] = []
+    private(set) var environmentFiles: [EnvironmentFileSnapshot] = []
 
     init(steps: [ResourceScriptedStep]) { self.steps = steps }
 
     func run(_ request: CommandRequest) async throws -> CommandResult {
         requests.append(request)
+        if let optionIndex = request.arguments.firstIndex(of: "--env-file"),
+           request.arguments.indices.contains(optionIndex + 1) {
+            let path = request.arguments[optionIndex + 1]
+            let contents = try String(contentsOfFile: path, encoding: .utf8)
+            let attributes = try FileManager.default.attributesOfItem(atPath: path)
+            environmentFiles.append(
+                EnvironmentFileSnapshot(
+                    path: path,
+                    contents: contents,
+                    permissions: attributes[.posixPermissions] as? Int
+                )
+            )
+        }
         guard !steps.isEmpty else { throw CommandExecutionError.streamFailed }
         switch steps.removeFirst() {
         case .success(let result): return result
         case .failure(let error): throw error
         }
     }
+}
+
+private struct EnvironmentFileSnapshot: Sendable {
+    let path: String
+    let contents: String
+    let permissions: Int?
 }
 
 private func resourceVersionResult() -> CommandResult {

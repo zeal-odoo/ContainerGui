@@ -223,6 +223,36 @@ final class ContainerMetricsTests: XCTestCase {
         XCTAssertEqual(snapshot.items.count, 2)
     }
 
+    func testConcurrentRequestsShareCompleteMetricsAndBoundFilesystemProbes() async throws {
+        let executor = ConcurrentMetricsCommandExecutor(containerCount: 8)
+        let client = ContainerCLIClient(
+            executor: executor,
+            executableURL: URL(fileURLWithPath: "/fixture/container"),
+            maximumConcurrentFilesystemProbes: 3
+        )
+
+        let snapshots = try await withThrowingTaskGroup(
+            of: ContainerMetricsSnapshot.self,
+            returning: [ContainerMetricsSnapshot].self
+        ) { group in
+            for _ in 0..<12 {
+                group.addTask { try await client.containerMetrics() }
+            }
+            var values: [ContainerMetricsSnapshot] = []
+            for try await value in group { values.append(value) }
+            return values
+        }
+
+        XCTAssertEqual(snapshots.count, 12)
+        XCTAssertTrue(snapshots.allSatisfy { $0.items.count == 8 })
+        let statsInvocationCount = await executor.statsInvocationCount
+        let filesystemInvocationCount = await executor.filesystemInvocationCount
+        let maximumActiveFilesystemProbes = await executor.maximumActiveFilesystemProbes
+        XCTAssertEqual(statsInvocationCount, 1)
+        XCTAssertEqual(filesystemInvocationCount, 8)
+        XCTAssertLessThanOrEqual(maximumActiveFilesystemProbes, 3)
+    }
+
     private func batch(
         cpu: UInt64,
         memory: UInt64,
@@ -318,5 +348,48 @@ private actor FilesystemMetricsCommandExecutor: CommandExecuting {
             throw CommandExecutionError.streamFailed
         }
         return CommandResult(stdout: result.0, stderr: Data(), exitCode: result.1, duration: .zero)
+    }
+}
+
+private actor ConcurrentMetricsCommandExecutor: CommandExecuting {
+    private let containerCount: Int
+    private(set) var statsInvocationCount = 0
+    private(set) var filesystemInvocationCount = 0
+    private(set) var maximumActiveFilesystemProbes = 0
+    private var activeFilesystemProbes = 0
+
+    init(containerCount: Int) {
+        self.containerCount = containerCount
+    }
+
+    func run(_ request: CommandRequest) async throws -> CommandResult {
+        switch request.arguments {
+        case ["--version"]:
+            return result(Data("container CLI version 1.3.1".utf8))
+        case ["stats", "--no-stream", "--format", "json"]:
+            statsInvocationCount += 1
+            try await Task.sleep(for: .milliseconds(40))
+            let rows = (0..<containerCount).map { index in
+                #"{"id":"demo-\#(index)","cpuUsageUsec":1,"memoryUsageBytes":1,"memoryLimitBytes":2}"#
+            }.joined(separator: ",")
+            return result(Data("[\(rows)]".utf8))
+        case let arguments where arguments.count == 5
+                && arguments[0] == "exec"
+                && Array(arguments.dropFirst(2)) == ["df", "-kP", "/"]:
+            filesystemInvocationCount += 1
+            activeFilesystemProbes += 1
+            maximumActiveFilesystemProbes = max(maximumActiveFilesystemProbes, activeFilesystemProbes)
+            try await Task.sleep(for: .milliseconds(30))
+            activeFilesystemProbes -= 1
+            return result(Data(
+                "Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/vdb 10 1 9 10% /\n".utf8
+            ))
+        default:
+            throw CommandExecutionError.streamFailed
+        }
+    }
+
+    private func result(_ stdout: Data) -> CommandResult {
+        CommandResult(stdout: stdout, stderr: Data(), exitCode: 0, duration: .zero)
     }
 }

@@ -128,6 +128,32 @@ struct ContainerMetricsSnapshot: Codable, Equatable, Sendable {
     let observedAt: Date
 }
 
+actor ContainerMetricsRequestCoalescer {
+    private var inFlight: (id: UInt64, task: Task<ContainerMetricsSnapshot, Error>)?
+    private var nextID: UInt64 = 0
+
+    func snapshot(
+        load: @escaping @Sendable () async throws -> ContainerMetricsSnapshot
+    ) async throws -> ContainerMetricsSnapshot {
+        if let inFlight {
+            return try await inFlight.task.value
+        }
+
+        nextID += 1
+        let requestID = nextID
+        let task = Task { try await load() }
+        inFlight = (requestID, task)
+        do {
+            let snapshot = try await task.value
+            if inFlight?.id == requestID { inFlight = nil }
+            return snapshot
+        } catch {
+            if inFlight?.id == requestID { inFlight = nil }
+            throw error
+        }
+    }
+}
+
 actor ContainerMetricsSampler {
     private struct Computation: Sendable {
         let snapshot: ContainerMetricsSnapshot

@@ -63,6 +63,10 @@ final class LaunchAgentAssetsTests: XCTestCase {
         )
 
         XCTAssertTrue(watchdog.contains("http://127.0.0.1:8787/api/v1"))
+        XCTAssertTrue(watchdog.contains("ContainerGUI/auth-token"))
+        XCTAssertTrue(watchdog.contains("^[0-9A-Fa-f]{64}$"))
+        XCTAssertTrue(watchdog.contains("--config -"))
+        XCTAssertFalse(watchdog.contains("--user"))
         XCTAssertTrue(watchdog.contains("\"name\":\"Container GUI\""))
         XCTAssertTrue(watchdog.contains("for attempt_number in 1 2"))
         XCTAssertTrue(watchdog.contains("kickstart -k"))

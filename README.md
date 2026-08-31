@@ -6,7 +6,7 @@ A lightweight local web interface for Apple [`container`](https://github.com/app
 
 [中文](#中文说明) · [English](#english-guide)
 
-**GUI v2.16.1** · Apple `container` `1.3.x` · `http://127.0.0.1:8787`
+**GUI v2.16.2** · Apple `container` `1.3.x` · `http://127.0.0.1:8787`
 
 > Container GUI is a local, single-user tool. It never listens on the LAN or public Internet and is not a replacement for Docker Desktop, Compose, Kubernetes, or a multi-user remote administration platform.
 >
@@ -63,6 +63,14 @@ swift run ContainerGUI
 http://127.0.0.1:8787/
 ```
 
+首次访问会显示浏览器登录框。用户名固定为 `container-gui`，密码是以下用户私有文件中的随机令牌：
+
+```bash
+cat "$HOME/Library/Application Support/ContainerGUI/auth-token"
+```
+
+令牌会在首次启动时生成并跨重启保留；目录权限为 `0700`，令牌文件权限为 `0600`。不要把令牌复制到项目、日志或截图中。
+
 服务固定监听 `127.0.0.1`。如果端口 `8787` 已被占用：
 
 ```bash
@@ -81,7 +89,9 @@ CONTAINER_GUI_PORT=9876 swift run ContainerGUI
 
 ```bash
 launchctl print "gui/$(id -u)/com.msj.container-gui"
-curl -fsS http://127.0.0.1:8787/api/v1
+AUTH_TOKEN="$(tr -d '\r\n' < "$HOME/Library/Application Support/ContainerGUI/auth-token")"
+printf 'user = "container-gui:%s"\n' "$AUTH_TOKEN" | curl --config - -fsS http://127.0.0.1:8787/api/v1
+unset AUTH_TOKEN
 ```
 
 如需停用自动启动与自愈：
@@ -144,10 +154,13 @@ GUI 也支持显式 root 公钥登录。root 模式仍禁用密码、键盘交�
 ### 安全模型
 
 - 服务固定监听 `127.0.0.1`，不接受局域网或公网连接。
+- 静态页面、读取 API、写入 API 和实时事件流都要求同一份 HTTP Basic 凭据；写操作仍额外校验同源、JSON 类型和请求大小。
 - 浏览器只提交结构化字段；服务端不提供任意主机 shell 或任意 `container` 子命令入口。
 - 启动、停止、重启、创建、拉取和删除均具有操作记录、目标互斥、幂等保护和完成后的状态回读。
 - 删除不使用 `--all` 或 `--force`；运行中容器、被引用镜像和 Apple `vminit` 系统镜像受到保护。
-- 环境变量值和公钥不会进入操作摘要或详情回显；私钥从不发送到服务端。
+- 创建容器时，环境变量和 SSH 公钥通过权限为 `0600` 的临时 env-file 传给 CLI，并在命令结束后删除，不进入进程参数。
+- 环境变量值、敏感键及凭据 URI 会在详情回显中结构化脱敏；私钥从不发送到服务端。
+- 并发指标请求共享同一次完整采样，容器文件系统探针有固定并发上限，避免请求放大产生大量 CLI 子进程。
 - Docker Hub 搜索是只读操作，只有用户明确提交拉取表单后才下载镜像。
 - 本项目适用于本机开发与实验环境，不构成生产编排、远程管理或多用户权限隔离方案。
 
@@ -164,7 +177,7 @@ GUI 也支持显式 root 公钥登录。root 模式仍禁用密码、键盘交�
 
 | 现象 | 检查方式 |
 | --- | --- |
-| 页面一直显示“正在读取” | 运行 `container system status --format json`，再检查 `curl -fsS http://127.0.0.1:8787/api/v1/system/health` |
+| 页面一直显示“正在读取” | 运行 `container system status --format json`，再使用上方带本机凭据的 `curl --config -` 方式检查 `/api/v1/system/health` |
 | 页面显示 CLI 不可用 | 运行 `container --version`；CLI 不在常见路径时设置 `CONTAINER_GUI_CLI_PATH` |
 | 容器启动后立即停止 | 查看最近日志；无常驻进程的普通镜像可重新创建并启用“保持容器运行” |
 | SSH 长时间停在“初始化中” | 检查容器日志、镜像是否支持 `apt-get` 以及本机端口是否冲突 |
@@ -235,6 +248,14 @@ Open:
 http://127.0.0.1:8787/
 ```
 
+The browser shows a sign-in prompt on first access. Use the fixed username `container-gui`; the password is the random token stored in this user-private file:
+
+```bash
+cat "$HOME/Library/Application Support/ContainerGUI/auth-token"
+```
+
+The token is generated on first launch and persists across restarts. Its directory is mode `0700` and the token file is mode `0600`. Do not copy it into the repository, logs, or screenshots.
+
 The service always binds to `127.0.0.1`. To use another local port:
 
 ```bash
@@ -253,7 +274,9 @@ The installer builds a release binary and copies it to `~/Library/Application Su
 
 ```bash
 launchctl print "gui/$(id -u)/com.msj.container-gui"
-curl -fsS http://127.0.0.1:8787/api/v1
+AUTH_TOKEN="$(tr -d '\r\n' < "$HOME/Library/Application Support/ContainerGUI/auth-token")"
+printf 'user = "container-gui:%s"\n' "$AUTH_TOKEN" | curl --config - -fsS http://127.0.0.1:8787/api/v1
+unset AUTH_TOKEN
 ```
 
 To disable automatic startup and recovery:
@@ -316,10 +339,13 @@ Stopping and starting the same container preserves its port, authorized key, and
 ### Security model
 
 - The server always listens on `127.0.0.1` and rejects LAN or public access.
+- Static files, read APIs, mutation APIs, and event streams all require the same HTTP Basic credential. Mutations still enforce Origin, JSON content type, and body-size checks.
 - The browser submits structured fields only; the backend does not expose arbitrary host-shell or arbitrary `container` command execution.
 - Start, stop, restart, create, pull, and delete operations use operation records, per-target exclusion, idempotency protection, and post-operation readback.
 - Delete workflows never use `--all` or `--force`; running containers, referenced images, and Apple’s `vminit` system image are protected.
-- Environment values and public keys are omitted from operation summaries and detail readbacks. Private keys never reach the server.
+- Container environment values and SSH public keys reach the CLI through a mode-`0600` temporary env file that is deleted after the command, rather than through process arguments.
+- Environment values, sensitive keys, and credential-bearing URIs are structurally redacted from detail readbacks. Private keys never reach the server.
+- Concurrent metrics callers share one complete sample, and filesystem probes have a fixed concurrency bound to prevent CLI-process amplification.
 - Docker Hub search is read-only. Images are downloaded only after an explicit pull submission.
 - This project is designed for local development and experimentation, not production orchestration, remote administration, or multi-user isolation.
 
@@ -336,7 +362,7 @@ Stopping and starting the same container preserves its port, authorized key, and
 
 | Symptom | What to check |
 | --- | --- |
-| The page remains on “Loading” | Run `container system status --format json`, then check `curl -fsS http://127.0.0.1:8787/api/v1/system/health` |
+| The page remains on “Loading” | Run `container system status --format json`, then use the authenticated `curl --config -` pattern above to check `/api/v1/system/health` |
 | The CLI is unavailable | Run `container --version`; set `CONTAINER_GUI_CLI_PATH` if the executable is outside the usual paths |
 | A container stops immediately | Read recent logs; recreate an ordinary image with “Keep container running” if it has no persistent process |
 | SSH remains “Initializing” | Check container logs, `apt-get` support, and host-port conflicts; a running container is not proof of SSH readiness |

@@ -1,6 +1,7 @@
 import Foundation
 
 enum ProblemCode: String, Codable, CaseIterable, Sendable {
+    case authenticationRequired = "AUTHENTICATION_REQUIRED"
     case cliNotFound = "CLI_NOT_FOUND"
     case cliNotExecutable = "CLI_NOT_EXECUTABLE"
     case cliVersionUnsupported = "CLI_VERSION_UNSUPPORTED"
@@ -24,6 +25,7 @@ enum ProblemCode: String, Codable, CaseIterable, Sendable {
 
     var status: Int {
         switch self {
+        case .authenticationRequired: 401
         case .originRejected: 403
         case .targetNotFound: 404
         case .stateConflict, .operationInProgress, .idempotencyConflict: 409
@@ -39,6 +41,7 @@ enum ProblemCode: String, Codable, CaseIterable, Sendable {
 
     var safeMessage: String {
         switch self {
+        case .authenticationRequired: "需要有效的本机访问凭据。"
         case .cliNotFound: "未找到 Apple container 命令行工具。"
         case .cliNotExecutable: "Apple container 工具不可执行。"
         case .cliVersionUnsupported: "当前 Apple container 版本暂不受支持。"

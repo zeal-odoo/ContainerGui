@@ -57,18 +57,67 @@ enum JSONValue: Codable, Equatable, Sendable {
     func redacted() -> JSONValue {
         switch self {
         case .object(let object):
-            return .object(
-                object.mapValues { $0.redacted() }.mapValuesWithKeys { key, value in
-                    Self.isSensitive(key) ? .string("[REDACTED]") : value
+            return .object(object.reduce(into: [:]) { result, element in
+                if Self.isEnvironmentKey(element.key) {
+                    result[element.key] = element.value.redactedEnvironment()
+                } else if Self.isSensitive(element.key) {
+                    result[element.key] = .string("[REDACTED]")
+                } else {
+                    result[element.key] = element.value.redacted()
                 }
-            )
+            })
         case .array(let values):
             return .array(values.map { $0.redacted() })
         case .string(let value):
-            return .string(Self.redactedEmbeddedAssignment(value) ?? value)
+            return .string(
+                Self.redactedEmbeddedAssignment(value)
+                    ?? Self.redactedCredentialURI(value)
+                    ?? value
+            )
         default:
             return self
         }
+    }
+
+    private func redactedEnvironment() -> JSONValue {
+        switch self {
+        case .object(let object):
+            let normalizedKeys = Set(object.keys.map { $0.lowercased() })
+            if normalizedKeys.contains("name"), normalizedKeys.contains("value") {
+                return .object(object.reduce(into: [:]) { result, element in
+                    result[element.key] = element.key.lowercased() == "value"
+                        ? element.value.redactedEnvironmentValue()
+                        : element.value.redacted()
+                })
+            }
+            return .object(object.mapValues { $0.redactedEnvironmentValue() })
+        case .array(let values):
+            return .array(values.map { value in
+                if case .string(let string) = value,
+                   let redacted = Self.redactedAnyAssignment(string) {
+                    return .string(redacted)
+                }
+                return value.redactedEnvironment()
+            })
+        default:
+            return .string("[REDACTED]")
+        }
+    }
+
+    private func redactedEnvironmentValue() -> JSONValue {
+        switch self {
+        case .object(let object):
+            return .object(object.mapValues { $0.redactedEnvironmentValue() })
+        case .array(let values):
+            return .array(values.map { $0.redactedEnvironmentValue() })
+        default:
+            return .string("[REDACTED]")
+        }
+    }
+
+    private static func isEnvironmentKey(_ key: String) -> Bool {
+        let normalized = key.lowercased().replacingOccurrences(of: "-", with: "_")
+        return normalized == "environment" || normalized == "env"
     }
 
     private static func isSensitive(_ key: String) -> Bool {
@@ -76,8 +125,16 @@ enum JSONValue: Codable, Equatable, Sendable {
         if normalized == SSHCreateConfiguration.publicKeyEnvironmentName.lowercased() {
             return true
         }
-        return ["password", "passwd", "secret", "token", "api_key", "apikey", "authorization", "credential", "private_key"]
-            .contains { normalized == $0 || normalized.hasSuffix("_\($0)") }
+        let sensitiveNames = [
+            "password", "passwd", "pass", "secret", "token", "api_key", "apikey",
+            "access_key", "authorization", "credential", "private_key", "database_url", "dsn",
+        ]
+        let components = Set(normalized.split(separator: "_").map(String.init))
+        return sensitiveNames.contains { name in
+            normalized == name
+                || normalized.hasSuffix("_\(name)")
+                || components.contains(name)
+        } || normalized.hasSuffix("password")
     }
 
     private static func redactedEmbeddedAssignment(_ value: String) -> String? {
@@ -91,12 +148,47 @@ enum JSONValue: Codable, Equatable, Sendable {
         }
         return "\(name)=[REDACTED]"
     }
-}
 
-private extension Dictionary where Key == String, Value == JSONValue {
-    func mapValuesWithKeys(_ transform: (String, JSONValue) -> JSONValue) -> [String: JSONValue] {
-        reduce(into: [:]) { result, element in
-            result[element.key] = transform(element.key, element.value)
+    private static func redactedAnyAssignment(_ value: String) -> String? {
+        guard let separator = value.firstIndex(of: "="), separator != value.startIndex else {
+            return nil
+        }
+        return "\(value[..<separator])=[REDACTED]"
+    }
+
+    private static func redactedCredentialURI(_ value: String) -> String? {
+        guard var components = URLComponents(string: value),
+              components.scheme != nil,
+              components.host != nil else {
+            return nil
+        }
+        var changed = false
+        if components.user != nil {
+            components.user = "[REDACTED]"
+            changed = true
+        }
+        if components.password != nil {
+            components.password = "[REDACTED]"
+            changed = true
+        }
+        if let queryItems = components.queryItems {
+            components.queryItems = queryItems.map { item in
+                guard isSensitiveQueryName(item.name), item.value != nil else { return item }
+                changed = true
+                return URLQueryItem(name: item.name, value: "[REDACTED]")
+            }
+        }
+        return changed ? components.string : nil
+    }
+
+    private static func isSensitiveQueryName(_ name: String) -> Bool {
+        if isSensitive(name) { return true }
+        let normalized = name.lowercased().replacingOccurrences(of: "-", with: "_")
+        return [
+            "auth", "code", "jwt", "key", "session", "session_id", "sessionid",
+            "sig", "signature",
+        ].contains { marker in
+            normalized == marker || normalized.hasSuffix("_\(marker)")
         }
     }
 }

@@ -157,7 +157,11 @@ struct ContainerCreateRequest: Codable, Equatable, Sendable {
                 $0.name.range(
                     of: #"^[A-Za-z_][A-Za-z0-9_]*$"#,
                     options: .regularExpression
-                ) == nil || $0.value.count > 4096 || $0.value.contains("\0")
+                ) == nil
+                    || $0.value.count > 4096
+                    || $0.value.contains("\0")
+                    || $0.value.contains("\n")
+                    || $0.value.contains("\r")
             }) {
             errors["environment"] = "环境变量名称、数量或值无效"
         }
