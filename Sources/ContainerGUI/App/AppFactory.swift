@@ -7,10 +7,7 @@ enum AppFactory {
         Bundle.module.url(forResource: "Public", withExtension: nil)!
     }
 
-    static func makeRouter(
-        configuration: AppConfiguration,
-        authentication: APIAuthentication
-    ) -> Router<BasicRequestContext> {
+    static func makeRouter(configuration: AppConfiguration) -> Router<BasicRequestContext> {
         let executableURL: URL?
         let unavailableCompatibility: CLICompatibility
         do {
@@ -32,11 +29,7 @@ enum AppFactory {
             imagePullTimeout: configuration.imagePullTimeout,
             maximumOutputBytes: configuration.maximumCommandOutputBytes
         )
-        let router = makeRouter(
-            configuration: configuration,
-            reader: reader,
-            authentication: authentication
-        )
+        let router = makeRouter(configuration: configuration, reader: reader)
         ContainerMetricsRoutes.register(
             on: router,
             reader: reader,
@@ -78,14 +71,10 @@ enum AppFactory {
 
     static func makeRouter<Reader: ContainerReading>(
         configuration: AppConfiguration,
-        reader: Reader,
-        authentication: APIAuthentication
+        reader: Reader
     ) -> Router<BasicRequestContext> {
         let router = Router()
         router.middlewares.add(ErrorMiddleware())
-        router.middlewares.add(
-            APIAuthenticationMiddleware(authentication: authentication)
-        )
         router.middlewares.add(
             SafetyMiddleware(
                 policy: RequestSafetyPolicy(
@@ -106,14 +95,8 @@ enum AppFactory {
         return router
     }
 
-    static func makeApplication(
-        configuration: AppConfiguration,
-        authentication: APIAuthentication
-    ) -> Application<RouterResponder<BasicRequestContext>> {
-        let router = makeRouter(
-            configuration: configuration,
-            authentication: authentication
-        )
+    static func makeApplication(configuration: AppConfiguration) -> Application<RouterResponder<BasicRequestContext>> {
+        let router = makeRouter(configuration: configuration)
         return Application(
             router: router,
             configuration: .init(

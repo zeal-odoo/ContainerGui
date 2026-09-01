@@ -10,7 +10,6 @@ readonly service_label="com.msj.container-gui"
 readonly watchdog_label="com.msj.container-gui.watchdog"
 readonly launch_agents_directory="$HOME/Library/LaunchAgents"
 readonly support_root="$HOME/Library/Application Support/ContainerGUI"
-readonly auth_token_file="$support_root/auth-token"
 readonly versions_directory="$support_root/versions"
 readonly log_directory="$HOME/Library/Logs/ContainerGUI"
 readonly swift_executable="$(/usr/bin/xcrun --find swift)"
@@ -27,21 +26,12 @@ if [[ -z "$app_version" ]]; then
   exit 65
 fi
 
-if [[ -L "$support_root" || -L "$auth_token_file" ]]; then
-  print -u2 "Container GUI authentication path must not be a symbolic link."
+if [[ -L "$support_root" ]]; then
+  print -u2 "Container GUI support path must not be a symbolic link."
   exit 65
 fi
 /bin/mkdir -p "$support_root"
 /bin/chmod 700 "$support_root"
-if [[ ! -e "$auth_token_file" ]]; then
-  (umask 077; /usr/bin/openssl rand -hex 32 > "$auth_token_file")
-fi
-/bin/chmod 600 "$auth_token_file"
-readonly auth_token="$(/usr/bin/tr -d '\r\n' < "$auth_token_file")"
-if ! print -r -- "$auth_token" | /usr/bin/grep -Eq '^[0-9A-Fa-f]{64}$'; then
-  print -u2 "Container GUI authentication token is invalid: $auth_token_file"
-  exit 65
-fi
 
 print "Building Container GUI $app_version in release mode..."
 cd "$project_root"
@@ -105,14 +95,11 @@ fi
 
 for wait_number in {1..20}; do
   identity=$(
-    print -r -- "user = \"container-gui:$auth_token\"" | \
-      /usr/bin/curl --config - --silent --fail --connect-timeout 1 --max-time 2 \
-        "http://127.0.0.1:8787/api/v1" 2>/dev/null
+    /usr/bin/curl --silent --fail --connect-timeout 1 --max-time 2 \
+      "http://127.0.0.1:8787/api/v1" 2>/dev/null
   ) || identity=""
   if [[ "$identity" == *'"name":"Container GUI"'* ]]; then
     print "Container GUI $app_version is managed by launchd at http://127.0.0.1:8787/."
-    print "Login username: container-gui"
-    print "Password token file: $auth_token_file"
     print "Logs: $log_directory"
     exit 0
   fi
