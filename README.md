@@ -31,6 +31,7 @@ Container GUI 为 Apple `container` CLI 提供浏览器管理界面。后端直�
 | SSH 快速配置 | Debian/Ubuntu 镜像仅公钥登录、自定义本机端口、普通用户或显式 root 模式 |
 | Odoo 快速配置 | 官方 Odoo 镜像显示数据库地址、端口及 `/mnt/extra-addons` 自定义模块目录 |
 | 中英文界面 | 首次访问跟随浏览器语言，顶部可切换中文/English 并记住选择；动态状态和弹窗同步切换 |
+| 版本更新提醒 | 页面加载后每天自动检查一次稳定版，也可从顶部手动检查；发现新版时跳转官方 GitHub Release 下载 PKG |
 | 现代界面 | Material 3 浅色/深色主题、克制 glass 表面、渐进动效及无障碍回退 |
 
 ### 环境要求
@@ -167,6 +168,17 @@ GUI 也支持显式 root 公钥登录。root 模式仍禁用密码、键盘交�
 
 停止并重新启动同一个容器会保留端口、授权公钥和 SSH 主机密钥；删除并重建后主机指纹可能改变。自动 SSH 初始化目前只支持能够以 root 执行 `apt-get` 的 Debian/Ubuntu 系镜像。
 
+### 检查 Container GUI 更新
+
+页面首次可用后会在后台检查 GitHub 最新稳定版；同一浏览器 24 小时内不会重复自动查询。顶部“检查更新”可随时手动检查，不受该间隔限制。
+
+发现新版本时，界面只显示当前/最新版本并提供“前往 GitHub 下载 PKG”：
+
+- 不会自动下载、安装或执行任何安装包。
+- 只允许打开 `zeal-odoo/ContainerGui` 的官方 GitHub Release 页面。
+- GitHub 暂时不可用不会影响容器列表或管理功能；手动检查会显示可重试提示。
+- 下载后仍应使用 Release 中的 `.sha256` 文件校验 PKG，再自行确认安装。
+
 ### 安全模型
 
 - 服务固定监听 `127.0.0.1`，不接受局域网或公网连接。
@@ -209,6 +221,7 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
 node --test Tests/Frontend/*.mjs
 node --check Sources/ContainerGUI/Resources/Public/app.js
 node --check Sources/ContainerGUI/Resources/Public/pagination.js
+node --check Sources/ContainerGUI/Resources/Public/update-check.js
 ```
 
 生成可发布的 Apple silicon 安装包：
@@ -244,6 +257,7 @@ Key capabilities:
 | Configure SSH | Bootstrap public-key-only SSH for supported Debian/Ubuntu images with a custom host port and normal-user or explicit root mode |
 | Configure Odoo | Show database host/port and the `/mnt/extra-addons` custom-module directory only for the official Odoo image |
 | Use Chinese or English | Follow the browser language on first visit, switch from the header, remember the choice, and localize dynamic states and dialogs together |
+| Discover updates | Check the latest stable release once per day after load or on demand from the header, then open the official GitHub Release to download the PKG |
 | Use a modern UI | Material 3 light/dark themes, restrained glass surfaces, progressive motion, and accessibility fallbacks |
 
 ### Requirements
@@ -380,6 +394,17 @@ The GUI also offers an explicit root public-key mode. Password, keyboard-interac
 
 Stopping and starting the same container preserves its port, authorized key, and SSH host keys. Deleting and recreating it may change the host fingerprint. Automatic SSH bootstrap currently supports Debian/Ubuntu-family images that can run `apt-get` as root.
 
+### Check for Container GUI updates
+
+After the page becomes usable, it checks the latest stable GitHub Release in the background. The same browser will not repeat an automatic check within 24 hours. The “Check for updates” action in the header always performs an immediate manual check.
+
+When a newer release is available, the interface shows the current and latest versions and offers “Download PKG from GitHub”:
+
+- It never downloads, installs, or executes a package automatically.
+- It opens only the official `zeal-odoo/ContainerGui` GitHub Release page.
+- A temporary GitHub failure does not affect container listing or management; a manual check shows a retryable message.
+- After downloading, verify the PKG with the `.sha256` file from the Release before deciding to install it.
+
 ### Security model
 
 - The server always listens on `127.0.0.1` and rejects LAN or public access.
@@ -422,6 +447,7 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
 node --test Tests/Frontend/*.mjs
 node --check Sources/ContainerGUI/Resources/Public/app.js
 node --check Sources/ContainerGUI/Resources/Public/pagination.js
+node --check Sources/ContainerGUI/Resources/Public/update-check.js
 ```
 
 Build an Apple silicon installer suitable for release:

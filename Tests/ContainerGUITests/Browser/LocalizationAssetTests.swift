@@ -16,8 +16,8 @@ final class LocalizationAssetTests: XCTestCase {
 
     func testLocalizationRuntimeLoadsBeforeApplicationRuntime() throws {
         let html = try asset("index.html")
-        let localizationIndex = try XCTUnwrap(html.range(of: "src=\"/i18n.js?v=2.16.0\"")?.lowerBound)
-        let applicationIndex = try XCTUnwrap(html.range(of: "src=\"/app.js?v=2.16.0\"")?.lowerBound)
+        let localizationIndex = try XCTUnwrap(html.range(of: "src=\"/i18n.js?v=\(AppVersion.current)\"")?.lowerBound)
+        let applicationIndex = try XCTUnwrap(html.range(of: "src=\"/app.js?v=\(AppVersion.current)\"")?.lowerBound)
 
         XCTAssertLessThan(localizationIndex, applicationIndex)
     }

@@ -188,6 +188,37 @@ pre:focus-visible {
   font-weight: 700;
 }
 
+.update-check-button {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-full);
+  color: var(--md-sys-color-primary);
+  background: color-mix(in srgb, var(--md-sys-color-surface-container) 82%, transparent);
+  font: inherit;
+  font-size: var(--md-sys-typescale-label-small-size);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-standard),
+    background-color var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-standard),
+    transform var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-standard);
+}
+
+.update-check-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 10%, transparent);
+}
+
+.update-check-button:active:not(:disabled) {
+  transform: scale(.97);
+}
+
+.update-check-button:disabled {
+  cursor: wait;
+  opacity: .62;
+}
+
 .language-switch {
   display: inline-flex;
   min-height: 36px;
@@ -1198,6 +1229,36 @@ dialog code {
   overflow-wrap: anywhere;
 }
 
+.update-version-grid {
+  display: grid;
+  margin-top: 20px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.update-version-grid div {
+  display: grid;
+  min-height: 88px;
+  padding: 16px;
+  align-content: center;
+  gap: 7px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container-highest);
+}
+
+.update-version-grid span {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: var(--md-sys-typescale-label-small-size);
+  font-weight: 650;
+}
+
+.update-version-grid strong {
+  color: var(--md-sys-color-on-surface);
+  font-size: 1.2rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .form-help {
   margin: 10px 0 0;
   color: var(--md-sys-color-on-surface-variant);
@@ -1602,6 +1663,10 @@ dialog code {
     padding-inline: 8px;
   }
 
+  .update-check-button {
+    padding-inline: 10px;
+  }
+
   .hero {
     min-height: 0;
     padding: 24px 20px;
@@ -1676,6 +1741,10 @@ dialog code {
 
   .dialog-actions .button {
     width: 100%;
+  }
+
+  .update-version-grid {
+    grid-template-columns: 1fr;
   }
 }
 

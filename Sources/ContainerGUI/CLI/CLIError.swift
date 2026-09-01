@@ -13,12 +13,39 @@ enum CLICompatibility: String, Codable, Equatable, Sendable {
     case notExecutable
 }
 
-struct SemanticVersion: Codable, Equatable, Sendable, CustomStringConvertible {
+struct SemanticVersion: Codable, Comparable, Equatable, Sendable, CustomStringConvertible {
     let major: Int
     let minor: Int
     let patch: Int
 
+    init?(_ rawValue: String) {
+        var value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.first == "v" { value.removeFirst() }
+        let buildParts = value.split(separator: "+", omittingEmptySubsequences: false)
+        guard buildParts.count <= 2,
+              buildParts.count == 1 || !buildParts[1].isEmpty else { return nil }
+        let components = buildParts[0].split(separator: ".", omittingEmptySubsequences: false)
+        guard components.count == 3,
+              components.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isNumber) }),
+              let major = Int(components[0]),
+              let minor = Int(components[1]),
+              let patch = Int(components[2]) else { return nil }
+        self.major = major
+        self.minor = minor
+        self.patch = patch
+    }
+
+    init(major: Int, minor: Int, patch: Int) {
+        self.major = major
+        self.minor = minor
+        self.patch = patch
+    }
+
     var description: String { "\(major).\(minor).\(patch)" }
+
+    static func < (lhs: SemanticVersion, rhs: SemanticVersion) -> Bool {
+        (lhs.major, lhs.minor, lhs.patch) < (rhs.major, rhs.minor, rhs.patch)
+    }
 }
 
 struct CLIVersionClassification: Equatable, Sendable {

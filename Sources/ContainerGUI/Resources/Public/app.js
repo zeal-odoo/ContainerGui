@@ -2,6 +2,7 @@
 
 const ENDPOINTS = {
   appInfo: "/api/v1",
+  updateCheck: "/api/v1/update-check",
   health: "/api/v1/system/health",
   containers: "/api/v1/containers",
   metrics: "/api/v1/containers/metrics",
@@ -28,7 +29,7 @@ let toastVisibilityTimer = null;
 let toastExitTimer = null;
 
 const elements = Object.fromEntries([
-  "appVersionBadge", "versionBadge", "healthCard", "healthLabel", "healthDetail",
+  "appVersionBadge", "checkUpdatesButton", "versionBadge", "healthCard", "healthLabel", "healthDetail",
   "totalCount", "runningCount", "stoppedCount", "observedAt", "searchInput",
   "loadingState", "emptyState", "errorState", "tableWrap", "containerRows",
   "detailPanel", "detailPlaceholder", "detailContent", "detailTitle", "detailFacts",
@@ -61,7 +62,9 @@ const elements = Object.fromEntries([
   "remoteRepositoryError", "remoteRepositoryResults", "remoteRepositoryPagination",
   "previousRepositoriesButton", "remoteRepositoryPageNumbers", "nextRepositoriesButton",
   "remoteTagPanel", "remoteTagCount", "remoteTagStatus", "remoteTagError", "remoteTagResults",
-  "remoteTagPagination", "previousTagsButton", "remoteTagPageNumbers", "nextTagsButton"
+  "remoteTagPagination", "previousTagsButton", "remoteTagPageNumbers", "nextTagsButton",
+  "updateDialog", "updateDialogMessage", "updateCurrentVersion", "updateLatestVersion",
+  "updateReleaseLink", "closeUpdateDialogButton"
 ].map((id) => [id, document.getElementById(id)]));
 
 const state = {
@@ -75,7 +78,8 @@ const state = {
   remoteSearchParameters: null, selectedRemoteRepository: null,
   remoteTags: [], remoteTagPage: 0, remoteTagPageSize: 10,
   remoteTagTotalCount: null, remoteTagHasMore: false,
-  remoteRepositoryLoading: false, remoteTagLoading: false
+  remoteRepositoryLoading: false, remoteTagLoading: false,
+  updateChecking: false, updateSummary: null
 };
 
 const stateLabels = {
@@ -165,6 +169,71 @@ async function loadApplicationVersion() {
     elements.appVersionBadge.textContent = appInfo.version ? `GUI v${appInfo.version}` : "GUI 版本未知";
   } catch {
     elements.appVersionBadge.textContent = "GUI 版本未知";
+  }
+}
+
+function shouldRunAutomaticCheck() {
+  if (!globalThis.ContainerGUIUpdate) return false;
+  let lastCheckedAt = null;
+  try {
+    lastCheckedAt = globalThis.localStorage?.getItem(ContainerGUIUpdate.STORAGE_KEY) ?? null;
+  } catch {
+    // Storage may be disabled; a one-off check is still safe.
+  }
+  return ContainerGUIUpdate.shouldRunAutomaticCheck(lastCheckedAt);
+}
+
+function recordAutomaticCheck() {
+  try {
+    globalThis.localStorage?.setItem(ContainerGUIUpdate.STORAGE_KEY, String(Date.now()));
+  } catch {
+    // Storage may be disabled; update discovery must remain optional.
+  }
+}
+
+function setUpdateChecking(checking) {
+  state.updateChecking = checking;
+  elements.checkUpdatesButton.disabled = checking;
+  elements.checkUpdatesButton.setAttribute("aria-busy", String(checking));
+  elements.checkUpdatesButton.textContent = checking ? "正在检查更新…" : "检查更新";
+}
+
+function renderUpdateDialog(summary) {
+  elements.updateCurrentVersion.textContent = summary.currentVersion;
+  elements.updateLatestVersion.textContent = summary.latestVersion;
+  elements.updateDialogMessage.textContent = `当前版本 ${summary.currentVersion} · 最新版本 ${summary.latestVersion}`;
+  elements.updateReleaseLink.href = summary.releaseURL;
+  openDialog(elements.updateDialog, elements.closeUpdateDialogButton);
+  globalThis.ContainerGUII18n?.apply(elements.updateDialog);
+}
+
+async function checkForUpdates({ automatic = false } = {}) {
+  if (state.updateChecking) return;
+  if (automatic && !shouldRunAutomaticCheck()) return;
+
+  setUpdateChecking(true);
+  try {
+    const result = await fetchJSON(ENDPOINTS.updateCheck);
+    const releaseURL = globalThis.ContainerGUIUpdate?.validatedReleaseURL(result.releaseURL);
+    if (!releaseURL ||
+        typeof result.currentVersion !== "string" ||
+        typeof result.latestVersion !== "string" ||
+        typeof result.updateAvailable !== "boolean") {
+      throw new Error("暂时无法检查更新，请稍后重试。");
+    }
+    state.updateSummary = {
+      currentVersion: result.currentVersion,
+      latestVersion: result.latestVersion,
+      updateAvailable: result.updateAvailable,
+      releaseURL
+    };
+    if (state.updateSummary.updateAvailable) renderUpdateDialog(state.updateSummary);
+    else if (!automatic) showToast("当前已是最新版本");
+  } catch {
+    if (!automatic) showToast("暂时无法检查更新，请稍后重试。");
+  } finally {
+    if (automatic) recordAutomaticCheck();
+    setUpdateChecking(false);
   }
 }
 
@@ -1879,6 +1948,8 @@ function showToast(message) {
 }
 
 elements.searchInput.addEventListener("input", renderContainers);
+elements.checkUpdatesButton.addEventListener("click", () => checkForUpdates());
+elements.closeUpdateDialogButton.addEventListener("click", () => closeDialog(elements.updateDialog, "dismiss"));
 elements.closeDetailButton.addEventListener("click", closeDetail);
 elements.copySSHCommandButton.addEventListener("click", copySSHCommand);
 elements.loadLogsButton.addEventListener("click", loadRecentLogs);
@@ -1946,6 +2017,9 @@ document.addEventListener("container-gui-language-change", () => {
     renderActions(state.selectedDetail.summary);
     renderSSHStatus(state.selectedSSHStatus, state.selectedDetail.summary);
   }
+  if (state.updateSummary?.updateAvailable && elements.updateDialog.open) {
+    renderUpdateDialog(state.updateSummary);
+  }
   globalThis.ContainerGUII18n?.apply(document.body);
 });
 window.setInterval(() => {
@@ -1954,4 +2028,4 @@ window.setInterval(() => {
 loadApplicationVersion();
 updateImageSpecificCreateFields();
 updateSSHFields();
-refreshDashboard();
+refreshDashboard().finally(() => checkForUpdates({ automatic: true }));

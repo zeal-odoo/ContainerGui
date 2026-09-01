@@ -33,6 +33,8 @@ struct AppConfiguration: Sendable, Equatable {
     let maximumLogSessions = 8
     let maximumRegistryResponseBytes = 2 * 1024 * 1024
     let registryTimeoutSeconds: TimeInterval = 5
+    let maximumUpdateResponseBytes = 128 * 1024
+    let updateTimeoutSeconds: TimeInterval = 5
 
     var host: String { Self.fixedHost }
     var origin: String { "http://\(host):\(port)" }

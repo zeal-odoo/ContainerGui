@@ -7,6 +7,17 @@ const ContainerGUII18n = (() => {
     "Container GUI 首页": "Container GUI home",
     "正在读取 GUI 版本…": "Loading GUI version…",
     "正在检查 CLI…": "Checking CLI…",
+    "检查更新": "Check for updates",
+    "正在检查更新…": "Checking for updates…",
+    "发现新版本": "Update available",
+    "已有新的稳定版本可供下载。": "A newer stable version is available to download.",
+    "当前版本": "Current version",
+    "最新版本": "Latest version",
+    "将打开官方 GitHub Release 页面；下载和安装 PKG 均由您确认。": "The official GitHub Release page will open. You choose whether to download and install the PKG.",
+    "稍后提醒": "Remind me later",
+    "前往 GitHub 下载 PKG": "Open GitHub to download the PKG",
+    "当前已是最新版本": "Container GUI is up to date",
+    "暂时无法检查更新，请稍后重试。": "Unable to check for updates right now. Try again later.",
     "本机容器控制台": "Local container console",
     "容器运行状态": "Container runtime status",
     "所有状态直接读取 Apple container CLI，不保存影子副本。": "All status is read directly from Apple container CLI; no shadow copy is stored.",
@@ -291,6 +302,7 @@ const ContainerGUII18n = (() => {
   ));
 
   const patterns = Object.freeze([
+    [/^当前版本 (.+) · 最新版本 (.+)$/, (_, current, latest) => `Current ${current} · Latest ${latest}`],
     [/^查看 (.+) 的详情$/, (_, name) => `View details for ${name}`],
     [/^收起 (.+) 的详情$/, (_, name) => `Collapse details for ${name}`],
     [/^删除镜像 (.+)$/, (_, name) => `Delete image ${name}`],

@@ -22,6 +22,8 @@ test("preferred language follows a valid saved choice before browser language", 
 test("static interface copy translates in both directions", () => {
   assert.equal(api.translate("容器运行状态", "en"), "Container runtime status");
   assert.equal(api.translate("运行中", "en"), "Running");
+  assert.equal(api.translate("检查更新", "en"), "Check for updates");
+  assert.equal(api.translate("前往 GitHub 下载 PKG", "en"), "Open GitHub to download the PKG");
   assert.equal(api.translate("Container runtime status", "zh"), "容器运行状态");
 });
 
@@ -31,6 +33,7 @@ test("dynamic interface patterns preserve user-owned identifiers and counts", ()
   assert.equal(api.translate("第 3 页", "en"), "Page 3");
   assert.equal(api.translate("100% = 3 核", "en"), "100% = 3 cores");
   assert.equal(api.translate("0.04% · 100% = 3 核", "en"), "0.04% · 100% = 3 cores");
+  assert.equal(api.translate("当前版本 2.17.0 · 最新版本 2.18.0", "en"), "Current 2.17.0 · Latest 2.18.0");
   assert.equal(api.translate("容器命令执行失败。（CLI_EXIT_NONZERO）", "en"), "The container command failed. (CLI_EXIT_NONZERO)");
 });
 

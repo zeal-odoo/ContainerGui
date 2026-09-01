@@ -60,6 +60,15 @@ enum AppFactory {
                 maximumResponseBytes: configuration.maximumRegistryResponseBytes
             )
         )
+        UpdateCheckRoutes.register(
+            on: router,
+            checker: GitHubReleaseChecker(
+                transport: FoundationRegistryHTTPTransport(
+                    timeoutSeconds: configuration.updateTimeoutSeconds
+                ),
+                maximumResponseBytes: configuration.maximumUpdateResponseBytes
+            )
+        )
         ContainerControlRoutes.registerControl(on: router, service: controlService)
         ContainerControlRoutes.registerLogs(
             on: router,

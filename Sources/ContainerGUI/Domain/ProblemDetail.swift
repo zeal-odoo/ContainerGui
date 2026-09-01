@@ -20,6 +20,7 @@ enum ProblemCode: String, Codable, CaseIterable, Sendable {
     case outputLimitExceeded = "OUTPUT_LIMIT_EXCEEDED"
     case registryRateLimited = "REGISTRY_RATE_LIMITED"
     case registryUnavailable = "REGISTRY_UNAVAILABLE"
+    case updateCheckUnavailable = "UPDATE_CHECK_UNAVAILABLE"
     case internalError = "INTERNAL_ERROR"
 
     var status: Int {
@@ -32,7 +33,7 @@ enum ProblemCode: String, Codable, CaseIterable, Sendable {
         case .validationFailed, .confirmationMismatch: 422
         case .cliTimeout: 504
         case .cliNotFound, .cliNotExecutable, .cliVersionUnsupported, .serviceUnavailable: 503
-        case .registryUnavailable: 502
+        case .registryUnavailable, .updateCheckUnavailable: 502
         case .cliExitNonzero, .cliOutputInvalid, .internalError: 500
         }
     }
@@ -58,6 +59,7 @@ enum ProblemCode: String, Codable, CaseIterable, Sendable {
         case .outputLimitExceeded: "容器命令输出超过安全上限。"
         case .registryRateLimited: "镜像平台请求过于频繁，请稍后重试。"
         case .registryUnavailable: "镜像平台当前不可用，请稍后重试。"
+        case .updateCheckUnavailable: "暂时无法检查更新，请稍后重试。"
         case .internalError: "发生内部错误。"
         }
     }
@@ -65,7 +67,7 @@ enum ProblemCode: String, Codable, CaseIterable, Sendable {
     var retryable: Bool {
         switch self {
         case .serviceUnavailable, .cliTimeout, .operationInProgress, .logSessionLimit,
-             .registryRateLimited, .registryUnavailable, .internalError: true
+             .registryRateLimited, .registryUnavailable, .updateCheckUnavailable, .internalError: true
         default: false
         }
     }
