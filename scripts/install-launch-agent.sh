@@ -90,8 +90,25 @@ if /usr/sbin/lsof -nP -iTCP:8787 -sTCP:LISTEN >/dev/null 2>&1; then
   exit 70
 fi
 
-/bin/launchctl bootstrap "$launch_domain" "$launch_agents_directory/$service_label.plist"
-/bin/launchctl bootstrap "$launch_domain" "$launch_agents_directory/$watchdog_label.plist"
+bootstrap_with_retry() {
+  local plist_path="$1"
+  local attempt_number
+  for attempt_number in 1 2 3 4 5; do
+    if (( attempt_number == 5 )); then
+      /bin/launchctl bootstrap "$launch_domain" "$plist_path" && return 0
+    elif /bin/launchctl bootstrap "$launch_domain" "$plist_path" 2>/dev/null; then
+      return 0
+    fi
+    /bin/sleep "$attempt_number"
+  done
+  return 1
+}
+
+bootstrap_with_retry "$launch_agents_directory/$service_label.plist"
+if ! bootstrap_with_retry "$launch_agents_directory/$watchdog_label.plist"; then
+  /bin/launchctl bootout "$launch_domain/$service_label" 2>/dev/null || true
+  exit 71
+fi
 
 for wait_number in {1..20}; do
   identity=$(

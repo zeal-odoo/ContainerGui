@@ -6,7 +6,7 @@ A lightweight local web interface for Apple [`container`](https://github.com/app
 
 [中文](#中文说明) · [English](#english-guide)
 
-**GUI v2.16.3** · Apple `container` `1.3.x` · `http://127.0.0.1:8787`
+**GUI v2.17.0** · Apple `container` `1.3.x` · `http://127.0.0.1:8787`
 
 > Container GUI is a local, single-user tool. It never listens on the LAN or public Internet and is not a replacement for Docker Desktop, Compose, Kubernetes, or a multi-user remote administration platform.
 >
@@ -37,7 +37,7 @@ Container GUI 为 Apple `container` CLI 提供浏览器管理界面。后端直�
 
 - Apple silicon Mac
 - macOS 26
-- Xcode 提供的 Swift 6.1 或更高版本
+- Xcode 提供的 Swift 6.1 或更高版本（仅从源码运行或打包时需要；安装 `.pkg` 不需要）
 - Apple `container` CLI `1.3.x`；当前验证基线为 `1.3.1`
 
 从 Apple 官方 [Releases](https://github.com/apple/container/releases) 安装签名安装包，然后确认 CLI 和系统服务可用：
@@ -48,7 +48,31 @@ container system start
 container system status
 ```
 
-### 快速开始
+### 安装 .pkg（推荐）
+
+从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 下载 `ContainerGUI-2.17.0-arm64.pkg` 和对应的 `.sha256` 文件，然后校验并安装：
+
+```bash
+shasum -a 256 -c ContainerGUI-2.17.0-arm64.pkg.sha256
+sudo installer -pkg ContainerGUI-2.17.0-arm64.pkg -target /
+open http://127.0.0.1:8787/
+```
+
+安装包把只读运行文件放到 `/Library/Application Support/ContainerGUI/versions/2.17.0`，并为当前控制台用户安装 LaunchAgent。服务仍以该用户身份运行，不会以 root 身份运行。若安装时没有登录的图形界面用户，登录后执行：
+
+```bash
+sudo container-gui-enable
+```
+
+当前发布包未使用 Developer ID Installer 签名，也未经过 Apple 公证。macOS 拦截时可在 Finder 中右键安装包选择“打开”，或使用上面的 `installer` 命令。完整卸载命令为：
+
+```bash
+sudo container-gui-uninstall
+```
+
+卸载会移除系统运行文件和当前用户的 LaunchAgent；用户日志以及旧的源码安装目录会保留，避免丢失排错信息。
+
+### 从源码运行
 
 ```bash
 git clone https://github.com/zeal-odoo/ContainerGui.git
@@ -71,7 +95,7 @@ http://127.0.0.1:8787/
 CONTAINER_GUI_PORT=9876 swift run ContainerGUI
 ```
 
-### 稳定运行（推荐）
+### 源码方式稳定运行
 
 日常使用不要依赖一直打开的终端窗口。安装用户级 LaunchAgent 后，Container GUI 会在登录时启动，异常退出时由 launchd 自动拉起；独立 watchdog 每 30 秒检查两次 GUI 身份接口，遇到“进程仍在但 8787 已失去监听”的假活状态会强制重启服务。
 
@@ -187,6 +211,18 @@ node --check Sources/ContainerGUI/Resources/Public/app.js
 node --check Sources/ContainerGUI/Resources/Public/pagination.js
 ```
 
+生成可发布的 Apple silicon 安装包：
+
+```bash
+./scripts/build-pkg.sh
+```
+
+安装包和 SHA-256 校验文件会输出到 `dist/`。如已安装 Developer ID Installer 证书，可选择签名：
+
+```bash
+CONTAINER_GUI_INSTALLER_IDENTITY="Developer ID Installer: Example (TEAMID)" ./scripts/build-pkg.sh
+```
+
 默认测试使用固定夹具和模拟命令执行器，不修改真实容器。只有显式设置对应实时只读环境变量后，测试才会读取本机 CLI 或 Docker Hub。
 
 ## English guide
@@ -214,7 +250,7 @@ Key capabilities:
 
 - Apple silicon Mac
 - macOS 26
-- Swift 6.1 or later from Xcode
+- Swift 6.1 or later from Xcode (required only to run from source or build a package; not required for `.pkg` installation)
 - Apple `container` CLI `1.3.x`; the current verified baseline is `1.3.1`
 
 Install the signed package from Apple’s official [Releases](https://github.com/apple/container/releases), then verify the CLI and system service:
@@ -225,7 +261,31 @@ container system start
 container system status
 ```
 
-### Quick start
+### Install the .pkg (recommended)
+
+Download `ContainerGUI-2.17.0-arm64.pkg` and its `.sha256` file from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest), then verify and install them:
+
+```bash
+shasum -a 256 -c ContainerGUI-2.17.0-arm64.pkg.sha256
+sudo installer -pkg ContainerGUI-2.17.0-arm64.pkg -target /
+open http://127.0.0.1:8787/
+```
+
+The package installs its read-only runtime at `/Library/Application Support/ContainerGUI/versions/2.17.0` and creates LaunchAgents for the current console user. The service continues to run as that user, never as root. If no graphical user is logged in during installation, run this after signing in:
+
+```bash
+sudo container-gui-enable
+```
+
+The current package is not signed with a Developer ID Installer certificate and has not been notarized by Apple. If macOS blocks it, right-click the package in Finder and choose Open, or use the `installer` command above. To remove the system runtime and current user's LaunchAgents:
+
+```bash
+sudo container-gui-uninstall
+```
+
+Logs and older source-checkout installations are retained to preserve diagnostic data.
+
+### Run from source
 
 ```bash
 git clone https://github.com/zeal-odoo/ContainerGui.git
@@ -248,7 +308,7 @@ The service always binds to `127.0.0.1`. To use another local port:
 CONTAINER_GUI_PORT=9876 swift run ContainerGUI
 ```
 
-### Stable operation (recommended)
+### Stable source-checkout operation
 
 Do not depend on an open terminal for daily use. Install the user LaunchAgents so launchd starts Container GUI at login and restarts it after an abnormal exit. A separate watchdog probes the GUI identity twice every 30 seconds and force-restarts a stale process that is still present after port 8787 has stopped listening.
 
@@ -362,6 +422,18 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
 node --test Tests/Frontend/*.mjs
 node --check Sources/ContainerGUI/Resources/Public/app.js
 node --check Sources/ContainerGUI/Resources/Public/pagination.js
+```
+
+Build an Apple silicon installer suitable for release:
+
+```bash
+./scripts/build-pkg.sh
+```
+
+The package and its SHA-256 checksum are written to `dist/`. If a Developer ID Installer certificate is available, signing is optional:
+
+```bash
+CONTAINER_GUI_INSTALLER_IDENTITY="Developer ID Installer: Example (TEAMID)" ./scripts/build-pkg.sh
 ```
 
 The default test suite uses fixed fixtures and fake command executors, so it does not modify real containers. Tests read the local CLI or Docker Hub only when the corresponding live read-only environment variable is explicitly enabled.

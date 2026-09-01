@@ -10,3 +10,4 @@ Packages/
 *.swp
 .vscode/
 .idea/
+dist/

@@ -71,6 +71,18 @@ final class LaunchAgentAssetsTests: XCTestCase {
         XCTAssertTrue(watchdog.contains("gui/$(/usr/bin/id -u)/com.msj.container-gui"))
     }
 
+    func testInstallerRetriesLaunchdBootstrapAndCleansUpPartialLoad() throws {
+        let installer = try String(
+            contentsOf: repositoryRoot.appendingPathComponent("scripts/install-launch-agent.sh"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(installer.contains("bootstrap_with_retry"))
+        XCTAssertTrue(installer.contains("for attempt_number in 1 2 3 4 5"))
+        XCTAssertTrue(installer.contains("bootout \"$launch_domain/$service_label\""))
+        XCTAssertTrue(installer.contains("exit 71"))
+    }
+
     private var repositoryRoot: URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

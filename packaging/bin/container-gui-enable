@@ -1,0 +1,125 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+readonly runtime_directory="/Library/Application Support/ContainerGUI/current"
+readonly service_label="com.msj.container-gui"
+readonly watchdog_label="com.msj.container-gui.watchdog"
+readonly allow_no_user="${1:-}"
+
+if (( EUID != 0 )); then
+  print -u2 "Run this command with sudo."
+  exit 77
+fi
+
+if (( $# > 1 )) || [[ -n "$allow_no_user" && "$allow_no_user" != "--allow-no-user" ]]; then
+  print -u2 "Usage: sudo container-gui-enable [--allow-no-user]"
+  exit 64
+fi
+
+target_user="${SUDO_USER:-}"
+if [[ -z "$target_user" || "$target_user" == "root" ]]; then
+  target_user="$(/usr/bin/stat -f '%Su' /dev/console)"
+fi
+
+if [[ -z "$target_user" || "$target_user" == "root" || "$target_user" == "loginwindow" ]]; then
+  if [[ "$allow_no_user" == "--allow-no-user" ]]; then
+    print "Container GUI was installed. Run sudo container-gui-enable from a logged-in account to start it."
+    exit 0
+  fi
+  print -u2 "No logged-in user was found."
+  exit 69
+fi
+
+readonly user_id="$(/usr/bin/id -u "$target_user")"
+readonly user_group="$(/usr/bin/id -gn "$target_user")"
+readonly launch_domain="gui/$user_id"
+home_record="$(/usr/bin/dscl . -read "/Users/$target_user" NFSHomeDirectory)"
+readonly home_directory="${home_record#NFSHomeDirectory: }"
+readonly launch_agents_directory="$home_directory/Library/LaunchAgents"
+readonly log_directory="$home_directory/Library/Logs/ContainerGUI"
+readonly service_plist="$launch_agents_directory/$service_label.plist"
+readonly watchdog_plist="$launch_agents_directory/$watchdog_label.plist"
+
+if [[ ! -x "$runtime_directory/ContainerGUI" || ! -x "$runtime_directory/render-launch-agents.sh" ]]; then
+  print -u2 "The Container GUI runtime is incomplete: $runtime_directory"
+  exit 66
+fi
+
+container_cli_path="/usr/local/bin/container"
+for candidate in /usr/local/bin/container /opt/homebrew/bin/container; do
+  if [[ -x "$candidate" ]]; then
+    container_cli_path="$candidate"
+    break
+  fi
+done
+readonly container_cli_path
+
+/bin/mkdir -p "$launch_agents_directory" "$log_directory"
+/usr/sbin/chown "$target_user:$user_group" "$launch_agents_directory" "$log_directory"
+/bin/chmod 700 "$log_directory"
+
+"$runtime_directory/render-launch-agents.sh" \
+  "$launch_agents_directory" \
+  "$runtime_directory" \
+  "$log_directory" \
+  "$container_cli_path"
+/usr/sbin/chown "$target_user:$user_group" "$service_plist" "$watchdog_plist"
+/bin/chmod 600 "$service_plist" "$watchdog_plist"
+
+/bin/launchctl bootout "$launch_domain/$watchdog_label" 2>/dev/null || true
+/bin/launchctl bootout "$launch_domain/$service_label" 2>/dev/null || true
+
+for wait_number in {1..20}; do
+  service_present=0
+  watchdog_present=0
+  /bin/launchctl print "$launch_domain/$service_label" >/dev/null 2>&1 && service_present=1
+  /bin/launchctl print "$launch_domain/$watchdog_label" >/dev/null 2>&1 && watchdog_present=1
+  if (( service_present == 0 && watchdog_present == 0 )) && \
+      ! /usr/sbin/lsof -nP -iTCP:8787 -sTCP:LISTEN >/dev/null 2>&1; then
+    break
+  fi
+  /bin/sleep 1
+done
+
+if /usr/sbin/lsof -nP -iTCP:8787 -sTCP:LISTEN >/dev/null 2>&1; then
+  print -u2 "Port 8787 is still in use. Stop that process and rerun sudo container-gui-enable."
+  exit 70
+fi
+
+bootstrap_with_retry() {
+  local plist_path="$1"
+  local attempt_number
+  for attempt_number in 1 2 3 4 5; do
+    if (( attempt_number == 5 )); then
+      /bin/launchctl bootstrap "$launch_domain" "$plist_path" && return 0
+    elif /bin/launchctl bootstrap "$launch_domain" "$plist_path" 2>/dev/null; then
+      return 0
+    fi
+    /bin/sleep "$attempt_number"
+  done
+  return 1
+}
+
+bootstrap_with_retry "$service_plist"
+if ! bootstrap_with_retry "$watchdog_plist"; then
+  /bin/launchctl bootout "$launch_domain/$service_label" 2>/dev/null || true
+  exit 71
+fi
+
+for wait_number in {1..30}; do
+  identity=$(
+    /usr/bin/curl --silent --fail --connect-timeout 1 --max-time 2 \
+      "http://127.0.0.1:8787/api/v1" 2>/dev/null
+  ) || identity=""
+  if [[ "$identity" == *'"name":"Container GUI"'* ]]; then
+    print "Container GUI is running for $target_user at http://127.0.0.1:8787/."
+    print "Logs: $log_directory"
+    exit 0
+  fi
+  /bin/sleep 1
+done
+
+print -u2 "Container GUI was loaded, but its identity endpoint did not become ready."
+print -u2 "Inspect $log_directory/service-error.log."
+exit 75

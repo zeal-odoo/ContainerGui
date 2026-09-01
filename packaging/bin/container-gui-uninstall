@@ -1,0 +1,37 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+readonly package_identifier="io.github.zeal-odoo.container-gui"
+readonly support_root="/Library/Application Support/ContainerGUI"
+readonly service_label="com.msj.container-gui"
+readonly watchdog_label="com.msj.container-gui.watchdog"
+
+if (( EUID != 0 )); then
+  print -u2 "Run this command with sudo."
+  exit 77
+fi
+
+target_user="${SUDO_USER:-}"
+if [[ -z "$target_user" || "$target_user" == "root" ]]; then
+  target_user="$(/usr/bin/stat -f '%Su' /dev/console)"
+fi
+
+if [[ -n "$target_user" && "$target_user" != "root" && "$target_user" != "loginwindow" ]]; then
+  user_id="$(/usr/bin/id -u "$target_user")"
+  home_record="$(/usr/bin/dscl . -read "/Users/$target_user" NFSHomeDirectory)"
+  home_directory="${home_record#NFSHomeDirectory: }"
+  launch_agents_directory="$home_directory/Library/LaunchAgents"
+  /bin/launchctl bootout "gui/$user_id/$watchdog_label" 2>/dev/null || true
+  /bin/launchctl bootout "gui/$user_id/$service_label" 2>/dev/null || true
+  /bin/rm -f \
+    "$launch_agents_directory/$watchdog_label.plist" \
+    "$launch_agents_directory/$service_label.plist"
+fi
+
+/bin/rm -rf "$support_root"
+/usr/sbin/pkgutil --forget "$package_identifier" >/dev/null 2>&1 || true
+/bin/rm -f /usr/local/bin/container-gui-enable /usr/local/bin/container-gui-uninstall
+
+print "Container GUI package files and LaunchAgents were removed."
+print "User logs and older per-user source installations were retained."

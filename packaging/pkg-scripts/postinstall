@@ -1,0 +1,11 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+readonly target_volume="${3:-/}"
+if [[ "$target_volume" != "/" ]]; then
+  print "Container GUI payload was installed on $target_volume without loading a user service."
+  exit 0
+fi
+
+/usr/local/bin/container-gui-enable --allow-no-user
