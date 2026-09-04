@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 final class FoundationProcessExecutor: CommandExecuting, @unchecked Sendable {
     private final class StreamState: @unchecked Sendable {
@@ -75,6 +76,10 @@ final class FoundationProcessExecutor: CommandExecuting, @unchecked Sendable {
         let process = Process()
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
+        defer {
+            try? stdoutPipe.fileHandleForReading.close()
+            try? stderrPipe.fileHandleForReading.close()
+        }
         process.executableURL = request.executableURL
         process.arguments = request.arguments
         process.environment = request.environment
@@ -122,26 +127,30 @@ final class FoundationProcessExecutor: CommandExecuting, @unchecked Sendable {
                         return .timeout
                     }
 
-                    var stdoutEnded = false
-                    var stderrEnded = false
-                    var status: Int32?
-                    while let event = try await group.next() {
-                        try Task.checkCancellation()
-                        switch event {
-                        case .stdoutEnded: stdoutEnded = true
-                        case .stderrEnded: stderrEnded = true
-                        case .exited(let code): status = code
-                        case .timeout:
-                            Self.terminate(process)
-                            group.cancelAll()
-                            throw CommandExecutionError.timedOut
+                    do {
+                        var stdoutEnded = false
+                        var stderrEnded = false
+                        var status: Int32?
+                        while let event = try await group.next() {
+                            try Task.checkCancellation()
+                            switch event {
+                            case .stdoutEnded: stdoutEnded = true
+                            case .stderrEnded: stderrEnded = true
+                            case .exited(let code): status = code
+                            case .timeout: throw CommandExecutionError.timedOut
+                            }
+                            if stdoutEnded, stderrEnded, let status {
+                                group.cancelAll()
+                                return status
+                            }
                         }
-                        if stdoutEnded, stderrEnded, let status {
-                            group.cancelAll()
-                            return status
-                        }
+                        throw CommandExecutionError.streamFailed
+                    } catch {
+                        // Cleanup must happen before the task group waits for its readers.
+                        group.cancelAll()
+                        await Self.terminateAndWait(process)
+                        throw error
                     }
-                    throw CommandExecutionError.streamFailed
                 }
             } onCancel: {
                 Self.terminate(process)
@@ -238,12 +247,45 @@ final class FoundationProcessExecutor: CommandExecuting, @unchecked Sendable {
         accumulator: OutputAccumulator,
         toStdout: Bool
     ) async throws {
+        let descriptor = handle.fileDescriptor
+        let flags = fcntl(descriptor, F_GETFL)
+        guard flags >= 0, fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) == 0 else {
+            throw CommandExecutionError.streamFailed
+        }
+        var buffer = [UInt8](repeating: 0, count: 64 * 1024)
         while true {
             try Task.checkCancellation()
-            let data = try handle.read(upToCount: 64 * 1024) ?? Data()
-            if data.isEmpty { return }
-            try await accumulator.append(data, toStdout: toStdout)
+            let count = Darwin.read(descriptor, &buffer, buffer.count)
+            if count == 0 { return }
+            if count > 0 {
+                try await accumulator.append(Data(buffer.prefix(count)), toStdout: toStdout)
+            } else if errno == EINTR {
+                continue
+            } else if errno == EAGAIN || errno == EWOULDBLOCK {
+                // An inherited pipe can outlive the direct child. Never block cancellation on EOF.
+                try await Task.sleep(for: .milliseconds(10))
+            } else {
+                throw CommandExecutionError.streamFailed
+            }
         }
+    }
+
+    private static func terminateAndWait(_ process: Process) async {
+        // This bounded cleanup must also run when its caller is already cancelled.
+        await Task.detached {
+            guard process.isRunning else { return }
+            process.terminate()
+            let clock = ContinuousClock()
+            let gracefulDeadline = clock.now.advanced(by: .milliseconds(200))
+            while process.isRunning, clock.now < gracefulDeadline {
+                try? await Task.sleep(for: .milliseconds(10))
+            }
+            if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+            let reapDeadline = clock.now.advanced(by: .milliseconds(200))
+            while process.isRunning, clock.now < reapDeadline {
+                try? await Task.sleep(for: .milliseconds(10))
+            }
+        }.value
     }
 
     private static func terminate(_ process: Process) {

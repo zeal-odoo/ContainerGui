@@ -10,7 +10,7 @@ final class SSHStatusAPITests: XCTestCase {
         let readyChecker = StubSSHReadinessChecker(isReady: true)
         let readyApp = makeApplication(state: .running, connection: connection, checker: readyChecker)
 
-        try await readyApp.test(.router) { client in
+        try await readyApp.testLocal { client in
             try await client.execute(uri: "/api/v1/containers/ssh-demo/ssh", method: .get) { response in
                 XCTAssertEqual(response.status, .ok)
                 let status = try JSONDecoder.containerGUI.decode(ContainerSSHStatus.self, from: response.body)
@@ -24,7 +24,7 @@ final class SSHStatusAPITests: XCTestCase {
 
         let pendingChecker = StubSSHReadinessChecker(isReady: false)
         let pendingApp = makeApplication(state: .running, connection: connection, checker: pendingChecker)
-        try await pendingApp.test(.router) { client in
+        try await pendingApp.testLocal { client in
             try await client.execute(uri: "/api/v1/containers/ssh-demo/ssh", method: .get) { response in
                 let status = try JSONDecoder.containerGUI.decode(ContainerSSHStatus.self, from: response.body)
                 XCTAssertEqual(status.state, .initializing)
@@ -40,7 +40,7 @@ final class SSHStatusAPITests: XCTestCase {
         ] {
             let checker = StubSSHReadinessChecker(isReady: true)
             let app = makeApplication(state: state, connection: connection, checker: checker)
-            try await app.test(.router) { client in
+            try await app.testLocal { client in
                 try await client.execute(uri: "/api/v1/containers/ssh-demo/ssh", method: .get) { response in
                     let status = try JSONDecoder.containerGUI.decode(ContainerSSHStatus.self, from: response.body)
                     XCTAssertEqual(status.state, expectedState)

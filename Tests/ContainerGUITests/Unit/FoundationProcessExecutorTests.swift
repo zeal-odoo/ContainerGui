@@ -120,6 +120,67 @@ final class FoundationProcessExecutorTests: XCTestCase {
         }
     }
 
+    func testOutputOverflowStopsHeldPipesAndReleasesChildPromptly() async throws {
+        for redirect in ["", ">&2"] {
+            let pidFile = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: pidFile) }
+            let clock = ContinuousClock()
+            let started = clock.now
+            do {
+                _ = try await executor.run(CommandRequest(
+                    executableURL: URL(fileURLWithPath: "/bin/sh"),
+                    arguments: ["-c", "printf '%d' $$ > \"$1\"; /usr/bin/head -c 65536 /dev/zero \(redirect); exec /bin/sleep 3", "probe", pidFile.path],
+                    timeout: .seconds(1),
+                    maximumOutputBytes: 12
+                ))
+                XCTFail("Expected output limit")
+            } catch let error as CommandExecutionError {
+                XCTAssertEqual(error, .outputLimitExceeded(limit: 12))
+            }
+            XCTAssertLessThan(started.duration(to: clock.now), .milliseconds(1500))
+            let pid = try XCTUnwrap(Int32(String(contentsOf: pidFile, encoding: .utf8)))
+            XCTAssertNotEqual(kill(pid, 0), 0, "overflow must release the CLI child")
+        }
+    }
+
+    func testTimeoutDoesNotWaitForDescendantHoldingAnInheritedPipe() async throws {
+        let clock = ContinuousClock()
+        let started = clock.now
+        do {
+            _ = try await executor.run(CommandRequest(
+                executableURL: URL(fileURLWithPath: "/bin/sh"),
+                arguments: ["-c", "/bin/sleep 2 & exit 0"],
+                timeout: .milliseconds(100),
+                maximumOutputBytes: 64
+            ))
+            XCTFail("Expected timeout")
+        } catch let error as CommandExecutionError {
+            XCTAssertEqual(error, .timedOut)
+        }
+        XCTAssertLessThan(started.duration(to: clock.now), .seconds(1))
+    }
+
+    func testTimeoutEscalatesWhenChildIgnoresTermination() async throws {
+        let pidFile = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: pidFile) }
+        let clock = ContinuousClock()
+        let started = clock.now
+        do {
+            _ = try await executor.run(CommandRequest(
+                executableURL: URL(fileURLWithPath: "/bin/sh"),
+                arguments: ["-c", "trap '' TERM; printf '%d' $$ > \"$1\"; exec /bin/sleep 3", "probe", pidFile.path],
+                timeout: .milliseconds(100),
+                maximumOutputBytes: 64
+            ))
+            XCTFail("Expected timeout")
+        } catch let error as CommandExecutionError {
+            XCTAssertEqual(error, .timedOut)
+        }
+        XCTAssertLessThan(started.duration(to: clock.now), .milliseconds(1500))
+        let pid = try XCTUnwrap(Int32(String(contentsOf: pidFile, encoding: .utf8)))
+        XCTAssertNotEqual(kill(pid, 0), 0, "SIGTERM-resistant child must be reaped")
+    }
+
     func testStreamCancellationTerminatesChildProcess() async throws {
         let stream = executor.stream(
             CommandRequest(

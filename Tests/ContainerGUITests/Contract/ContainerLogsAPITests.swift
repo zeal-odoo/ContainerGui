@@ -13,7 +13,7 @@ final class ContainerLogsAPITests: XCTestCase {
         ContainerControlRoutes.registerLogs(on: router, reader: reader, limiter: LogSessionLimiter(maximumSessions: 8))
         let app = Application(router: router)
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             try await client.execute(uri: "/api/v1/containers/demo/logs?tail=25", method: .get) { response in
                 XCTAssertEqual(response.status, .ok)
                 let logs = try JSONDecoder.containerGUI.decode(RecentLogs.self, from: response.body)

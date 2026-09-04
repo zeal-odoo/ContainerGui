@@ -10,7 +10,7 @@ final class ContainerMetricsAPITests: XCTestCase {
         let reader = StubMetricsReader()
         let app = makeApplication(reader: reader)
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             try await client.execute(uri: "/api/v1/containers/metrics", method: .get) { response in
                 XCTAssertEqual(response.status, .ok)
                 XCTAssertTrue(response.headers[.contentType]?.hasPrefix("application/json") == true)
@@ -31,7 +31,7 @@ final class ContainerMetricsAPITests: XCTestCase {
         let reader = StubMetricsReader(metricsTimeOut: true)
         let app = makeApplication(reader: reader)
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             try await client.execute(uri: "/api/v1/containers/metrics", method: .get) { response in
                 XCTAssertEqual(response.status, .gatewayTimeout)
                 XCTAssertTrue(response.headers[.contentType]?.hasPrefix("application/problem+json") == true)
@@ -50,7 +50,7 @@ final class ContainerMetricsAPITests: XCTestCase {
         let reader = StubMetricsReader(metricsDelay: .seconds(30))
         let app = makeApplication(reader: reader, metricsTimeout: .milliseconds(50))
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             try await client.execute(uri: "/api/v1/containers/metrics", method: .get) { response in
                 XCTAssertEqual(response.status, .gatewayTimeout)
                 let problem = try JSONDecoder.containerGUI.decode(ProblemDetail.self, from: response.body)

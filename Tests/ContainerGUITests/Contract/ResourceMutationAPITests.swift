@@ -17,7 +17,7 @@ final class ResourceMutationAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             try await client.execute(uri: "/api/v1/images", method: .get) { response in
                 XCTAssertEqual(response.status, .ok)
                 let list = try JSONDecoder.containerGUI.decode(ImageList.self, from: response.body)
@@ -74,7 +74,7 @@ final class ResourceMutationAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [
                 .origin: expectedOrigin,
                 .contentType: "application/json",
@@ -104,7 +104,7 @@ final class ResourceMutationAPITests: XCTestCase {
         let key = UUID().uuidString
         let body = ByteBuffer(string: #"{"reference":"docker.io/library/postgres:latest","confirmationTarget":"docker.io/library/postgres:latest"}"#)
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [
                 .origin: expectedOrigin,
                 .contentType: "application/json",
@@ -153,7 +153,7 @@ final class ResourceMutationAPITests: XCTestCase {
             (StubImageManager(mode: .existingContainer), "docker.io/library/postgres:latest", .stateConflict),
         ] {
             let app = makeImageApplication(manager: manager)
-            try await app.test(.router) { client in
+            try await app.testLocal { client in
                 let headers: HTTPFields = [
                     .origin: expectedOrigin,
                     .contentType: "application/json",
@@ -182,7 +182,7 @@ final class ResourceMutationAPITests: XCTestCase {
         let headerName = idempotencyName
         let reference = "ghcr.io/apple/containerization/vminit:0.33.3"
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [
                 .origin: expectedOrigin,
                 .contentType: "application/json",
@@ -211,7 +211,7 @@ final class ResourceMutationAPITests: XCTestCase {
         let key = UUID().uuidString
         let secret = "must-never-appear-in-operation"
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [
                 .origin: expectedOrigin,
                 .contentType: "application/json",
@@ -276,7 +276,7 @@ final class ResourceMutationAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [
                 .origin: expectedOrigin,
                 .contentType: "application/json",
@@ -330,7 +330,7 @@ final class ResourceMutationAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [
                 .origin: expectedOrigin,
                 .contentType: "application/json",
@@ -377,7 +377,7 @@ final class ResourceMutationAPITests: XCTestCase {
         for (request, expectedFields) in requests {
             let manager = StubImageManager()
             let app = makeImageApplication(manager: manager)
-            try await app.test(.router) { client in
+            try await app.testLocal { client in
                 let headers: HTTPFields = [
                     .origin: expectedOrigin,
                     .contentType: "application/json",
@@ -410,7 +410,7 @@ final class ResourceMutationAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [
                 .origin: expectedOrigin,
                 .contentType: "application/json",
@@ -439,7 +439,7 @@ final class ResourceMutationAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [
                 .origin: expectedOrigin,
                 .contentType: "application/json",
@@ -483,7 +483,7 @@ final class ResourceMutationAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [
                 .origin: expectedOrigin,
                 .contentType: "application/json",
@@ -520,7 +520,7 @@ final class ResourceMutationAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [
                 .origin: expectedOrigin,
                 .contentType: "application/json",
@@ -550,7 +550,7 @@ final class ResourceMutationAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [
                 .origin: expectedOrigin,
                 .contentType: "application/json",
@@ -577,7 +577,7 @@ final class ResourceMutationAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [
                 .origin: expectedOrigin,
                 .contentType: "application/json",
@@ -609,7 +609,7 @@ final class ResourceMutationAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [
                 .origin: expectedOrigin,
                 .contentType: "application/json",
@@ -638,7 +638,7 @@ final class ResourceMutationAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [
                 .origin: expectedOrigin,
                 .contentType: "application/json",

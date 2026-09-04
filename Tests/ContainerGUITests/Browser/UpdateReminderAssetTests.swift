@@ -14,7 +14,7 @@ final class UpdateReminderAssetTests: XCTestCase {
         XCTAssertTrue(html.contains("id=\"updateReleaseLink\""))
         XCTAssertTrue(html.contains("target=\"_blank\""))
         XCTAssertTrue(html.contains("rel=\"noopener noreferrer\""))
-        XCTAssertTrue(html.contains("src=\"/update-check.js?v=2.17.0\""))
+        XCTAssertTrue(html.contains("src=\"/update-check.js?v=\(AppVersion.current)\""))
         XCTAssertTrue(html.contains("检查更新"))
         XCTAssertTrue(html.contains("前往 GitHub 下载 PKG"))
     }

@@ -10,7 +10,7 @@ final class UpdateCheckAPITests: XCTestCase {
         let checker = StubUpdateChecker()
         let app = makeApplication(checker: checker)
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             try await client.execute(uri: "/api/v1/update-check", method: .get) { response in
                 XCTAssertEqual(response.status, .ok)
                 let summary = try JSONDecoder.containerGUI.decode(UpdateSummary.self, from: response.body)
@@ -31,7 +31,7 @@ final class UpdateCheckAPITests: XCTestCase {
         let checker = StubUpdateChecker(problem: ProblemDetail(code: .updateCheckUnavailable))
         let app = makeApplication(checker: checker)
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             try await client.execute(uri: "/api/v1/update-check", method: .get) { response in
                 XCTAssertEqual(response.status, .badGateway)
                 XCTAssertTrue(response.headers[.contentType]?.hasPrefix("application/problem+json") == true)

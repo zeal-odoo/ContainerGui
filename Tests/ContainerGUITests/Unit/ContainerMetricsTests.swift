@@ -173,6 +173,30 @@ final class ContainerMetricsTests: XCTestCase {
         XCTAssertEqual(invocationCount, 1)
     }
 
+    func testOutputLimitFailureReleasesSharedSampleForTheNextRequest() async throws {
+        let sampler = ContainerMetricsSampler()
+        let batch = batch(cpu: 1, memory: 1, limit: 2, offset: 0)
+        let clock = ContinuousClock()
+        let started = clock.now
+        do {
+            _ = try await sampler.snapshot {
+                _ = try await FoundationProcessExecutor().run(CommandRequest(
+                    executableURL: URL(fileURLWithPath: "/bin/sh"),
+                    arguments: ["-c", "/usr/bin/head -c 65536 /dev/zero; exec /bin/sleep 3"],
+                    timeout: .seconds(1),
+                    maximumOutputBytes: 12
+                ))
+                return batch
+            }
+            XCTFail("Expected output limit")
+        } catch let error as CommandExecutionError {
+            XCTAssertEqual(error, .outputLimitExceeded(limit: 12))
+        }
+        let recovered = try await sampler.snapshot { batch }
+        XCTAssertEqual(recovered.items.first?.containerID, "demo-running")
+        XCTAssertLessThan(started.duration(to: clock.now), .milliseconds(1500))
+    }
+
     func testCLIUsesFixedReadOnlyStatsCommand() async throws {
         let executor = MetricsCommandExecutor(results: [
             CommandResult(

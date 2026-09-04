@@ -50,6 +50,21 @@ final class PackageAssetsTests: XCTestCase {
         XCTAssertFalse(uninstaller.contains("/Users/mingliu"))
     }
 
+    func testHomePathOperationsDropPrivilegesBeforeFollowingUserControlledPaths() throws {
+        let enable = try asset("packaging/bin/container-gui-enable")
+        let renderer = try asset("scripts/render-launch-agents.sh")
+        let uninstaller = try asset("packaging/bin/container-gui-uninstall")
+
+        XCTAssertTrue(enable.contains("/usr/bin/sudo -H -u \"#$user_id\" -- /usr/bin/env -i"))
+        XCTAssertTrue(enable.contains("/bin/zsh -f \"$runtime_directory/render-launch-agents.sh\""))
+        XCTAssertFalse(enable.contains("/bin/mkdir"))
+        XCTAssertFalse(enable.contains("/usr/sbin/chown"))
+        XCTAssertFalse(enable.contains("/bin/chmod"))
+        XCTAssertTrue(renderer.contains("if (( EUID == 0 )); then"))
+        XCTAssertTrue(renderer.contains("umask 077"))
+        XCTAssertTrue(uninstaller.contains("/usr/bin/sudo -H -u \"#$user_id\" -- /bin/rm -f"))
+    }
+
     private var repositoryRoot: URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

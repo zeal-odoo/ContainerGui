@@ -32,7 +32,10 @@ if [[ -z "$target_user" || "$target_user" == "root" || "$target_user" == "loginw
 fi
 
 readonly user_id="$(/usr/bin/id -u "$target_user")"
-readonly user_group="$(/usr/bin/id -gn "$target_user")"
+if (( user_id == 0 )); then
+  print -u2 "Container GUI must run as a non-root user."
+  exit 77
+fi
 readonly launch_domain="gui/$user_id"
 home_record="$(/usr/bin/dscl . -read "/Users/$target_user" NFSHomeDirectory)"
 readonly home_directory="${home_record#NFSHomeDirectory: }"
@@ -55,17 +58,15 @@ for candidate in /usr/local/bin/container /opt/homebrew/bin/container; do
 done
 readonly container_cli_path
 
-/bin/mkdir -p "$launch_agents_directory" "$log_directory"
-/usr/sbin/chown "$target_user:$user_group" "$launch_agents_directory" "$log_directory"
-/bin/chmod 700 "$log_directory"
-
-"$runtime_directory/render-launch-agents.sh" \
+# Home paths are user-controlled, including ancestor symlinks. Drop privileges
+# before any filesystem operation; never repair these paths with root chown.
+/usr/bin/sudo -H -u "#$user_id" -- /usr/bin/env -i \
+  PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+  /bin/zsh -f "$runtime_directory/render-launch-agents.sh" \
   "$launch_agents_directory" \
   "$runtime_directory" \
   "$log_directory" \
   "$container_cli_path"
-/usr/sbin/chown "$target_user:$user_group" "$service_plist" "$watchdog_plist"
-/bin/chmod 600 "$service_plist" "$watchdog_plist"
 
 /bin/launchctl bootout "$launch_domain/$watchdog_label" 2>/dev/null || true
 /bin/launchctl bootout "$launch_domain/$service_label" 2>/dev/null || true

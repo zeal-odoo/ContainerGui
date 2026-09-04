@@ -14,7 +14,7 @@ final class LocalAccessCompatibilityTests: XCTestCase {
         )
         let app = Application(router: router)
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             for uri in ["/", "/api/v1"] {
                 try await client.execute(uri: uri, method: .get) { response in
                     XCTAssertEqual(response.status, .ok)

@@ -2,6 +2,13 @@
 
 set -euo pipefail
 
+if (( EUID == 0 )); then
+  print -u2 "Render LaunchAgents as the target user, not root."
+  exit 77
+fi
+
+umask 077
+
 if (( $# < 3 || $# > 4 )); then
   print -u2 "Usage: $0 OUTPUT_DIRECTORY RUNTIME_DIRECTORY LOG_DIRECTORY [CONTAINER_CLI_PATH]"
   exit 64
@@ -17,7 +24,15 @@ readonly service_path="$runtime_directory/ContainerGUI"
 readonly watchdog_path="$runtime_directory/container-gui-watchdog.sh"
 readonly command_path="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
-/bin/mkdir -p "$output_directory"
+for target_path in "$output_directory" "$log_directory" "$service_plist" "$watchdog_plist"; do
+  if [[ -L "$target_path" ]]; then
+    print -u2 "Refusing a symlinked LaunchAgent or log target: $target_path"
+    exit 73
+  fi
+done
+
+/bin/mkdir -p "$output_directory" "$log_directory"
+/bin/chmod 700 "$log_directory"
 
 /usr/bin/plutil -create xml1 "$service_plist"
 /usr/bin/plutil -insert Label -string "com.msj.container-gui" "$service_plist"
@@ -46,4 +61,5 @@ readonly command_path="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:
 /usr/bin/plutil -insert StandardOutPath -string "$log_directory/watchdog.log" "$watchdog_plist"
 /usr/bin/plutil -insert StandardErrorPath -string "$log_directory/watchdog-error.log" "$watchdog_plist"
 
+/bin/chmod 600 "$service_plist" "$watchdog_plist"
 /usr/bin/plutil -lint "$service_plist" "$watchdog_plist"

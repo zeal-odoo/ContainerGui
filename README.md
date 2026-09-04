@@ -6,7 +6,7 @@ A lightweight local web interface for Apple [`container`](https://github.com/app
 
 [中文](#中文说明) · [English](#english-guide)
 
-**GUI v2.17.0** · Apple `container` `1.3.x` · `http://127.0.0.1:8787`
+**GUI v2.17.1** · Apple `container` `1.3.x` · `http://127.0.0.1:8787`
 
 > Container GUI is a local, single-user tool. It never listens on the LAN or public Internet and is not a replacement for Docker Desktop, Compose, Kubernetes, or a multi-user remote administration platform.
 >
@@ -182,7 +182,9 @@ GUI 也支持显式 root 公钥登录。root 模式仍禁用密码、键盘交�
 ### 安全模型
 
 - 服务固定监听 `127.0.0.1`，不接受局域网或公网连接。
-- 本机界面不要求账号或令牌；写操作仍校验精确同源、JSON 类型和请求大小。因此只应在受信任的单用户 Mac 上运行，不适用于共享或不可信主机。
+- 本机界面不要求账号或令牌；所有请求仅接受配置的 `127.0.0.1:端口` Host，拒绝重复 Host 和显式跨域 Origin。写操作另需精确同源、JSON 类型和请求大小校验。请使用界面所示的 IP 地址，不使用自定义域名或反向代理。
+- PKG 激活和卸载脚本以目标用户权限处理用户目录，避免符号链接将 root 写入或删除重定向到其他路径；CLI 输出超限、超时或取消时会有界清理子进程和管道。
+- 只应在受信任的单用户 Mac 上运行，不适用于共享或不可信主机；这些限制不用于隔离已经在本机运行的恶意程序。
 - 浏览器只提交结构化字段；服务端不提供任意主机 shell 或任意 `container` 子命令入口。
 - 启动、停止、重启、创建、拉取和删除均具有操作记录、目标互斥、幂等保护和完成后的状态回读。
 - 删除不使用 `--all` 或 `--force`；运行中容器、被引用镜像和 Apple `vminit` 系统镜像受到保护。
@@ -408,7 +410,9 @@ When a newer release is available, the interface shows the current and latest ve
 ### Security model
 
 - The server always listens on `127.0.0.1` and rejects LAN or public access.
-- The local interface requires no account or token. Mutations still enforce exact Origin, JSON content type, and body-size checks. Run it only on a trusted single-user Mac, not a shared or untrusted host.
+- The local interface requires no account or token. Requests accept only the configured `127.0.0.1:port` Host and reject duplicate Host fields or an explicit cross-origin Origin. Mutations additionally enforce exact Origin, JSON content type, and body-size checks. Use the displayed IP address, not a custom hostname or reverse proxy.
+- PKG activation and removal handle home-directory paths as the target user, preventing symlinks from redirecting root writes or deletions. Captured CLI commands use bounded child/pipe cleanup on output overflow, timeout, or cancellation.
+- Run it only on a trusted single-user Mac, not a shared or untrusted host. These controls do not isolate malicious software already running locally.
 - The browser submits structured fields only; the backend does not expose arbitrary host-shell or arbitrary `container` command execution.
 - Start, stop, restart, create, pull, and delete operations use operation records, per-target exclusion, idempotency protection, and post-operation readback.
 - Delete workflows never use `--all` or `--force`; running containers, referenced images, and Apple’s `vminit` system image are protected.

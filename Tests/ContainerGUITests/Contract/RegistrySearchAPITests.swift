@@ -10,7 +10,7 @@ final class RegistrySearchAPITests: XCTestCase {
         let searcher = StubRegistrySearcher()
         let app = makeApplication(searcher: searcher)
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             try await client.execute(
                 uri: "/api/v1/registry-search/repositories?registry=dockerHub&query=postgres&page=2",
                 method: .get
@@ -46,7 +46,7 @@ final class RegistrySearchAPITests: XCTestCase {
         let searcher = StubRegistrySearcher()
         let app = makeApplication(searcher: searcher)
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             try await client.execute(
                 uri: "/api/v1/registry-search/repositories?registry=ghcr&ownerType=organization&owner=apple&page=1",
                 method: .get
@@ -66,7 +66,7 @@ final class RegistrySearchAPITests: XCTestCase {
         let searcher = StubRegistrySearcher()
         let app = makeApplication(searcher: searcher)
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             for (uri, expectedField) in [
                 ("/api/v1/registry-search/repositories?registry=dockerHub", "query"),
                 ("/api/v1/registry-search/repositories?registry=unknown&query=x", "registry"),

@@ -19,12 +19,16 @@ fi
 
 if [[ -n "$target_user" && "$target_user" != "root" && "$target_user" != "loginwindow" ]]; then
   user_id="$(/usr/bin/id -u "$target_user")"
+  if (( user_id == 0 )); then
+    print -u2 "Container GUI must be removed for a non-root user."
+    exit 77
+  fi
   home_record="$(/usr/bin/dscl . -read "/Users/$target_user" NFSHomeDirectory)"
   home_directory="${home_record#NFSHomeDirectory: }"
   launch_agents_directory="$home_directory/Library/LaunchAgents"
   /bin/launchctl bootout "gui/$user_id/$watchdog_label" 2>/dev/null || true
   /bin/launchctl bootout "gui/$user_id/$service_label" 2>/dev/null || true
-  /bin/rm -f \
+  /usr/bin/sudo -H -u "#$user_id" -- /bin/rm -f \
     "$launch_agents_directory/$watchdog_label.plist" \
     "$launch_agents_directory/$service_label.plist"
 fi

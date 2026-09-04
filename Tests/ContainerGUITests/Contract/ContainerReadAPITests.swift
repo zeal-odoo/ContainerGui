@@ -10,7 +10,7 @@ final class ContainerReadAPITests: XCTestCase {
         let reader = StubContainerReader()
         let app = makeApplication(reader: reader)
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             try await client.execute(uri: "/api/v1/system/health", method: .get) { response in
                 XCTAssertEqual(response.status, .ok)
                 let value = try JSONDecoder.containerGUI.decode(SystemHealth.self, from: response.body)
@@ -33,7 +33,7 @@ final class ContainerReadAPITests: XCTestCase {
         let reader = StubContainerReader(items: [])
         let app = makeApplication(reader: reader)
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             try await client.execute(uri: "/api/v1/containers", method: .get) { response in
                 XCTAssertEqual(response.status, .ok)
                 let value = try JSONDecoder.containerGUI.decode(ContainerList.self, from: response.body)
@@ -47,7 +47,7 @@ final class ContainerReadAPITests: XCTestCase {
         let reader = StubContainerReader(listProblem: ProblemDetail(code: .serviceUnavailable))
         let app = makeApplication(reader: reader)
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             try await client.execute(uri: "/api/v1/containers", method: .get) { response in
                 XCTAssertEqual(response.status, .serviceUnavailable)
                 XCTAssertTrue(response.headers[.contentType]?.hasPrefix("application/problem+json") == true)

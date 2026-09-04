@@ -38,6 +38,14 @@ struct SafetyMiddleware<Context: RequestContext>: RouterMiddleware {
         next: (Request, Context) async throws -> Response
     ) async throws -> Response {
         var request = incomingRequest
+        // HTTP/1 moves the first Host into authority and retains duplicate Host fields.
+        // Compare literally: resolving a hostname to loopback would allow DNS rebinding.
+        guard let authority = request.head.authority,
+              "http://\(authority)" == policy.expectedOrigin,
+              request.headers[HTTPField.Name("Host")!] == nil,
+              request.headers[.origin].map({ $0 == policy.expectedOrigin }) ?? true else {
+            return addSecurityHeaders(to: makeProblemResponse(ProblemDetail(code: .originRejected)))
+        }
         var response: Response
         if Self.isMutation(request.method) {
             let length = request.headers[.contentLength].flatMap(Int.init)

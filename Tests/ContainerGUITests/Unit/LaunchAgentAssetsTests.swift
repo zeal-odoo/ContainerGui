@@ -54,6 +54,83 @@ final class LaunchAgentAssetsTests: XCTestCase {
         ])
         XCTAssertEqual(watchdog["RunAtLoad"] as? Bool, true)
         XCTAssertEqual(watchdog["StartInterval"] as? Int, 30)
+
+        for name in ["com.msj.container-gui.plist", "com.msj.container-gui.watchdog.plist"] {
+            let attributes = try FileManager.default.attributesOfItem(atPath: temporaryDirectory.appendingPathComponent(name).path)
+            XCTAssertEqual(attributes[.posixPermissions] as? Int, 0o600)
+            XCTAssertEqual(attributes[.ownerAccountID] as? UInt32, getuid())
+        }
+        let logAttributes = try FileManager.default.attributesOfItem(atPath: logDirectory.path)
+        XCTAssertEqual(logAttributes[.posixPermissions] as? Int, 0o700)
+    }
+
+    func testRendererRejectsSymlinkedOutputAndLogTargets() throws {
+        for target in ["agents", "logs", "agents/com.msj.container-gui.plist", "agents/com.msj.container-gui.watchdog.plist"] {
+            let temporaryDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            try FileManager.default.createDirectory(at: temporaryDirectory.appendingPathComponent("agents"), withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
+            let destination = temporaryDirectory.appendingPathComponent("untouched")
+            try Data("unchanged".utf8).write(to: destination)
+            let symlink = temporaryDirectory.appendingPathComponent(target)
+            if target == "agents" { try FileManager.default.removeItem(at: symlink) }
+            try FileManager.default.createSymbolicLink(at: symlink, withDestinationURL: destination)
+
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+            process.arguments = [
+                "-f", repositoryRoot.appendingPathComponent("scripts/render-launch-agents.sh").path,
+                temporaryDirectory.appendingPathComponent("agents").path,
+                temporaryDirectory.appendingPathComponent("runtime").path,
+                temporaryDirectory.appendingPathComponent("logs").path,
+            ]
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            try process.run()
+            process.waitUntilExit()
+
+            XCTAssertNotEqual(process.terminationStatus, 0, target)
+            XCTAssertEqual(try String(contentsOf: destination, encoding: .utf8), "unchanged", target)
+        }
+    }
+
+    func testRendererHonorsUserPermissionsThroughASymlinkedParent() throws {
+        let temporaryDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let destination = temporaryDirectory.appendingPathComponent("destination")
+        let alias = temporaryDirectory.appendingPathComponent("home-link")
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: destination.path)
+            try? FileManager.default.removeItem(at: temporaryDirectory)
+        }
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: destination)
+
+        for writable in [false, true] {
+            try FileManager.default.setAttributes([.posixPermissions: writable ? 0o700 : 0o500], ofItemAtPath: destination.path)
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+            process.arguments = [
+                "-f", repositoryRoot.appendingPathComponent("scripts/render-launch-agents.sh").path,
+                alias.appendingPathComponent("agents").path,
+                temporaryDirectory.appendingPathComponent("runtime").path,
+                alias.appendingPathComponent("logs").path,
+            ]
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            try process.run()
+            process.waitUntilExit()
+            if writable {
+                XCTAssertEqual(process.terminationStatus, 0)
+                let plist = destination.appendingPathComponent("agents/com.msj.container-gui.plist")
+                let attributes = try FileManager.default.attributesOfItem(atPath: plist.path)
+                XCTAssertEqual(attributes[.ownerAccountID] as? UInt32, getuid())
+                XCTAssertEqual(attributes[.posixPermissions] as? Int, 0o600)
+            } else {
+                XCTAssertNotEqual(process.terminationStatus, 0)
+                XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: destination.path), [])
+                let attributes = try FileManager.default.attributesOfItem(atPath: destination.path)
+                XCTAssertEqual(attributes[.posixPermissions] as? Int, 0o500)
+            }
+        }
     }
 
     func testWatchdogUsesIdentityProbeAndForcedLaunchdRecovery() throws {

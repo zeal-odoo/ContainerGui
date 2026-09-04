@@ -17,7 +17,7 @@ final class ContainerControlAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [.origin: expectedOrigin, .contentType: "application/json", headerName: key]
             let first: ContainerGUI.Operation = try await client.execute(uri: "/api/v1/containers/demo/start", method: .post, headers: headers, body: ByteBuffer(string: "{}")) { response in
                 XCTAssertEqual(response.status, .accepted)
@@ -48,7 +48,7 @@ final class ContainerControlAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [.origin: expectedOrigin, .contentType: "application/json", headerName: key]
             let body = ByteBuffer(string: "{\"confirmationTarget\":\"demo\"}")
             let first: ContainerGUI.Operation = try await client.execute(
@@ -93,7 +93,7 @@ final class ContainerControlAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await runningApp.test(.router) { client in
+        try await runningApp.testLocal { client in
             let headers: HTTPFields = [.origin: expectedOrigin, .contentType: "application/json", headerName: UUID().uuidString]
             try await client.execute(
                 uri: "/api/v1/containers/demo/restart",
@@ -111,7 +111,7 @@ final class ContainerControlAPITests: XCTestCase {
 
         let stoppedController = StubController(state: .stopped)
         let stoppedApp = makeApplication(controller: stoppedController)
-        try await stoppedApp.test(.router) { client in
+        try await stoppedApp.testLocal { client in
             let headers: HTTPFields = [.origin: expectedOrigin, .contentType: "application/json", headerName: UUID().uuidString]
             try await client.execute(
                 uri: "/api/v1/containers/demo/restart",
@@ -134,7 +134,7 @@ final class ContainerControlAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [.origin: expectedOrigin, .contentType: "application/json", headerName: UUID().uuidString]
             let operation: ContainerGUI.Operation = try await client.execute(
                 uri: "/api/v1/containers/demo/restart",
@@ -165,7 +165,7 @@ final class ContainerControlAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [.origin: expectedOrigin, .contentType: "application/json", headerName: UUID().uuidString]
             let operation: ContainerGUI.Operation = try await client.execute(
                 uri: "/api/v1/containers/demo/restart",
@@ -201,7 +201,7 @@ final class ContainerControlAPITests: XCTestCase {
         for (failure, expectedCalls, expectedState) in cases {
             let controller = StubController(state: .running, failure: failure)
             let app = makeApplication(controller: controller)
-            try await app.test(.router) { client in
+            try await app.testLocal { client in
                 let headers: HTTPFields = [.origin: expectedOrigin, .contentType: "application/json", headerName: UUID().uuidString]
                 let operation: ContainerGUI.Operation = try await client.execute(
                     uri: "/api/v1/containers/demo/restart",
@@ -234,7 +234,7 @@ final class ContainerControlAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let restartHeaders: HTTPFields = [.origin: expectedOrigin, .contentType: "application/json", headerName: UUID().uuidString]
             let body = ByteBuffer(string: "{\"confirmationTarget\":\"demo\"}")
             try await client.execute(uri: "/api/v1/containers/demo/restart", method: .post, headers: restartHeaders, body: body) { response in
@@ -256,7 +256,7 @@ final class ContainerControlAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let sharedKey = UUID().uuidString
             let startHeaders: HTTPFields = [.origin: expectedOrigin, .contentType: "application/json", headerName: sharedKey]
             try await client.execute(uri: "/api/v1/containers/demo/start", method: .post, headers: startHeaders, body: ByteBuffer(string: "{}")) { response in
@@ -284,7 +284,7 @@ final class ContainerControlAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [.origin: expectedOrigin, .contentType: "application/json", headerName: UUID().uuidString]
             try await client.execute(
                 uri: "/api/v1/containers/demo/stop",
@@ -305,7 +305,7 @@ final class ContainerControlAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [.origin: expectedOrigin, .contentType: "application/json", headerName: UUID().uuidString]
             let operation: ContainerGUI.Operation = try await client.execute(
                 uri: "/api/v1/containers/demo/delete",
@@ -338,7 +338,7 @@ final class ContainerControlAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [.origin: expectedOrigin, .contentType: "application/json", headerName: UUID().uuidString]
             try await client.execute(
                 uri: "/api/v1/containers/demo/delete",
@@ -362,7 +362,7 @@ final class ContainerControlAPITests: XCTestCase {
         let expectedOrigin = origin
         let headerName = idempotencyName
 
-        try await app.test(.router) { client in
+        try await app.testLocal { client in
             let headers: HTTPFields = [.origin: expectedOrigin, .contentType: "application/json", headerName: UUID().uuidString]
             try await client.execute(
                 uri: "/api/v1/containers/demo/delete",
