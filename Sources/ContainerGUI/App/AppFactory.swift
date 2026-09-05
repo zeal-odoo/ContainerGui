@@ -46,9 +46,11 @@ enum AppFactory {
             operationTTL: configuration.operationTTL
         )
         let controlService = ContainerControlService(controller: reader, coordinator: coordinator)
+        let systemService = SystemControlService(controller: reader, coordinator: coordinator)
         let imageService = ImageMutationService(manager: reader, coordinator: coordinator)
         let creationService = ContainerCreationService(manager: reader, coordinator: coordinator)
         OperationRoutes.register(on: router, coordinator: coordinator)
+        SystemControlRoutes.register(on: router, service: systemService)
         ResourceMutationRoutes.registerImages(on: router, reader: reader, service: imageService)
         ResourceMutationRoutes.registerCreation(on: router, service: creationService)
         RegistrySearchRoutes.register(

@@ -6,7 +6,7 @@ A lightweight local web interface for Apple [`container`](https://github.com/app
 
 [中文](#中文说明) · [English](#english-guide)
 
-**GUI v2.17.1** · Apple `container` `1.3.x` · `http://127.0.0.1:8787`
+**GUI v2.18.0** · Apple `container` `1.3.x` · `http://127.0.0.1:8787`
 
 > Container GUI is a local, single-user tool. It never listens on the LAN or public Internet and is not a replacement for Docker Desktop, Compose, Kubernetes, or a multi-user remote administration platform.
 >
@@ -22,6 +22,7 @@ Container GUI 为 Apple `container` CLI 提供浏览器管理界面。后端直�
 
 | 任务 | 当前能力 |
 | --- | --- |
+| 启动系统服务 | 服务已停止或未注册时，顶部显示“启动 container”；只启动服务并验证健康状态，不自动启动已停止的容器 |
 | 查看容器 | 展示运行状态、镜像、IPv4/IPv6、CPU、内存和根文件系统容量，每 5 秒刷新 |
 | 查看详情 | 同一个按钮展开或收起详情；支持脱敏原始信息、最近日志和实时日志 |
 | 生命周期管理 | 启动、正常停止、重启和安全删除，并进行目标确认与状态回读 |
@@ -250,6 +251,7 @@ Key capabilities:
 
 | Task | Current capability |
 | --- | --- |
+| Start system service | The status card offers “Start container service” when stopped or unregistered; verifies health without automatically starting stopped containers |
 | Inspect containers | View runtime state, image, IPv4/IPv6, CPU, memory, and root-filesystem capacity with a five-second refresh interval |
 | Inspect details | Use the same button to open or close details, with redacted raw data, recent logs, and live logs |
 | Manage lifecycle | Start, gracefully stop, restart, and safely delete containers with target confirmation and authoritative readback |

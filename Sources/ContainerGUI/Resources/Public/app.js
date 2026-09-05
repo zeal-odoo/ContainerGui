@@ -4,6 +4,7 @@ const ENDPOINTS = {
   appInfo: "/api/v1",
   updateCheck: "/api/v1/update-check",
   health: "/api/v1/system/health",
+  systemStart: "/api/v1/system/start",
   containers: "/api/v1/containers",
   metrics: "/api/v1/containers/metrics",
   images: "/api/v1/images",
@@ -30,6 +31,7 @@ let toastExitTimer = null;
 
 const elements = Object.fromEntries([
   "appVersionBadge", "checkUpdatesButton", "versionBadge", "healthCard", "healthLabel", "healthDetail",
+  "startSystemButton", "systemStartHint", "systemOperationStatus",
   "totalCount", "runningCount", "stoppedCount", "observedAt", "searchInput",
   "loadingState", "emptyState", "errorState", "tableWrap", "containerRows",
   "detailPanel", "detailPlaceholder", "detailContent", "detailTitle", "detailFacts",
@@ -70,6 +72,7 @@ const elements = Object.fromEntries([
 const state = {
   containers: [], selectedID: null, selectedDetail: null, selectedSSHStatus: null, detailController: null,
   refreshing: false, submitting: false, eventSource: null,
+  systemHealth: null, startingSystem: false,
   reconnectAttempts: 0, reconnectTimer: null, metricsByID: new Map(), metricsStatus: "loading",
   images: [], imagesLoaded: false, localImagePage: 1, localImagePageSize: 10,
   containersLoaded: false, imageSubmitting: false, createSubmitting: false,
@@ -242,6 +245,7 @@ function setBusy(busy) {
 }
 
 function renderHealth(health) {
+  state.systemHealth = health;
   const compatibility = health.tool?.compatibility || "unrecognized";
   const version = health.tool?.semanticVersion || "未知版本";
   elements.versionBadge.textContent = compatibility === "supported" ? `container ${version}` : "CLI 不可用";
@@ -252,6 +256,41 @@ function renderHealth(health) {
   dot.className = "status-dot";
   dot.classList.add(health.serviceState === "healthy" ? "healthy" :
     ["stopped", "unregistered", "degraded"].includes(health.serviceState) ? "degraded" : "unavailable");
+  renderSystemStart();
+}
+
+function canStartSystem(health) {
+  return health?.tool?.compatibility === "supported"
+    && ["stopped", "unregistered"].includes(health.serviceState);
+}
+
+function renderSystemStart() {
+  elements.startSystemButton.hidden = !canStartSystem(state.systemHealth) && !state.startingSystem;
+  elements.startSystemButton.disabled = state.startingSystem;
+  elements.startSystemButton.setAttribute("aria-busy", String(state.startingSystem));
+  elements.startSystemButton.textContent = state.startingSystem ? "正在启动 container…" : "启动 container";
+  elements.systemStartHint.hidden = elements.startSystemButton.hidden;
+}
+
+async function startSystem() {
+  if (state.startingSystem || !canStartSystem(state.systemHealth)) return;
+  state.startingSystem = true;
+  renderSystemStart();
+  showOperationStatus("正在提交操作…", false, elements.systemOperationStatus);
+  try {
+    const operation = await fetchJSON(ENDPOINTS.systemStart, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+      body: "{}"
+    });
+    await pollOperation(operation.id, elements.systemOperationStatus);
+  } catch (error) {
+    showOperationStatus(formatProblem(error), true, elements.systemOperationStatus);
+  } finally {
+    await refreshDashboard();
+    state.startingSystem = false;
+    renderSystemStart();
+  }
 }
 
 function renderContainers() {
@@ -912,6 +951,8 @@ async function refreshDashboard({ announce = false } = {}) {
   ]);
   if (healthResult.status === "fulfilled") renderHealth(healthResult.value);
   else {
+    state.systemHealth = null;
+    renderSystemStart();
     elements.healthCard.setAttribute("aria-busy", "false");
     elements.healthLabel.textContent = "连接失败";
     elements.healthDetail.textContent = healthResult.reason.message;
@@ -1949,6 +1990,7 @@ function showToast(message) {
 
 elements.searchInput.addEventListener("input", renderContainers);
 elements.checkUpdatesButton.addEventListener("click", () => checkForUpdates());
+elements.startSystemButton.addEventListener("click", startSystem);
 elements.closeUpdateDialogButton.addEventListener("click", () => closeDialog(elements.updateDialog, "dismiss"));
 elements.closeDetailButton.addEventListener("click", closeDetail);
 elements.copySSHCommandButton.addEventListener("click", copySSHCommand);

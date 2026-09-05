@@ -356,9 +356,20 @@ h3 {
   gap: 2px;
 }
 
-.health-card span:last-child {
+.health-card #healthDetail,
+.health-card .system-start-hint {
   color: var(--md-sys-color-on-surface-variant);
   font-size: var(--md-sys-typescale-label-small-size);
+}
+
+#startSystemButton {
+  justify-self: start;
+  margin-top: 10px;
+}
+
+.system-start-hint,
+#systemOperationStatus {
+  margin: 8px 0 0;
 }
 
 .status-dot {

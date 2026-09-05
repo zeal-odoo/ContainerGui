@@ -35,6 +35,10 @@ protocol ContainerReading: Sendable {
     func containerDetail(id: String) async throws -> ContainerDetail
 }
 
+protocol SystemControlling: Sendable {
+    func startSystem() async throws -> SystemHealth
+}
+
 protocol ContainerMetricsReading: Sendable {
     func containerMetrics() async throws -> ContainerMetricsSnapshot
 }
@@ -71,7 +75,7 @@ protocol ContainerLogReading: Sendable {
     func followLogs(id: String, tail: Int) async throws -> AsyncThrowingStream<CommandStreamEvent, Error>
 }
 
-final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, ContainerControlling, ContainerLogReading, ImageReading, ResourceMutating, @unchecked Sendable {
+final class ContainerCLIClient: ContainerReading, SystemControlling, ContainerMetricsReading, ContainerControlling, ContainerLogReading, ImageReading, ResourceMutating, @unchecked Sendable {
     private let executor: any CommandExecuting
     private let executableURL: URL?
     private let unavailableCompatibility: CLICompatibility
@@ -162,6 +166,12 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
             throw error
         }
         guard result.exitCode == 0 else {
+            // CLI 1.3.x exits nonzero for a valid stopped/unregistered status.
+            if let health = try? CLIOutputParser.parseSystemHealth(
+                data: result.stdout, installation: tool, observedAt: observedAt
+            ), health.serviceState == .stopped || health.serviceState == .unregistered {
+                return health
+            }
             return SystemHealth(
                 tool: tool,
                 serviceState: .unavailable,
@@ -178,6 +188,22 @@ final class ContainerCLIClient: ContainerReading, ContainerMetricsReading, Conta
             installation: tool,
             observedAt: observedAt
         )
+    }
+
+    func startSystem() async throws -> SystemHealth {
+        try await requireSupportedInstallation()
+        let current = try await systemHealth()
+        if current.serviceState == .healthy { return current }
+        guard current.serviceState == .stopped || current.serviceState == .unregistered else {
+            throw ProblemDetail(code: .serviceUnavailable)
+        }
+        // Never prompt for, or implicitly install, a kernel from a GUI request.
+        let result = try await execute(
+            ["system", "start", "--disable-kernel-install", "--timeout", "20"],
+            timeout: mutationTimeout
+        )
+        guard result.exitCode == 0 else { throw ContainerCLIError.nonZeroExit(result.exitCode) }
+        return try await systemHealth()
     }
 
     func listContainers() async throws -> ContainerList {
