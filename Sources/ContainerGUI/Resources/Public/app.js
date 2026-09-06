@@ -30,6 +30,7 @@ let toastVisibilityTimer = null;
 let toastExitTimer = null;
 
 const elements = Object.fromEntries([
+  "pageTitle", "containersSection", "detailState", "detailExtraFacts", "workspaceOperationStatus",
   "appVersionBadge", "checkUpdatesButton", "versionBadge", "healthCard", "healthLabel", "healthDetail",
   "startSystemButton", "systemStartHint", "systemOperationStatus",
   "totalCount", "runningCount", "stoppedCount", "observedAt", "searchInput",
@@ -70,6 +71,7 @@ const elements = Object.fromEntries([
 ].map((id) => [id, document.getElementById(id)]));
 
 const state = {
+  activeView: "containers",
   containers: [], selectedID: null, selectedDetail: null, selectedSSHStatus: null, detailController: null,
   refreshing: false, submitting: false, eventSource: null,
   systemHealth: null, startingSystem: false,
@@ -93,6 +95,26 @@ const healthLabels = {
   healthy: "系统正常", stopped: "服务已停止", unregistered: "服务未注册",
   degraded: "服务异常", unavailable: "服务不可用", unknown: "状态未知"
 };
+
+function renderWorkspace() {
+  const requested = window.location.hash.slice(1);
+  const view = ["containers", "images", "registry"].includes(requested) ? requested : "containers";
+  if (state.activeView === "containers" && view !== "containers") stopFollowingLogs("已停止跟随");
+  state.activeView = view;
+  elements.containersSection.hidden = view !== "containers";
+  elements.imagesSection.hidden = view !== "images";
+  elements.remoteRegistrySection.hidden = view !== "registry";
+  elements.pageTitle.textContent = { containers: "容器", images: "本机镜像", registry: "镜像仓库" }[view];
+  elements.openCreateContainerButton.hidden = view === "registry";
+  for (const link of document.querySelectorAll("[data-view]")) {
+    if (link.dataset.view === view) link.setAttribute("aria-current", "page");
+    else link.removeAttribute("aria-current");
+  }
+}
+
+function shortImageReference(reference) {
+  return reference ? reference.replace(/^docker\.io\/(library\/)?/, "") : "—";
+}
 
 function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -251,6 +273,8 @@ function renderHealth(health) {
   elements.versionBadge.textContent = compatibility === "supported" ? `container ${version}` : "CLI 不可用";
   elements.healthLabel.textContent = healthLabels[health.serviceState] || healthLabels.unknown;
   elements.healthDetail.textContent = health.apiServerVersion || health.diagnosticMessage || "未返回服务版本";
+  elements.healthCard.dataset.state = health.serviceState;
+  elements.healthLabel.title = elements.healthDetail.textContent;
   elements.healthCard.setAttribute("aria-busy", "false");
   const dot = elements.healthCard.querySelector(".status-dot");
   dot.className = "status-dot";
@@ -302,6 +326,7 @@ function renderContainers() {
       .some((value) => value.toLocaleLowerCase(locale).includes(query))
   );
 
+  const focusedID = elements.containerRows.contains(document.activeElement) ? document.activeElement.dataset.detailId : null;
   elements.containerRows.replaceChildren();
   for (const container of visible) {
     const row = document.createElement("tr");
@@ -310,29 +335,29 @@ function renderContainers() {
     const name = document.createElement("span");
     name.className = "container-name";
     name.textContent = container.displayName;
-    const id = document.createElement("code");
-    id.textContent = container.id;
-    name.append(id);
+    const image = document.createElement("span");
+    image.className = "container-image";
+    image.textContent = shortImageReference(container.imageReference);
+    name.title = container.id;
+    image.title = container.imageReference || "";
     nameCell.append(name);
-    const imageCell = document.createElement("td");
-    imageCell.textContent = container.imageReference || "—";
+    nameCell.append(image);
     const stateCell = document.createElement("td");
     const pill = document.createElement("span");
     pill.className = `pill ${container.state}`;
     pill.textContent = stateLabels[container.state] || stateLabels.unknown;
     stateCell.append(pill);
     const cpuCell = document.createElement("td");
-    renderMetricCell(cpuCell, cpuDisplay(container));
+    const cpu = cpuDisplay(container);
+    renderMetricCell(cpuCell, { ...cpu, detail: cpu.detail?.replace("100% = ", "") });
     const memoryCell = document.createElement("td");
-    renderMetricCell(memoryCell, memoryDisplay(container));
-    const storageCell = document.createElement("td");
-    renderMetricCell(storageCell, storageDisplay(container));
-    const addressCell = document.createElement("td");
-    addressCell.textContent = container.ipv4Address || container.ipv6Address || "—";
+    const memory = memoryDisplay(container);
+    memoryCell.textContent = memory.detail || memory.value;
+    memoryCell.title = memory.value;
     const actionCell = document.createElement("td");
     const detailButton = document.createElement("button");
     detailButton.type = "button";
-    detailButton.className = "button secondary small";
+    detailButton.className = "detail-link";
     detailButton.textContent = "查看详情";
     detailButton.dataset.detailId = container.id;
     detailButton.dataset.detailName = container.displayName;
@@ -341,8 +366,9 @@ function renderContainers() {
     detailButton.setAttribute("aria-label", `查看 ${container.displayName} 的详情`);
     detailButton.addEventListener("click", () => toggleDetail(container.id));
     actionCell.append(detailButton);
-    row.append(nameCell, imageCell, stateCell, cpuCell, memoryCell, storageCell, addressCell, actionCell);
+    row.append(nameCell, stateCell, cpuCell, memoryCell, actionCell);
     elements.containerRows.append(row);
+    if (focusedID === container.id) detailButton.focus({ preventScroll: true });
   }
 
   elements.loadingState.hidden = true;
@@ -361,6 +387,7 @@ function syncDetailButtons() {
     const isExpanded = state.selectedID === button.dataset.detailId && !elements.detailContent.hidden;
     button.textContent = isExpanded ? "收起详情" : "查看详情";
     button.setAttribute("aria-expanded", String(isExpanded));
+    button.closest("tr").classList.toggle("is-selected", isExpanded);
     button.setAttribute(
       "aria-label",
       `${isExpanded ? "收起" : "查看"} ${button.dataset.detailName} 的详情`
@@ -494,6 +521,8 @@ function renderImages(snapshot) {
     name.append(identifier);
     nameCell.append(name);
     const digestCell = document.createElement("td");
+    digestCell.className = "digest-cell";
+    digestCell.title = image.digest;
     const digest = document.createElement("code");
     digest.textContent = image.digest;
     digestCell.append(digest);
@@ -954,8 +983,11 @@ async function refreshDashboard({ announce = false } = {}) {
     state.systemHealth = null;
     renderSystemStart();
     elements.healthCard.setAttribute("aria-busy", "false");
+    elements.healthCard.dataset.state = "unavailable";
+    elements.healthCard.querySelector(".status-dot").className = "status-dot unavailable";
     elements.healthLabel.textContent = "连接失败";
     elements.healthDetail.textContent = healthResult.reason.message;
+    elements.healthLabel.title = healthResult.reason.message;
   }
   if (listResult.status === "fulfilled") {
     state.containers = listResult.value.items;
@@ -992,6 +1024,21 @@ async function loadDetail(id, { quiet = false } = {}) {
   const controller = new AbortController();
   state.detailController = controller;
   const shouldReveal = elements.detailContent.hidden || state.selectedID !== id;
+  if (state.selectedID !== id) {
+    stopFollowingLogs();
+    state.selectedDetail = null;
+    elements.detailFacts.replaceChildren();
+    elements.detailExtraFacts.replaceChildren();
+    elements.containerActions.replaceChildren();
+    elements.detailState.hidden = true;
+    elements.sshConnectionPanel.hidden = true;
+    elements.operationStatus.hidden = true;
+    elements.rawDetail.textContent = "";
+    elements.logOutput.textContent = "";
+    elements.logStatus.textContent = "尚未读取";
+    elements.loadLogsButton.disabled = true;
+    elements.followLogsButton.disabled = true;
+  }
   state.selectedID = id;
   if (shouldReveal) revealDetailContent();
   syncDetailButtons();
@@ -1006,6 +1053,9 @@ async function loadDetail(id, { quiet = false } = {}) {
     renderSSHStatus(null, detail.summary);
     elements.rawDetail.textContent = JSON.stringify(detail.raw, null, 2);
     renderActions(detail.summary);
+    if (!quiet && window.matchMedia("(max-width: 900px)").matches) {
+      elements.detailPanel.scrollIntoView({ behavior: prefersReducedMotion() ? "instant" : "smooth", block: "start" });
+    }
     elements.loadLogsButton.disabled = false;
     elements.followLogsButton.disabled = false;
     await loadSSHStatus(id, { signal: controller.signal });
@@ -1084,9 +1134,20 @@ async function copySSHCommand() {
 
 function renderFacts(summary) {
   elements.detailFacts.replaceChildren();
+  elements.detailExtraFacts.replaceChildren();
+  elements.detailState.hidden = false;
+  elements.detailState.className = `pill ${summary.state}`;
+  elements.detailState.textContent = stateLabels[summary.state] || stateLabels.unknown;
   const cpu = cpuDisplay(summary);
   const memory = memoryDisplay(summary);
   const storage = storageDisplay(summary);
+  const essentials = [
+    ["镜像", shortImageReference(summary.imageReference)],
+    ["CPU 配置", Number.isInteger(summary.cpuCount) && summary.cpuCount > 0 ? `${summary.cpuCount} 核` : "—"],
+    ["内存", memory.detail || memory.value],
+    ["存储", storage.detail || storage.value],
+    ["IPv4", summary.ipv4Address || "—"]
+  ];
   const facts = [
     ["完整标识", summary.id], ["状态", stateLabels[summary.state] || stateLabels.unknown],
     ["原始状态", summary.rawState || "—"], ["镜像", summary.imageReference || "—"],
@@ -1097,12 +1158,14 @@ function renderFacts(summary) {
     ["创建时间", summary.createdAt ? formatTime(summary.createdAt) : "—"],
     ["读取时间", formatTime(summary.observedAt)]
   ];
-  for (const [label, value] of facts) {
-    const term = document.createElement("dt");
-    term.textContent = label;
-    const description = document.createElement("dd");
-    description.textContent = value;
-    elements.detailFacts.append(term, description);
+  for (const [target, entries] of [[elements.detailFacts, essentials], [elements.detailExtraFacts, facts]]) {
+    for (const [label, value] of entries) {
+      const term = document.createElement("dt");
+      term.textContent = label;
+      const description = document.createElement("dd");
+      description.textContent = value;
+      target.append(term, description);
+    }
   }
 }
 
@@ -1115,7 +1178,7 @@ function renderActions(summary) {
   if (summary.state === "running") {
     const restartButton = document.createElement("button");
     restartButton.type = "button";
-    restartButton.className = "button";
+    restartButton.className = "button secondary";
     restartButton.textContent = "重启容器";
     restartButton.disabled = state.submitting;
     restartButton.addEventListener("click", () => restartContainer(summary));
@@ -1142,12 +1205,18 @@ function renderActions(summary) {
 }
 
 function closeDetail() {
+  const selectedID = state.selectedID;
+  const returnFocus = elements.detailPanel.contains(document.activeElement);
   state.detailController?.abort();
   stopFollowingLogs("已停止跟随");
   state.selectedID = null;
   state.selectedDetail = null;
   state.selectedSSHStatus = null;
   syncDetailButtons();
+  if (returnFocus) {
+    const trigger = [...elements.containerRows.querySelectorAll("[data-detail-id]")].find((button) => button.dataset.detailId === selectedID);
+    (trigger || elements.searchInput).focus({ preventScroll: true });
+  }
   elements.sshConnectionPanel.hidden = true;
   if (detailRevealTimer !== null) {
     window.clearTimeout(detailRevealTimer);
@@ -1359,7 +1428,7 @@ function renderImagePullProgress(operation) {
 
 function showOperationStatus(message, isError = false, target = elements.operationStatus) {
   target.hidden = false;
-  target.className = `operation-status${target === elements.imageOperationStatus ? " resource-status" : ""}${isError ? " error" : ""}`;
+  target.className = `operation-status${target === elements.imageOperationStatus ? " resource-status" : target === elements.workspaceOperationStatus ? " workspace-status" : ""}${isError ? " error" : ""}`;
   target.textContent = message;
 }
 
@@ -1466,6 +1535,7 @@ async function submitImagePull(event) {
       body: JSON.stringify(body)
     });
     closeDialog(elements.pullImageDialog);
+    window.location.hash = "images";
     showOperationStatus("镜像拉取已排队", false, elements.imageOperationStatus);
     await pollOperation(operation.id, elements.imageOperationStatus);
   } catch (error) {
@@ -1827,8 +1897,9 @@ async function createContainer(event) {
     });
     elements.createEnvironment.value = "";
     closeDialog(elements.createContainerDialog);
-    showOperationStatus("容器创建已排队", false, elements.imageOperationStatus);
-    await pollOperation(operation.id, elements.imageOperationStatus);
+    showOperationStatus("容器创建已排队", false, elements.workspaceOperationStatus);
+    await pollOperation(operation.id, elements.workspaceOperationStatus);
+    window.location.hash = "containers";
     elements.createContainerForm.reset();
     elements.generatedSSHKeyStatus.textContent = "";
     updateImageSpecificCreateFields();
@@ -1837,7 +1908,7 @@ async function createContainer(event) {
     const errors = Object.fromEntries((error.problem?.fieldErrors || []).map((item) => [item.field, item.message]));
     renderCreateErrors(errors);
     elements.createFormStatus.textContent = formatProblem(error);
-    showOperationStatus(formatProblem(error), true, elements.imageOperationStatus);
+    showOperationStatus(formatProblem(error), true, elements.workspaceOperationStatus);
   } finally {
     state.createSubmitting = false;
     elements.submitCreateContainerButton.disabled = false;
@@ -1856,16 +1927,18 @@ function formatProblem(error) {
 
 async function loadRecentLogs() {
   if (!state.selectedID) return;
+  const selectedID = state.selectedID;
   elements.loadLogsButton.disabled = true;
   elements.logStatus.textContent = "正在读取最近日志…";
   try {
-    const logs = await fetchJSON(`${ENDPOINTS.containers}/${encodeURIComponent(state.selectedID)}/logs?tail=200`);
+    const logs = await fetchJSON(`${ENDPOINTS.containers}/${encodeURIComponent(selectedID)}/logs?tail=200`);
+    if (state.selectedID !== selectedID) return;
     elements.logOutput.textContent = logs.text;
     elements.logStatus.textContent = logs.truncated ? "最近日志（已截断）" : `读取于 ${formatTime(logs.observedAt)}`;
   } catch (error) {
-    elements.logStatus.textContent = formatProblem(error);
+    if (state.selectedID === selectedID) elements.logStatus.textContent = formatProblem(error);
   } finally {
-    elements.loadLogsButton.disabled = false;
+    if (state.selectedID === selectedID) elements.loadLogsButton.disabled = false;
   }
 }
 
@@ -1988,6 +2061,11 @@ function showToast(message) {
   }, 2200);
 }
 
+window.addEventListener("hashchange", () => {
+  renderWorkspace();
+  window.scrollTo({ top: 0, behavior: "instant" });
+  elements.pageTitle.focus({ preventScroll: true });
+});
 elements.searchInput.addEventListener("input", renderContainers);
 elements.checkUpdatesButton.addEventListener("click", () => checkForUpdates());
 elements.startSystemButton.addEventListener("click", startSystem);
@@ -2030,7 +2108,10 @@ elements.confirmDialog.querySelector("form").addEventListener("submit", (event) 
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape" || event.defaultPrevented) return;
   const openDialogElement = document.querySelector("dialog[open]");
-  if (!openDialogElement) return;
+  if (!openDialogElement) {
+    if (state.activeView === "containers" && state.selectedID) closeDetail();
+    return;
+  }
   event.preventDefault();
   closeDialog(openDialogElement, "cancel");
 });
@@ -2050,6 +2131,7 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") refreshDashboard();
 });
 document.addEventListener("container-gui-language-change", () => {
+  renderWorkspace();
   renderContainers();
   if (state.imagesLoaded) renderImages({ items: state.images });
   if (state.remoteSearchParameters) renderRemoteRepositories();
@@ -2067,6 +2149,7 @@ document.addEventListener("container-gui-language-change", () => {
 window.setInterval(() => {
   if (document.visibilityState === "visible") refreshDashboard();
 }, REFRESH_INTERVAL_MS);
+renderWorkspace();
 loadApplicationVersion();
 updateImageSpecificCreateFields();
 updateSSHFields();

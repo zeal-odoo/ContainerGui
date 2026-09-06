@@ -4,7 +4,7 @@ import XCTest
 @testable import ContainerGUI
 
 final class Material3AssetTests: XCTestCase {
-    func testMaterial3SemanticDesignTokensAreDefined() throws {
+    func testWorkbenchRetainsSemanticDesignTokens() throws {
         let style = try asset("app.css")
         let requiredTokens = [
             "--md-sys-color-primary",
@@ -67,17 +67,22 @@ final class Material3AssetTests: XCTestCase {
         XCTAssertTrue(style.contains("color-scheme: dark"))
     }
 
-    func testRestrainedGlassSurfacesHaveBlurAndOpaqueFallback() throws {
+    func testMercuryWorkbenchUsesOpaqueSurfacesAndSeparateNavigation() throws {
         let style = try asset("app.css")
+        let html = try asset("index.html")
 
-        XCTAssertTrue(style.contains("--md-sys-glass-blur"))
         XCTAssertTrue(style.contains(".topbar"))
         XCTAssertTrue(style.contains(".detail-panel"))
         XCTAssertTrue(style.contains("dialog"))
-        XCTAssertTrue(style.contains("-webkit-backdrop-filter"))
-        XCTAssertTrue(style.contains("backdrop-filter"))
-        XCTAssertTrue(style.contains("@supports not ((backdrop-filter"))
-        XCTAssertTrue(style.contains("@media (prefers-reduced-transparency: reduce)"))
+        XCTAssertFalse(style.contains("backdrop-filter"))
+        XCTAssertFalse(style.contains("radial-gradient"))
+        XCTAssertTrue(style.contains(".sidebar"))
+        XCTAssertTrue(style.contains(".container-table"))
+        XCTAssertTrue(style.contains("tbody tr.is-selected"))
+        for view in ["containers", "images", "registry"] {
+            XCTAssertTrue(html.contains("data-view=\"\(view)\""))
+        }
+        XCTAssertTrue(html.contains("id=\"detailExtraFacts\""))
     }
 
     func testHTMLDeclaresLocalThemeMetadataWithoutRemoteDependencies() throws {

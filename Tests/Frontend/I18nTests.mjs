@@ -32,6 +32,9 @@ test("dynamic interface patterns preserve user-owned identifiers and counts", ()
   assert.equal(api.translate("本页 10 条 · 共 75 条", "en"), "10 on this page · 75 total");
   assert.equal(api.translate("第 3 页", "en"), "Page 3");
   assert.equal(api.translate("100% = 3 核", "en"), "100% = 3 cores");
+  assert.equal(api.translate("3 核", "en"), "3 cores");
+  assert.equal(api.translate("1 核", "en"), "1 core");
+  assert.equal(api.translate("本机工作区", "en"), "Local workspace");
   assert.equal(api.translate("0.04% · 100% = 3 核", "en"), "0.04% · 100% = 3 cores");
   assert.equal(api.translate("当前版本 2.17.0 · 最新版本 2.18.0", "en"), "Current 2.17.0 · Latest 2.18.0");
   assert.equal(api.translate("容器命令执行失败。（CLI_EXIT_NONZERO）", "en"), "The container command failed. (CLI_EXIT_NONZERO)");

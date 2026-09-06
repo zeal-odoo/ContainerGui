@@ -4,64 +4,68 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#fffbfe" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#141218" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#191b20" media="(prefers-color-scheme: dark)">
   <title>Container GUI</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%236750a4'/%3E%3Cpath d='M17 18h30v28H17z' fill='none' stroke='white' stroke-width='5'/%3E%3Cpath d='M17 29h30M29 18v28' stroke='white' stroke-width='4'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/app.css?v=2.18.0">
+  <link rel="icon" href="/icons/cube.svg">
+  <link rel="stylesheet" href="/app.css?v=2.19.0">
 </head>
 <body>
-  <header class="topbar">
+  <a class="skip-link" href="#main">跳到主要内容</a>
+  <aside class="sidebar" aria-label="工作区导航">
     <a class="brand" href="#main" aria-label="Container GUI 首页">
-      <span class="brand-mark" aria-hidden="true">▣</span>
+      <img class="brand-mark" src="/icons/cube.svg" alt="" width="34" height="34">
       <span>Container GUI</span>
     </a>
+    <nav class="workspace-nav" aria-label="主要导航">
+      <a href="#containers" data-view="containers" aria-current="page"><img src="/icons/window.svg" alt="" width="22" height="22"><span>容器</span></a>
+      <a href="#images" data-view="images"><img src="/icons/square-3-stack-3d.svg" alt="" width="22" height="22"><span>本机镜像</span></a>
+      <a href="#registry" data-view="registry"><img src="/icons/square-3-stack-3d.svg" alt="" width="22" height="22"><span>镜像仓库</span></a>
+    </nav>
+    <div class="sidebar-footer">
+      <div id="healthCard" class="health-card" aria-live="polite" aria-busy="true">
+        <span class="status-dot unknown" aria-hidden="true"></span>
+        <div>
+          <strong id="healthLabel">正在连接</strong>
+          <span id="healthDetail" class="health-detail">等待系统状态</span>
+          <button id="startSystemButton" class="button" type="button" aria-describedby="systemStartHint" hidden>启动 container</button>
+          <p id="systemStartHint" class="system-start-hint" hidden>只启动系统服务，不会自动启动已停止的容器。</p>
+          <p id="systemOperationStatus" class="operation-status" role="status" hidden></p>
+        </div>
+      </div>
+      <span id="versionBadge" class="quiet">正在检查 CLI…</span>
+      <span id="appVersionBadge" class="app-version-badge" aria-live="polite">正在读取 GUI 版本…</span>
+    </div>
+  </aside>
+  <header class="topbar">
+    <span class="workspace-label">本机工作区</span>
     <div class="topbar-actions">
       <div id="languageSwitch" class="language-switch" role="group" aria-label="语言 / Language">
         <button type="button" data-language="zh" aria-pressed="true">中文</button>
         <button type="button" data-language="en" aria-pressed="false">English</button>
       </div>
       <button id="checkUpdatesButton" class="update-check-button" type="button">检查更新</button>
-      <span id="appVersionBadge" class="app-version-badge" aria-live="polite">正在读取 GUI 版本…</span>
-      <span id="versionBadge" class="quiet">正在检查 CLI…</span>
     </div>
   </header>
 
   <main id="main" class="page" tabindex="-1">
-    <section class="hero" aria-labelledby="pageTitle">
-      <div>
-        <p class="eyebrow">本机容器控制台</p>
-        <h1 id="pageTitle">容器运行状态</h1>
-        <p class="lede">所有状态直接读取 Apple container CLI，不保存影子副本。</p>
-      </div>
-      <div id="healthCard" class="health-card" aria-live="polite" aria-busy="true">
-        <span class="status-dot unknown" aria-hidden="true"></span>
-        <div>
-          <strong id="healthLabel">正在连接</strong>
-          <span id="healthDetail">等待系统状态</span>
-          <button id="startSystemButton" class="button" type="button" aria-describedby="systemStartHint" hidden>启动 container</button>
-          <p id="systemStartHint" class="system-start-hint" hidden>只启动系统服务，不会自动启动已停止的容器。</p>
-          <p id="systemOperationStatus" class="operation-status" role="status" hidden></p>
-        </div>
-      </div>
-    </section>
-
-    <section class="stats" aria-label="容器统计">
-      <article><span>全部</span><strong id="totalCount">—</strong></article>
-      <article><span>运行中</span><strong id="runningCount">—</strong></article>
-      <article><span>已停止</span><strong id="stoppedCount">—</strong></article>
-      <article><span>最后刷新</span><strong id="observedAt">—</strong></article>
-    </section>
-
-    <section class="workspace" aria-label="容器管理区域">
-      <div class="panel list-panel">
-        <div class="panel-header">
-          <div>
-            <p class="eyebrow">Containers</p>
-            <h2>容器概览</h2>
-          </div>
+    <div class="page-heading">
+      <h1 id="pageTitle" tabindex="-1">容器</h1>
+      <button id="openCreateContainerButton" class="button" type="button">创建容器</button>
+    </div>
+    <div id="workspaceOperationStatus" class="operation-status workspace-status" role="status" aria-live="polite" hidden></div>
+    <section id="containersSection" class="workspace" aria-label="容器管理区域">
+      <div class="panel list-panel" aria-label="容器概览">
+        <section class="stats" aria-label="容器统计">
+          <article><span>全部</span><strong id="totalCount">—</strong></article>
+          <article><span>运行中</span><strong id="runningCount">—</strong></article>
+          <article><span>已停止</span><strong id="stoppedCount">—</strong></article>
+          <article><span>最后刷新</span><strong id="observedAt">—</strong></article>
+        </section>
+        <div class="list-toolbar">
           <label class="search">
             <span class="sr-only">筛选容器</span>
+            <img src="/icons/magnifying-glass.svg" alt="" width="20" height="20">
             <input id="searchInput" type="search" placeholder="搜索名称、镜像或 ID">
           </label>
         </div>
@@ -69,33 +73,34 @@
         <div id="loadingState" class="state-block" role="status">正在读取容器…</div>
         <div id="emptyState" class="state-block" hidden>
           <strong>还没有容器</strong>
-          <span>可继续使用官方 CLI 创建容器，然后在这里刷新。</span>
+          <span>点击“创建容器”开始，状态会自动刷新。</span>
         </div>
         <div id="errorState" class="state-block error" role="alert" hidden></div>
 
         <div class="table-wrap" id="tableWrap" hidden>
-          <table>
+          <table class="container-table" aria-label="容器概览">
             <thead>
-              <tr><th>名称</th><th>镜像</th><th>状态</th><th scope="col">CPU</th><th scope="col">内存</th><th scope="col">存储</th><th>地址</th><th><span class="sr-only">操作</span></th></tr>
+              <tr><th scope="col">名称 / 镜像</th><th scope="col">状态</th><th scope="col">CPU</th><th scope="col">内存</th><th scope="col">操作</th></tr>
             </thead>
             <tbody id="containerRows"></tbody>
           </table>
         </div>
+        <p class="table-note">100% 代表分配的全部 CPU 核心。</p>
       </div>
 
-      <aside id="detailPanel" class="panel detail-panel" aria-labelledby="detailTitle">
+      <aside id="detailPanel" class="panel detail-panel" aria-label="容器详情">
         <div class="detail-placeholder" id="detailPlaceholder">
-          <span aria-hidden="true">⌁</span>
+          <img src="/icons/cube.svg" alt="" width="32" height="32">
           <strong>选择一个容器</strong>
           <p>查看权威详情、受控操作和日志。</p>
         </div>
         <div id="detailContent" hidden>
           <div class="panel-header">
             <div>
-              <p class="eyebrow">Container detail</p>
-              <h2 id="detailTitle">容器详情</h2>
+              <p class="detail-caption">容器详情</p>
+              <div class="detail-title-row"><h2 id="detailTitle">容器详情</h2><span id="detailState" class="pill" hidden></span></div>
             </div>
-            <button id="closeDetailButton" class="icon-button" type="button" aria-label="关闭详情">×</button>
+            <button id="closeDetailButton" class="icon-button" type="button" aria-label="关闭详情"><img src="/icons/x-mark.svg" alt="" width="20" height="20"></button>
           </div>
           <dl id="detailFacts" class="facts"></dl>
           <section id="sshConnectionPanel" class="ssh-connection-panel" aria-labelledby="sshConnectionTitle" aria-live="polite" hidden>
@@ -124,16 +129,16 @@
           </section>
           <details class="raw-detail">
             <summary>原始详情（已脱敏）</summary>
+            <dl id="detailExtraFacts" class="facts"></dl>
             <pre id="rawDetail" tabindex="0"></pre>
           </details>
         </div>
       </aside>
     </section>
 
-    <section id="imagesSection" class="panel resource-panel" aria-labelledby="imagesTitle">
+    <section id="imagesSection" class="panel resource-panel" aria-labelledby="imagesTitle" hidden>
       <div class="panel-header">
         <div>
-          <p class="eyebrow">Images</p>
           <div class="image-title-row">
             <h2 id="imagesTitle">本机镜像</h2>
             <button id="toggleImagesButton" class="disclosure-button" type="button"
@@ -144,7 +149,6 @@
           </div>
         </div>
         <div class="panel-actions">
-          <button id="openCreateContainerButton" class="button secondary" type="button">创建容器</button>
           <button id="openPullImageButton" class="button" type="button">拉取镜像</button>
         </div>
       </div>
@@ -181,10 +185,9 @@
       </div>
     </section>
 
-    <section id="remoteRegistrySection" class="panel resource-panel" aria-labelledby="remoteRegistryTitle">
+    <section id="remoteRegistrySection" class="panel resource-panel" aria-labelledby="remoteRegistryTitle" hidden>
       <div class="panel-header">
         <div>
-          <p class="eyebrow">Remote registries</p>
           <h2 id="remoteRegistryTitle">搜索远程镜像</h2>
         </div>
         <span class="quiet">只读浏览，不会自动拉取</span>
@@ -447,8 +450,8 @@
   <script src="/ssh-key-generator.js" defer></script>
   <script src="/odoo-create-form.js" defer></script>
   <script src="/pagination.js" defer></script>
-  <script src="/update-check.js?v=2.18.0" defer></script>
-  <script src="/i18n.js?v=2.18.0" defer></script>
-  <script src="/app.js?v=2.18.0" defer></script>
+  <script src="/update-check.js?v=2.19.0" defer></script>
+  <script src="/i18n.js?v=2.19.0" defer></script>
+  <script src="/app.js?v=2.19.0" defer></script>
 </body>
 </html>

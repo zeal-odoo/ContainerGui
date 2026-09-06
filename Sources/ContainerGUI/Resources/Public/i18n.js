@@ -4,6 +4,15 @@ const ContainerGUII18n = (() => {
   const STORAGE_KEY = "container-gui-language";
   const supportedLanguages = new Set(["zh", "en"]);
   const english = Object.freeze({
+    "跳到主要内容": "Skip to main content",
+    "工作区导航": "Workspace navigation",
+    "主要导航": "Main navigation",
+    "本机工作区": "Local workspace",
+    "容器": "Containers",
+    "名称 / 镜像": "Name / Image",
+    "CPU 配置": "CPU allocation",
+    "100% 代表分配的全部 CPU 核心。": "100% represents all CPU cores allocated to the container.",
+    "点击“创建容器”开始，状态会自动刷新。": "Select “Create container” to get started. Status refreshes automatically.",
     "Container GUI 首页": "Container GUI home",
     "正在读取 GUI 版本…": "Loading GUI version…",
     "正在检查 CLI…": "Checking CLI…",
@@ -342,6 +351,8 @@ const ContainerGUII18n = (() => {
   function translateCore(value, language) {
     if (language === "zh") return chinese[value] || value;
     if (english[value]) return english[value];
+    const coreCount = value.match(/^(\d+) 核$/);
+    if (coreCount) return `${coreCount[1]} ${coreCount[1] === "1" ? "core" : "cores"}`;
     const problemWithCode = value.match(/^(.+)（([A-Z0-9_]+)）$/);
     if (problemWithCode) return `${translateCore(problemWithCode[1], "en")} (${problemWithCode[2]})`;
     for (const [pattern, replacement] of patterns) {

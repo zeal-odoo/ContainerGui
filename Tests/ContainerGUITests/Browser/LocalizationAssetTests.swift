@@ -22,12 +22,12 @@ final class LocalizationAssetTests: XCTestCase {
         XCTAssertLessThan(localizationIndex, applicationIndex)
     }
 
-    func testLanguageSwitchUsesMaterialInteractionStates() throws {
+    func testLanguageSwitchKeepsSelectionAndKeyboardFocusStates() throws {
         let style = try asset("app.css")
 
         XCTAssertTrue(style.contains(".language-switch"))
         XCTAssertTrue(style.contains(".language-switch button[aria-pressed=\"true\"]"))
-        XCTAssertTrue(style.contains(".language-switch button:focus-visible"))
+        XCTAssertTrue(style.contains("button:focus-visible"))
     }
 
     private func asset(_ name: String) throws -> String {

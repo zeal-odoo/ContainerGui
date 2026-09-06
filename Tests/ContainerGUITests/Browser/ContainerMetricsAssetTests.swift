@@ -4,12 +4,13 @@ import XCTest
 @testable import ContainerGUI
 
 final class ContainerMetricsAssetTests: XCTestCase {
-    func testDashboardHasAccessibleCPUAndMemoryAndStorageColumns() throws {
+    func testDashboardKeepsCPUAndMemoryInTableAndStorageInDetails() throws {
         let html = try asset("index.html")
 
         XCTAssertTrue(html.contains("<th scope=\"col\">CPU</th>"))
         XCTAssertTrue(html.contains("<th scope=\"col\">内存</th>"))
-        XCTAssertTrue(html.contains("<th scope=\"col\">存储</th>"))
+        XCTAssertTrue(html.contains("<th scope=\"col\">名称 / 镜像</th>"))
+        XCTAssertTrue(try asset("app.js").contains("[\"存储\", storage.detail || storage.value]"))
     }
 
     func testScriptRefreshesMetricsIndependentlyAndRendersSafeStates() throws {
