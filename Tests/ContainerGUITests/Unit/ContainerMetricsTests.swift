@@ -6,6 +6,21 @@ import XCTest
 final class ContainerMetricsTests: XCTestCase {
     private let firstObservedAt = Date(timeIntervalSince1970: 1_787_987_200)
 
+    func testHostCapacityComesFromTheServerNotContainerQuotas() {
+        let host = HostResourceCapacity.current
+        XCTAssertEqual(host.cpuCount, ProcessInfo.processInfo.processorCount)
+        XCTAssertEqual(host.memoryBytes, ProcessInfo.processInfo.physicalMemory)
+        XCTAssertGreaterThan(host.cpuCount, 0)
+        XCTAssertGreaterThan(host.memoryBytes, 0)
+    }
+
+    func testMetricsSnapshotStillDecodesWithoutHostMetadata() throws {
+        let data = Data("{\"items\":[],\"observedAt\":\"2026-09-07T00:00:00Z\"}".utf8)
+        let snapshot = try JSONDecoder.containerGUI.decode(ContainerMetricsSnapshot.self, from: data)
+        XCTAssertNil(snapshot.host)
+        XCTAssertTrue(snapshot.items.isEmpty)
+    }
+
     func testParserAcceptsUnknownFieldsAndEmptySnapshot() throws {
         let first = try CLIOutputParser.parseContainerResourceSamples(
             data: fixture("stats-first.json"),

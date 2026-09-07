@@ -24,6 +24,7 @@ Container GUI 为 Apple `container` CLI 提供浏览器管理界面。后端直�
 | --- | --- |
 | 启动系统服务 | 服务已停止或未注册时，顶部显示“启动 container”；只启动服务并验证健康状态，不自动启动已停止的容器 |
 | 查看容器 | 展示运行状态、镜像、IPv4/IPv6、CPU、内存和根文件系统容量，每 5 秒刷新 |
+| 主机用量汇总 | 容器页展示所有运行中容器合计占 Mac CPU、物理内存的比例，每 5 秒刷新，不受搜索筛选影响 |
 | 查看详情 | 同一个按钮展开或收起详情；支持脱敏原始信息、最近日志和实时日志 |
 | 生命周期管理 | 启动、正常停止、重启和安全删除，并进行目标确认与状态回读 |
 | 本机镜像 | 折叠/展开、每页 10 条数字分页、真实拉取进度、安全删除未引用镜像 |
@@ -34,6 +35,8 @@ Container GUI 为 Apple `container` CLI 提供浏览器管理界面。后端直�
 | 中英文界面 | 首次访问跟随浏览器语言，顶部可切换中文/English 并记住选择；动态状态和弹窗同步切换 |
 | 版本更新提醒 | 页面加载后每天自动检查一次稳定版，也可从顶部手动检查；发现新版时跳转官方 GitHub Release 下载 PKG |
 | 现代界面 | Material 3 浅色/深色主题、克制 glass 表面、渐进动效及无障碍回退 |
+
+汇总口径：CPU 为容器原始 CPU 百分比之和 ÷ Mac 总核心数；内存为容器内存用量之和 ÷ Mac 物理内存。数据来自 Apple `container stats`，不包含虚拟机和系统服务开销，也不等同于 macOS 活动监视器的进程内存。首次 CPU 采样、样本不完整或读取失败会显示提示，不会作为零用量显示。
 
 ### 环境要求
 
@@ -253,6 +256,7 @@ Key capabilities:
 | --- | --- |
 | Start system service | The status card offers “Start container service” when stopped or unregistered; verifies health without automatically starting stopped containers |
 | Inspect containers | View runtime state, image, IPv4/IPv6, CPU, memory, and root-filesystem capacity with a five-second refresh interval |
+| Host usage summary | Show all running containers' combined share of the Mac's CPU and physical memory, refreshed every five seconds independently of search filters |
 | Inspect details | Use the same button to open or close details, with redacted raw data, recent logs, and live logs |
 | Manage lifecycle | Start, gracefully stop, restart, and safely delete containers with target confirmation and authoritative readback |
 | Manage local images | Collapse or expand the section, browse numbered 10-item pages, view real pull progress, and safely delete unused images |
@@ -263,6 +267,8 @@ Key capabilities:
 | Use Chinese or English | Follow the browser language on first visit, switch from the header, remember the choice, and localize dynamic states and dialogs together |
 | Discover updates | Check the latest stable release once per day after load or on demand from the header, then open the official GitHub Release to download the PKG |
 | Use a modern UI | Material 3 light/dark themes, restrained glass surfaces, progressive motion, and accessibility fallbacks |
+
+The summary divides the sum of raw container CPU percentages by the Mac's total core count, and combined container memory usage by the Mac's physical memory. It uses [Apple `container stats`](https://github.com/apple/container/blob/main/docs/resource-usage.md), excluding VM and system-service overhead; it is not the same as process memory in macOS Activity Monitor. First CPU samples, incomplete samples, and read failures are shown explicitly instead of as zero usage.
 
 ### Requirements
 

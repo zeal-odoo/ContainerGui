@@ -123,9 +123,28 @@ struct ContainerResourceUsage: Codable, Equatable, Sendable {
     }
 }
 
+struct HostResourceCapacity: Codable, Equatable, Sendable {
+    let cpuCount: Int
+    let memoryBytes: UInt64
+
+    static var current: HostResourceCapacity {
+        HostResourceCapacity(
+            cpuCount: ProcessInfo.processInfo.processorCount,
+            memoryBytes: ProcessInfo.processInfo.physicalMemory
+        )
+    }
+}
+
 struct ContainerMetricsSnapshot: Codable, Equatable, Sendable {
     let items: [ContainerResourceUsage]
     let observedAt: Date
+    let host: HostResourceCapacity?
+
+    init(items: [ContainerResourceUsage], observedAt: Date, host: HostResourceCapacity? = nil) {
+        self.items = items
+        self.observedAt = observedAt
+        self.host = host
+    }
 }
 
 actor ContainerMetricsRequestCoalescer {

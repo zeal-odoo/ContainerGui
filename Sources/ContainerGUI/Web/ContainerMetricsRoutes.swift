@@ -4,10 +4,16 @@ enum ContainerMetricsRoutes {
     static func register<Reader: ContainerMetricsReading>(
         on router: Router<BasicRequestContext>,
         reader: Reader,
-        timeout: Duration = .seconds(5)
+        timeout: Duration = .seconds(5),
+        hostCapacity: HostResourceCapacity = .current
     ) {
         router.get("/api/v1/containers/metrics") { _, _ in
-            try makeJSONResponse(try await boundedSnapshot(reader: reader, timeout: timeout))
+            let snapshot = try await boundedSnapshot(reader: reader, timeout: timeout)
+            return try makeJSONResponse(ContainerMetricsSnapshot(
+                items: snapshot.items,
+                observedAt: snapshot.observedAt,
+                host: hostCapacity
+            ))
         }
     }
 

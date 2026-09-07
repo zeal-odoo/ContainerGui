@@ -34,6 +34,8 @@ const elements = Object.fromEntries([
   "appVersionBadge", "checkUpdatesButton", "versionBadge", "healthCard", "healthLabel", "healthDetail",
   "startSystemButton", "systemStartHint", "systemOperationStatus",
   "totalCount", "runningCount", "stoppedCount", "observedAt", "searchInput",
+  "hostUsageStatus", "hostCPUValue", "hostCPUDetail", "hostCPUMeter",
+  "hostMemoryValue", "hostMemoryDetail", "hostMemoryMeter",
   "loadingState", "emptyState", "errorState", "tableWrap", "containerRows",
   "detailPanel", "detailPlaceholder", "detailContent", "detailTitle", "detailFacts",
   "sshConnectionPanel", "sshStatusLabel", "sshConnectionCommand", "copySSHCommandButton",
@@ -76,6 +78,7 @@ const state = {
   refreshing: false, submitting: false, eventSource: null,
   systemHealth: null, startingSystem: false,
   reconnectAttempts: 0, reconnectTimer: null, metricsByID: new Map(), metricsStatus: "loading",
+  metricsSnapshot: null,
   images: [], imagesLoaded: false, localImagePage: 1, localImagePageSize: 10,
   containersLoaded: false, imageSubmitting: false, createSubmitting: false,
   remoteRepositories: [], remoteRepositoryPage: 0, remoteRepositoryPageSize: 10,
@@ -482,6 +485,58 @@ function updateStatistics(snapshot) {
   elements.runningCount.textContent = String(snapshot.items.filter((item) => item.state === "running").length);
   elements.stoppedCount.textContent = String(snapshot.items.filter((item) => item.state === "stopped").length);
   elements.observedAt.textContent = formatTime(snapshot.observedAt);
+}
+
+function hostUsage(snapshot, containers) {
+  const host = snapshot?.host;
+  if (!host || !Number.isSafeInteger(host.cpuCount) || host.cpuCount <= 0
+      || !Number.isSafeInteger(host.memoryBytes) || host.memoryBytes <= 0
+      || !Array.isArray(snapshot.items)) return null;
+  const samples = snapshot.items;
+  const sampledIDs = new Set(samples.map((item) => item.containerId));
+  if (sampledIDs.size !== samples.length) return null;
+  const running = containers.filter((container) => container.state === "running");
+  if (running.length !== samples.length || running.some((container) => !sampledIDs.has(container.id))) {
+    return { cpuPercent: null, cpuCores: null, memoryPercent: null, memoryUsageBytes: null, status: "incomplete" };
+  }
+  if (samples.some((item) => !Number.isSafeInteger(item.memoryUsageBytes) || item.memoryUsageBytes < 0)) return null;
+  const memoryUsageBytes = samples.reduce((sum, item) => sum + item.memoryUsageBytes, 0);
+  if (!Number.isSafeInteger(memoryUsageBytes)) return null;
+  const cpuReady = samples.every((item) => item.cpuState === "ready"
+    && Number.isFinite(item.cpuPercent) && item.cpuPercent >= 0);
+  const cpuTotal = samples.reduce((sum, item) => sum + (item.cpuPercent || 0), 0);
+  const cpuCores = cpuReady && Number.isFinite(cpuTotal) ? cpuTotal / 100 : null;
+  return {
+    cpuPercent: cpuCores === null ? null : cpuCores / host.cpuCount * 100,
+    cpuCores,
+    memoryPercent: memoryUsageBytes / host.memoryBytes * 100,
+    memoryUsageBytes,
+    status: cpuCores === null ? "sampling" : "ready"
+  };
+}
+
+function renderHostUsage() {
+  const snapshot = state.metricsSnapshot;
+  const usage = state.containersLoaded ? hostUsage(snapshot, state.containers) : null;
+  const unavailable = state.metricsStatus === "loading" ? "读取中" : "暂不可用";
+  elements.hostUsageStatus.textContent = !usage ? unavailable
+    : usage.status === "incomplete" ? "统计不完整，等待下一次刷新"
+    : `已更新 ${formatTime(snapshot.observedAt)}`;
+  elements.hostCPUValue.textContent = Number.isFinite(usage?.cpuPercent)
+    ? formatPercent(usage.cpuPercent) : usage?.status === "sampling" ? "采样中" : unavailable;
+  elements.hostCPUDetail.textContent = Number.isFinite(usage?.cpuCores)
+    ? `已用 ${usage.cpuCores.toFixed(2)} 核 / 主机 ${snapshot.host.cpuCount} 核` : "等待完整 CPU 样本";
+  elements.hostMemoryValue.textContent = Number.isFinite(usage?.memoryPercent)
+    ? formatPercent(usage.memoryPercent) : unavailable;
+  elements.hostMemoryDetail.textContent = Number.isFinite(usage?.memoryUsageBytes)
+    ? `${formatBytes(usage.memoryUsageBytes)} / ${formatBytes(snapshot.host.memoryBytes)}` : "等待完整内存样本";
+  for (const [meter, percent] of [
+    [elements.hostCPUMeter, usage?.cpuPercent],
+    [elements.hostMemoryMeter, usage?.memoryPercent]
+  ]) {
+    meter.hidden = !Number.isFinite(percent);
+    meter.value = Number.isFinite(percent) ? Math.min(percent, 100) : 0;
+  }
 }
 
 function showListError(error) {
@@ -1003,14 +1058,17 @@ async function refreshDashboard({ announce = false } = {}) {
   }
   const metricsResult = await metricsResultPromise;
   if (metricsResult.status === "fulfilled") {
+    state.metricsSnapshot = metricsResult.value;
     state.metricsByID = new Map(
       metricsResult.value.items.map((metric) => [metric.containerId, metric])
     );
     state.metricsStatus = "ready";
   } else {
+    state.metricsSnapshot = null;
     state.metricsByID = new Map();
     state.metricsStatus = "error";
   }
+  renderHostUsage();
   if (listResult.status === "fulfilled") renderContainers();
   if (state.selectedDetail) renderFacts(state.selectedDetail.summary);
   const imagesAvailable = await imagesPromise;
@@ -2133,6 +2191,7 @@ document.addEventListener("visibilitychange", () => {
 document.addEventListener("container-gui-language-change", () => {
   renderWorkspace();
   renderContainers();
+  renderHostUsage();
   if (state.imagesLoaded) renderImages({ items: state.images });
   if (state.remoteSearchParameters) renderRemoteRepositories();
   if (state.selectedRemoteRepository) renderRemoteTags();

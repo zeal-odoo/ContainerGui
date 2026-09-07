@@ -101,7 +101,7 @@ test("a failed health request clears the previous healthy sidebar state", async 
     fetchJSON: async (url) => { if (url === "health") throw new Error("Connection lost"); return { items: [] }; },
     loadImages: async () => {}, setBusy: () => {}, renderSystemStart: () => {},
     updateStatistics: () => {}, renderContainers: () => {}, renderFacts: () => {},
-    renderMetrics: () => {}
+    renderMetrics: () => {}, renderHostUsage: () => {}
   };
   const dot = { className: "status-dot healthy" };
   await loadFunction("refreshDashboard", context)();

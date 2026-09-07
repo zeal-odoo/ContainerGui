@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#191b20" media="(prefers-color-scheme: dark)">
   <title>Container GUI</title>
   <link rel="icon" href="/icons/cube.svg">
-  <link rel="stylesheet" href="/app.css?v=2.19.0">
+  <link rel="stylesheet" href="/app.css?v=2.20.0">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -61,6 +61,25 @@
           <article><span>运行中</span><strong id="runningCount">—</strong></article>
           <article><span>已停止</span><strong id="stoppedCount">—</strong></article>
           <article><span>最后刷新</span><strong id="observedAt">—</strong></article>
+        </section>
+        <section class="host-usage" aria-labelledby="hostUsageTitle" aria-describedby="hostUsageNote">
+          <div class="host-usage-heading">
+            <h2 id="hostUsageTitle">容器合计 · 占主机</h2>
+            <span id="hostUsageStatus" class="quiet" role="status">读取中</span>
+          </div>
+          <div class="host-usage-grid">
+            <article class="host-usage-metric">
+              <div class="host-usage-value"><span>CPU 占主机</span><strong id="hostCPUValue">—</strong></div>
+              <meter id="hostCPUMeter" min="0" max="100" value="0" aria-label="容器 CPU 占主机比例" hidden></meter>
+              <span id="hostCPUDetail" class="quiet">等待完整 CPU 样本</span>
+            </article>
+            <article class="host-usage-metric">
+              <div class="host-usage-value"><span>内存占主机</span><strong id="hostMemoryValue">—</strong></div>
+              <meter id="hostMemoryMeter" min="0" max="100" value="0" aria-label="容器内存占主机比例" hidden></meter>
+              <span id="hostMemoryDetail" class="quiet">等待完整内存样本</span>
+            </article>
+          </div>
+          <p id="hostUsageNote" class="host-usage-note">每 5 秒刷新所有容器的合计，不受筛选影响。按容器内用量计算，不含虚拟机及系统服务开销。</p>
         </section>
         <div class="list-toolbar">
           <label class="search">
@@ -450,8 +469,8 @@
   <script src="/ssh-key-generator.js" defer></script>
   <script src="/odoo-create-form.js" defer></script>
   <script src="/pagination.js" defer></script>
-  <script src="/update-check.js?v=2.19.0" defer></script>
-  <script src="/i18n.js?v=2.19.0" defer></script>
-  <script src="/app.js?v=2.19.0" defer></script>
+  <script src="/update-check.js?v=2.20.0" defer></script>
+  <script src="/i18n.js?v=2.20.0" defer></script>
+  <script src="/app.js?v=2.20.0" defer></script>
 </body>
 </html>

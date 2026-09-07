@@ -34,6 +34,9 @@ test("dynamic interface patterns preserve user-owned identifiers and counts", ()
   assert.equal(api.translate("100% = 3 核", "en"), "100% = 3 cores");
   assert.equal(api.translate("3 核", "en"), "3 cores");
   assert.equal(api.translate("1 核", "en"), "1 core");
+  assert.equal(api.translate("容器合计 · 占主机", "en"), "All containers · Host usage");
+  assert.equal(api.translate("已用 4.00 核 / 主机 16 核", "en"), "4.00 cores used / 16 host cores");
+  assert.equal(api.translate("已更新 09:00:00", "en"), "Updated 09:00:00");
   assert.equal(api.translate("本机工作区", "en"), "Local workspace");
   assert.equal(api.translate("0.04% · 100% = 3 核", "en"), "0.04% · 100% = 3 cores");
   assert.equal(api.translate("当前版本 2.17.0 · 最新版本 2.18.0", "en"), "Current 2.17.0 · Latest 2.18.0");

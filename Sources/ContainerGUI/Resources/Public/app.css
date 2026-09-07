@@ -386,6 +386,79 @@ img {
   font-size: 14px;
   font-weight: 400;
 }
+.host-usage {
+  margin: 20px 18px 0;
+}
+.host-usage-heading,
+.host-usage-value {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px 14px;
+}
+.host-usage-heading {
+  margin-bottom: 12px;
+}
+.host-usage-heading h2 {
+  font-size: 14px;
+  letter-spacing: 0;
+}
+.host-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.host-usage-metric {
+  padding: 16px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 8px;
+  background: var(--md-sys-color-surface-container-low);
+  min-width: 0;
+}
+.host-usage-value {
+  margin-bottom: 8px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 13px;
+}
+.host-usage-value strong {
+  font-size: 24px;
+  font-weight: 550;
+  color: var(--md-sys-color-on-surface);
+  font-variant-numeric: tabular-nums;
+}
+.host-usage-metric meter {
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin-bottom: 10px;
+  border: 0;
+  background: var(--md-sys-color-outline-variant);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.host-usage-metric meter::-webkit-meter-bar {
+  background: var(--md-sys-color-outline-variant);
+  border: 0;
+  border-radius: 3px;
+}
+.host-usage-metric meter::-webkit-meter-optimum-value {
+  background: var(--md-sys-color-primary);
+  transition: width 300ms ease;
+}
+.host-usage-metric meter::-moz-meter-bar {
+  background: var(--md-sys-color-primary);
+}
+.host-usage-metric > .quiet {
+  display: block;
+  min-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.host-usage-note {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+}
 .list-toolbar {
   padding: 16px 18px 20px;
 }
@@ -1681,6 +1754,13 @@ dialog[open].is-closing::backdrop {
   }
   .list-toolbar {
     padding-inline: 8px;
+  }
+  .host-usage {
+    margin-inline: 8px;
+  }
+  .host-usage-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
   .container-table th {
     font-size: 11px;

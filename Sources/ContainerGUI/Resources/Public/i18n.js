@@ -33,6 +33,15 @@ const ContainerGUII18n = (() => {
     "正在连接": "Connecting",
     "等待系统状态": "Waiting for system status",
     "容器统计": "Container statistics",
+    "容器合计 · 占主机": "All containers · Host usage",
+    "CPU 占主机": "Host CPU share",
+    "内存占主机": "Host memory share",
+    "容器 CPU 占主机比例": "Container CPU share of host capacity",
+    "容器内存占主机比例": "Container memory share of host capacity",
+    "等待完整 CPU 样本": "Waiting for a complete CPU sample",
+    "等待完整内存样本": "Waiting for a complete memory sample",
+    "统计不完整，等待下一次刷新": "Incomplete sample; waiting for next refresh",
+    "每 5 秒刷新所有容器的合计，不受筛选影响。按容器内用量计算，不含虚拟机及系统服务开销。": "All containers, refreshed every 5 seconds regardless of filters. Based on in-container usage; excludes VM and system-service overhead.",
     "全部": "Total",
     "运行中": "Running",
     "已停止": "Stopped",
@@ -315,6 +324,8 @@ const ContainerGUII18n = (() => {
   ));
 
   const patterns = Object.freeze([
+    [/^已用 ([\d.]+) 核 \/ 主机 (\d+) 核$/, (_, used, total) => `${used} cores used / ${total} host cores`],
+    [/^已更新 (.+)$/, (_, time) => `Updated ${time}`],
     [/^当前版本 (.+) · 最新版本 (.+)$/, (_, current, latest) => `Current ${current} · Latest ${latest}`],
     [/^查看 (.+) 的详情$/, (_, name) => `View details for ${name}`],
     [/^收起 (.+) 的详情$/, (_, name) => `Collapse details for ${name}`],

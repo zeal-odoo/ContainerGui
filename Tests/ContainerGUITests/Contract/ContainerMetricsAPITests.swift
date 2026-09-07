@@ -21,6 +21,10 @@ final class ContainerMetricsAPITests: XCTestCase {
                 XCTAssertNil(value.items.first?.cpuPercent)
                 XCTAssertEqual(value.items.first?.rootFilesystem.state, .ready)
                 XCTAssertEqual(value.items.first?.rootFilesystem.capacityBytes, 541_115_342_848)
+                let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+                let host = try XCTUnwrap(json["host"] as? [String: Any])
+                XCTAssertEqual(host["cpuCount"] as? Int, 16)
+                XCTAssertEqual(host["memoryBytes"] as? UInt64, 34_359_738_368)
                 XCTAssertTrue(String(decoding: body, as: UTF8.self).contains("\"cpuPercent\":null"))
                 XCTAssertTrue(String(decoding: body, as: UTF8.self).contains("\"rootFilesystem\""))
             }
@@ -66,7 +70,10 @@ final class ContainerMetricsAPITests: XCTestCase {
         let router = Router()
         router.middlewares.add(ErrorMiddleware())
         ContainerReadRoutes.register(on: router, reader: reader)
-        ContainerMetricsRoutes.register(on: router, reader: reader, timeout: metricsTimeout)
+        ContainerMetricsRoutes.register(
+            on: router, reader: reader, timeout: metricsTimeout,
+            hostCapacity: HostResourceCapacity(cpuCount: 16, memoryBytes: 34_359_738_368)
+        )
         return Application(router: router)
     }
 }

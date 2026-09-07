@@ -4,6 +4,17 @@ import XCTest
 @testable import ContainerGUI
 
 final class ContainerMetricsAssetTests: XCTestCase {
+    func testHostSummaryUsesAccessibleMetersAndUnfilteredSnapshots() throws {
+        let html = try asset("index.html")
+        let script = try asset("app.js")
+        XCTAssertTrue(html.contains("aria-labelledby=\"hostUsageTitle\""))
+        XCTAssertTrue(html.contains("<meter id=\"hostCPUMeter\""))
+        XCTAssertTrue(html.contains("<meter id=\"hostMemoryMeter\""))
+        XCTAssertTrue(html.contains("不含虚拟机及系统服务开销"))
+        XCTAssertTrue(script.contains("hostUsage(snapshot, state.containers)"))
+        XCTAssertTrue(script.contains("state.metricsSnapshot = null"))
+    }
+
     func testDashboardKeepsCPUAndMemoryInTableAndStorageInDetails() throws {
         let html = try asset("index.html")
 
