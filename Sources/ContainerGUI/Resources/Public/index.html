@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#191b20" media="(prefers-color-scheme: dark)">
   <title>Container GUI</title>
   <link rel="icon" href="/icons/cube.svg">
-  <link rel="stylesheet" href="/app.css?v=2.21.0">
+  <link rel="stylesheet" href="/app.css?v=2.22.0">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -80,6 +80,25 @@
             </article>
           </div>
           <p id="hostUsageNote" class="host-usage-note">每 5 秒刷新所有容器的合计，不受筛选影响。按容器内用量计算，不含虚拟机及系统服务开销。</p>
+        </section>
+        <section id="anePowerSection" class="host-usage ane-power" aria-labelledby="anePowerTitle" aria-describedby="anePowerNote">
+          <div class="host-usage-heading">
+            <h2 id="anePowerTitle">整机 ANE</h2>
+            <span id="anePowerStatus" class="quiet" role="status">采样中</span>
+          </div>
+          <div class="ane-power-summary">
+            <div>
+              <span class="quiet">估算功耗</span>
+              <strong id="anePowerValue">采样中</strong>
+              <span id="anePowerWindow" class="quiet">等待两次有效采样</span>
+            </div>
+            <div>
+              <span class="quiet">计算使用率</span>
+              <strong id="aneUtilizationValue">不可用</strong>
+              <span class="quiet">功耗不是计算使用率</span>
+            </div>
+          </div>
+          <p id="anePowerNote" class="host-usage-note">包含本机所有应用，非 Container GUI 专属。容器页可见时每 5 秒刷新，不受 AI 开关影响。</p>
         </section>
         <div class="list-toolbar">
           <label class="search">
@@ -498,9 +517,9 @@
   <script src="/ssh-key-generator.js" defer></script>
   <script src="/odoo-create-form.js" defer></script>
   <script src="/pagination.js" defer></script>
-  <script src="/update-check.js?v=2.21.0" defer></script>
-  <script src="/i18n.js?v=2.21.0" defer></script>
-  <script src="/ai-logs.js?v=2.21.0" defer></script>
-  <script src="/app.js?v=2.21.0" defer></script>
+  <script src="/update-check.js?v=2.22.0" defer></script>
+  <script src="/i18n.js?v=2.22.0" defer></script>
+  <script src="/ai-logs.js?v=2.22.0" defer></script>
+  <script src="/app.js?v=2.22.0" defer></script>
 </body>
 </html>

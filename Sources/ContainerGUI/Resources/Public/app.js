@@ -7,6 +7,7 @@ const ENDPOINTS = {
   systemStart: "/api/v1/system/start",
   containers: "/api/v1/containers",
   metrics: "/api/v1/containers/metrics",
+  ane: "/api/v1/system/ane",
   images: "/api/v1/images",
   imagePull: "/api/v1/images/pull",
   imageDelete: "/api/v1/images/delete",
@@ -36,6 +37,7 @@ const elements = Object.fromEntries([
   "totalCount", "runningCount", "stoppedCount", "observedAt", "searchInput",
   "hostUsageStatus", "hostCPUValue", "hostCPUDetail", "hostCPUMeter",
   "hostMemoryValue", "hostMemoryDetail", "hostMemoryMeter",
+  "anePowerStatus", "anePowerValue", "anePowerWindow", "aneUtilizationValue",
   "loadingState", "emptyState", "errorState", "tableWrap", "containerRows",
   "detailPanel", "detailPlaceholder", "detailContent", "detailTitle", "detailFacts",
   "sshConnectionPanel", "sshStatusLabel", "sshConnectionCommand", "copySSHCommandButton",
@@ -79,6 +81,7 @@ const state = {
   systemHealth: null, startingSystem: false,
   reconnectAttempts: 0, reconnectTimer: null, metricsByID: new Map(), metricsStatus: "loading",
   metricsSnapshot: null,
+  aneSnapshot: null, aneStatus: "sampling", aneController: null, aneRequestID: 0,
   images: [], imagesLoaded: false, localImagePage: 1, localImagePageSize: 10,
   containersLoaded: false, imageSubmitting: false, createSubmitting: false,
   remoteRepositories: [], remoteRepositoryPage: 0, remoteRepositoryPageSize: 10,
@@ -540,6 +543,70 @@ function renderHostUsage() {
   ]) {
     meter.hidden = !Number.isFinite(percent);
     meter.value = Number.isFinite(percent) ? Math.min(percent, 100) : 0;
+  }
+}
+
+function anePowerSnapshot(value) {
+  if (!value || value.scope !== "host" || value.estimated !== true
+      || value.utilizationPercent !== null || value.utilizationState !== "unavailable"
+      || typeof value.observedAt !== "string" || !Number.isFinite(Date.parse(value.observedAt))) return null;
+  if (value.state === "ready") {
+    return Number.isFinite(value.watts) && value.watts >= 0
+      && Number.isFinite(value.sampleSeconds) && value.sampleSeconds > 0 && value.reason === null ? value : null;
+  }
+  if (value.watts !== null || value.sampleSeconds !== null) return null;
+  if (value.state === "sampling" && value.reason === null) return value;
+  return value.state === "unavailable" && ["unsupported", "read_failed", "invalid_sample"].includes(value.reason) ? value : null;
+}
+
+function renderANEPower() {
+  const t = (text) => globalThis.ContainerGUII18n?.translate(text) || text;
+  const snapshot = anePowerSnapshot(state.aneSnapshot);
+  const sampling = snapshot?.state === "sampling" || (!snapshot && state.aneStatus === "sampling");
+  const ready = snapshot?.state === "ready";
+  const reasons = {
+    unsupported: "此系统暂不支持 ANE 功耗读取",
+    read_failed: "暂时无法读取 ANE 指标",
+    invalid_sample: "ANE 样本无效，等待重新采样"
+  };
+  elements.anePowerValue.textContent = ready ? `${snapshot.watts.toFixed(2)} W` : t(sampling ? "采样中" : "暂不可用");
+  elements.anePowerStatus.textContent = t(ready ? `已更新 ${formatTime(snapshot.observedAt)}`
+    : sampling ? "采样中" : reasons[snapshot?.reason] || "暂时无法读取 ANE 指标");
+  elements.anePowerWindow.textContent = t(ready ? `采样窗口 ${snapshot.sampleSeconds.toFixed(1)} 秒`
+    : sampling ? "等待两次有效采样" : "采样窗口 —");
+  elements.aneUtilizationValue.textContent = t("不可用");
+}
+
+function resetANEPower() {
+  state.aneRequestID += 1;
+  state.aneController?.abort();
+  state.aneController = null;
+  state.aneSnapshot = null;
+  state.aneStatus = "sampling";
+  renderANEPower();
+}
+
+async function refreshANEPower() {
+  if (document.visibilityState !== "visible" || state.activeView !== "containers" || state.aneController) return;
+  const requestID = ++state.aneRequestID;
+  const controller = new AbortController();
+  state.aneController = controller;
+  const timeout = setTimeout(() => controller.abort(), 4000);
+  try {
+    const value = await fetchJSON(ENDPOINTS.ane, { signal: controller.signal });
+    if (requestID !== state.aneRequestID) return;
+    state.aneSnapshot = anePowerSnapshot(value);
+    state.aneStatus = state.aneSnapshot?.state || "error";
+  } catch {
+    if (requestID !== state.aneRequestID) return;
+    state.aneSnapshot = null;
+    state.aneStatus = "error";
+  } finally {
+    clearTimeout(timeout);
+    if (requestID === state.aneRequestID) {
+      state.aneController = null;
+      renderANEPower();
+    }
   }
 }
 
@@ -1024,6 +1091,7 @@ function selectRemoteTag(tag) {
 }
 
 async function refreshDashboard({ announce = false } = {}) {
+  if (state.activeView === "containers") void refreshANEPower();
   if (state.refreshing) return;
   state.metricsStatus = "loading";
   state.containersLoaded = false;
@@ -2126,7 +2194,9 @@ function showToast(message) {
 }
 
 window.addEventListener("hashchange", () => {
+  resetANEPower();
   renderWorkspace();
+  void refreshANEPower();
   window.scrollTo({ top: 0, behavior: "instant" });
   elements.pageTitle.focus({ preventScroll: true });
 });
@@ -2192,13 +2262,16 @@ for (const dialog of document.querySelectorAll("dialog")) {
   });
 }
 document.addEventListener("visibilitychange", () => {
+  resetANEPower();
   if (document.visibilityState === "visible") refreshDashboard();
 });
+window.addEventListener("pagehide", resetANEPower);
 document.addEventListener("container-gui-language-change", () => {
   globalThis.ContainerGUIAILogs?.languageChanged();
   renderWorkspace();
   renderContainers();
   renderHostUsage();
+  renderANEPower();
   if (state.imagesLoaded) renderImages({ items: state.images });
   if (state.remoteSearchParameters) renderRemoteRepositories();
   if (state.selectedRemoteRepository) renderRemoteTags();

@@ -459,6 +459,30 @@ img {
   font-size: 12px;
   color: var(--md-sys-color-on-surface-variant);
 }
+.ane-power-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 8px;
+  background: var(--md-sys-color-surface-container-low);
+}
+.ane-power-summary > div {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ane-power-summary strong {
+  font-size: 20px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+}
+.ane-power-summary .quiet {
+  font-size: 12px;
+}
 .list-toolbar {
   padding: 16px 18px 20px;
 }

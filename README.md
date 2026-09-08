@@ -6,7 +6,7 @@ A lightweight local web interface for Apple [`container`](https://github.com/app
 
 [中文](#中文说明) · [English](#english-guide)
 
-**Source v2.21.0 · 本地源码，尚未发布 / Local source, unreleased** · Apple `container` `1.3.x` · `http://127.0.0.1:8787`
+**Source v2.22.0 · 本地源码，尚未发布 / Local source, unreleased** · Apple `container` `1.3.x` · `http://127.0.0.1:8787`
 
 > Container GUI is a local, single-user tool. It never listens on the LAN or public Internet and is not a replacement for Docker Desktop, Compose, Kubernetes, or a multi-user remote administration platform.
 >
@@ -25,6 +25,7 @@ Container GUI 为 Apple `container` CLI 提供浏览器管理界面。后端直�
 | 启动系统服务 | 服务已停止或未注册时，顶部显示“启动 container”；只启动服务并验证健康状态，不自动启动已停止的容器 |
 | 查看容器 | 展示运行状态、镜像、IPv4/IPv6、CPU、内存和根文件系统容量，每 5 秒刷新 |
 | 主机用量汇总 | 容器页展示所有运行中容器合计占 Mac CPU、物理内存的比例，每 5 秒刷新，不受搜索筛选影响 |
+| 整机 ANE | 独立展示 ANE 估算功耗（W），可见容器页约每 5 秒刷新；计算使用率明确显示不可用 |
 | 查看详情 | 同一个按钮展开或收起详情；支持脱敏原始信息、最近日志和实时日志 |
 | 本地 AI 日志分析 | 默认关闭；确认下载后使用固定 Qwen3-1.7B 分析所选容器日志，提供中英文建议；关闭后确认模型进程退出 |
 | 生命周期管理 | 启动、正常停止、重启和安全删除，并进行目标确认与状态回读 |
@@ -38,6 +39,8 @@ Container GUI 为 Apple `container` CLI 提供浏览器管理界面。后端直�
 | 现代界面 | Material 3 浅色/深色主题、克制 glass 表面、渐进动效及无障碍回退 |
 
 汇总口径：CPU 为容器原始 CPU 百分比之和 ÷ Mac 总核心数；内存为容器内存用量之和 ÷ Mac 物理内存。数据来自 Apple `container stats`，不包含虚拟机和系统服务开销，也不等同于 macOS 活动监视器的进程内存。首次 CPU 采样、样本不完整或读取失败会显示提示，不会作为零用量显示。
+
+ANE 是**整机所有应用**的估算功耗，不计入容器合计，也不是 Container GUI 专属。它由只读系统能量计数器的增量除以采样时长得到，不能换算成计算使用率；使用率显示“不可用”。读取不需要管理员权限、不启动模型、不联网。首次或长时间离开后显示“采样中”，缺失/异常数据清除旧值并显示不可用。底层 IOReport 为未公开系统接口，目前仅在 M4 Max/macOS 26.6.2 验证，其他机型/系统可能无法读取；功耗估算不用于不同设备的精确比较。
 
 ### 环境要求
 
@@ -56,7 +59,7 @@ container system status
 
 ### 安装 .pkg（推荐）
 
-从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 选择已发布的版本，下载 `ContainerGUI-<VERSION>-arm64.pkg` 和对应的 `.sha256` 文件。下面的版本号应替换成实际下载文件中的版本；本地源码版本 `2.21.0` 尚未发布安装包。
+从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 选择已发布的版本，下载 `ContainerGUI-<VERSION>-arm64.pkg` 和对应的 `.sha256` 文件。下面的版本号应替换成实际下载文件中的版本；本地源码版本 `2.22.0` 尚未发布安装包。
 
 ```bash
 CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"
@@ -273,6 +276,7 @@ Key capabilities:
 | Start system service | The status card offers “Start container service” when stopped or unregistered; verifies health without automatically starting stopped containers |
 | Inspect containers | View runtime state, image, IPv4/IPv6, CPU, memory, and root-filesystem capacity with a five-second refresh interval |
 | Host usage summary | Show all running containers' combined share of the Mac's CPU and physical memory, refreshed every five seconds independently of search filters |
+| Host ANE | Independently show estimated ANE power (W), refreshing about every five seconds on the visible container page; compute utilization is explicitly unavailable |
 | Inspect details | Use the same button to open or close details, with redacted raw data, recent logs, and live logs |
 | Analyse logs with local AI | Off by default; after a confirmed download, fixed Qwen3-1.7B analyses the selected container's logs in Chinese or English; turning it off verifies model-process exit |
 | Manage lifecycle | Start, gracefully stop, restart, and safely delete containers with target confirmation and authoritative readback |
@@ -286,6 +290,8 @@ Key capabilities:
 | Use a modern UI | Material 3 light/dark themes, restrained glass surfaces, progressive motion, and accessibility fallbacks |
 
 The summary divides the sum of raw container CPU percentages by the Mac's total core count, and combined container memory usage by the Mac's physical memory. It uses [Apple `container stats`](https://github.com/apple/container/blob/main/docs/resource-usage.md), excluding VM and system-service overhead; it is not the same as process memory in macOS Activity Monitor. First CPU samples, incomplete samples, and read failures are shown explicitly instead of as zero usage.
+
+ANE power covers **all applications on the host**, not container totals or Container GUI alone. It is estimated from read-only system energy-counter deltas divided by the sampling duration, not converted into compute utilization; utilization is shown as unavailable. Reading requires no administrator privileges, model loading, or network access. Initial samples and returns after a long gap show “Sampling”; missing or invalid readings clear the old value and show unavailable. The underlying IOReport interface is private and has only been validated here on M4 Max/macOS 26.6.2; other Macs or OS versions may not expose it. Power estimates should not be used for precise cross-device comparisons.
 
 ### Requirements
 
@@ -304,7 +310,7 @@ container system status
 
 ### Install the .pkg (recommended)
 
-Choose a published version from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) and download `ContainerGUI-<VERSION>-arm64.pkg` with its `.sha256` file. Replace the version below with the version in the downloaded filename. The local source version `2.21.0` does not yet have a published installer.
+Choose a published version from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) and download `ContainerGUI-<VERSION>-arm64.pkg` with its `.sha256` file. Replace the version below with the version in the downloaded filename. The local source version `2.22.0` does not yet have a published installer.
 
 ```bash
 CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"

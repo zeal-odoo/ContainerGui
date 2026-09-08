@@ -35,6 +35,10 @@ enum AppFactory {
             reader: reader,
             timeout: configuration.queryTimeout
         )
+        ANEPowerRoutes.register(
+            on: router,
+            sampler: ANEPowerSampler(reader: IOReportANEEnergyReader())
+        )
         SSHStatusRoutes.register(
             on: router,
             reader: reader,
