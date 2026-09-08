@@ -6,7 +6,7 @@ A lightweight local web interface for Apple [`container`](https://github.com/app
 
 [中文](#中文说明) · [English](#english-guide)
 
-**Source v2.23.0 · 本地源码，尚未发布 / Local source, unreleased** · Apple `container` `1.3.x` · `http://127.0.0.1:8787`
+**Source v2.23.1 · 本地源码，尚未发布 / Local source, unreleased** · Apple `container` `1.3.x` · `http://127.0.0.1:8787`
 
 > Container GUI is a local, single-user tool. It never listens on the LAN or public Internet and is not a replacement for Docker Desktop, Compose, Kubernetes, or a multi-user remote administration platform.
 >
@@ -60,7 +60,7 @@ container system status
 
 ### 安装 .pkg（推荐）
 
-从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 选择已发布的版本，下载 `ContainerGUI-<VERSION>-arm64.pkg` 和对应的 `.sha256` 文件。下面的版本号应替换成实际下载文件中的版本；本地源码版本 `2.23.0` 尚未发布安装包。
+从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 选择已发布的版本，下载 `ContainerGUI-<VERSION>-arm64.pkg` 和对应的 `.sha256` 文件。下面的版本号应替换成实际下载文件中的版本；本地源码版本 `2.23.1` 尚未发布安装包。
 
 ```bash
 CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"
@@ -185,6 +185,8 @@ GUI 也支持显式 root 公钥登录。root 模式仍禁用密码、键盘交�
 模型缓存在 `~/Library/Application Support/ContainerGUI/Models/qwen3-1.7b-ane-0977a61d/`。下载中断后可重试，已校验文件会复用；空间预检只计算尚未下载的文件并保留额外余量。安装时需要访问 Hugging Face，日志分析在本机进行，没有云端回退。
 
 每次只读取所选容器最近 200 行日志，脱敏后证据最多 6,144 字节；超长日志行会被省略。输入与输出合计最多 2,048 个 token，输出最多 256 个 token。全局只运行一个模型进程，串行分析，批次间隔至少 10 秒；相同证据不会重复触发分析。日志按不可信数据处理，结果仅提供可能原因和建议，不会执行命令、调用工具或修改容器。自动脱敏只能识别已知形式的敏感信息，不能保证移除所有秘密。
+
+v2.23.1 将日志预处理移出 AI 控制队列：大批日志只对最近最多 200 行、32 KiB 的候选窗口运行脱敏表达式，私钥边界仍扫描完整输入，最终证据上限不变。普通日志面板保留最近 64K 字符，超出明确提示截断；实时日志约每 100 毫秒合并重绘，避免逐片段刷新拖慢页面。只限制分析/显示窗口，不删除容器原始日志或已保存的分析历史。
 
 点击“关闭 AI”会取消待处理工作，并在确认模型进程退出后显示关闭；下载文件会保留。页面隐藏时会立即请求关闭；连接中断等导致请求未送达时，最后一次心跳约 60–65 秒后会触发兜底关闭。macOS 管理的文件缓存和编译缓存可能继续保留，系统内存数字不一定立即回落。
 
@@ -320,7 +322,7 @@ container system status
 
 ### Install the .pkg (recommended)
 
-Choose a published version from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) and download `ContainerGUI-<VERSION>-arm64.pkg` with its `.sha256` file. Replace the version below with the version in the downloaded filename. The local source version `2.23.0` does not yet have a published installer.
+Choose a published version from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) and download `ContainerGUI-<VERSION>-arm64.pkg` with its `.sha256` file. Replace the version below with the version in the downloaded filename. The local source version `2.23.1` does not yet have a published installer.
 
 ```bash
 CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"
@@ -445,6 +447,8 @@ Open the selected container's details and select “Enable AI” under “Local 
 Model files are cached under `~/Library/Application Support/ContainerGUI/Models/qwen3-1.7b-ane-0977a61d/`. Interrupted downloads can be retried, reusing verified files; the disk-space check reserves the missing bytes plus additional headroom. Installation connects to Hugging Face. Log analysis runs locally without a cloud fallback.
 
 Each batch reads only the selected container's latest 200 log lines. Redacted evidence is limited to 6,144 bytes, with oversized lines omitted. Input and output together fit within 2,048 tokens, including at most 256 output tokens. One model process serves serial analyses globally, with at least 10 seconds between batches; identical evidence does not trigger another analysis. Logs are untrusted data, and answers are advisory: the model cannot execute commands, call tools, or modify containers. Automatic redaction detects known secret formats and cannot guarantee removal of every secret.
+
+v2.23.1 moves log preparation off the AI control actor. Large batches run redaction expressions only on a recent candidate window of at most 200 lines and 32 KiB, while private-key boundaries are still scanned across the input and the final evidence limit stays unchanged. The ordinary log panel keeps the latest 64K characters with an explicit truncation notice; live updates are batched about every 100 milliseconds. These limits affect analysis/display windows only, not original container logs or saved analysis history.
 
 “Turn off AI” cancels pending work and shows the off state only after confirming that the model process exited. Downloaded files remain cached. Hiding the page immediately requests shutdown; if that request cannot arrive, such as after a lost connection, a fallback stops the worker approximately 60–65 seconds after the last heartbeat. macOS-managed file and compilation caches may remain, so system memory readings may not fall immediately.
 

@@ -166,7 +166,8 @@ actor AILogService {
                 let logs = try await reader.recentLogs(id: containerID, tail: 200)
                 try Task.checkCancellation()
                 guard current == generation, enabled else { return }
-                let evidence = AILogEvidence.prepare(logs.text)
+                let evidence = try await AILogEvidence.prepareForAnalysis(logs.text)
+                guard current == generation, enabled else { return }
                 let digest = SHA256.hash(data: Data(evidence.utf8))
                 guard !evidence.isEmpty else {
                     result = nil

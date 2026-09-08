@@ -4,6 +4,57 @@ import XCTest
 @testable import ContainerGUI
 
 final class AILogServiceTests: XCTestCase {
+    func testPreviouslySavedShortLinesRemainReadableWithoutRenormalizingHistory() {
+        let savedEvidence = Array(repeating: "ok", count: 1_000).joined(separator: "\n")
+        XCTAssertEqual(AILogEvidence.prepare(savedEvidence), savedEvidence)
+    }
+
+    func testBoundedRecentWindowNeverStartsInsideAPrivateKey() {
+        let text = "safe prefix\n-----BEGIN PRIVATE KEY-----\n"
+            + String(repeating: "private-key-material\n", count: 50_000)
+            + "-----END PRIVATE KEY-----\nlatest failure\nPASSWORD=still-secret"
+        let evidence = AILogEvidence.prepare(text)
+        XCTAssertFalse(evidence.contains("private-key-material"))
+        XCTAssertFalse(evidence.contains("still-secret"))
+        XCTAssertTrue(evidence.contains("latest failure"))
+    }
+
+    func testLargeBatchPreparesOnlyBoundedRecentEvidence() {
+        let text = String(repeating: "normal log line without an error\n", count: 200_000) + "Latest connection refused\nPASSWORD=hidden-secret"
+        let clock = ContinuousClock()
+        let start = clock.now
+        let evidence = AILogEvidence.prepare(text)
+        let elapsed = start.duration(to: clock.now)
+        print("Large log preparation: \(elapsed)")
+        XCTAssertLessThan(elapsed, .seconds(1))
+        XCTAssertTrue(evidence.contains("Latest connection refused"))
+        XCTAssertFalse(evidence.contains("hidden-secret"))
+        XCTAssertLessThanOrEqual(evidence.utf8.count, 6_144)
+    }
+
+    func testLargeBatchDoesNotBlockAIStatusOrShutdown() async throws {
+        let reader = FakeAILogReader()
+        await reader.setText(String(repeating: "normal log line without an error\n", count: 200_000))
+        let service = service(worker: FakeAILogWorker(generationDelay: .seconds(2)), reader: reader)
+        try await service.enable(containerID: "demo", language: "en")
+        try await waitFor(service, phase: "ready")
+        await service.analyse()
+        try await Task.sleep(for: .milliseconds(10))
+        let clock = ContinuousClock()
+        let start = clock.now
+        _ = await service.status()
+        let latency = start.duration(to: clock.now)
+        print("AI status during large log preparation: \(latency)")
+        XCTAssertLessThan(latency, .milliseconds(300))
+        let stopping = clock.now
+        try await service.disable()
+        XCTAssertLessThan(stopping.duration(to: clock.now), .seconds(1))
+        let state = await service.status()
+        XCTAssertEqual(state.phase, "off")
+        XCTAssertNil(state.workerPID)
+        XCTAssertNil(state.result)
+    }
+
     func testVeryLongUntrustedLinesAreBoundedWithoutRegexBacktracking() {
         let clock = ContinuousClock()
         let start = clock.now

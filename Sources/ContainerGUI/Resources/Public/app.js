@@ -16,7 +16,7 @@ const ENDPOINTS = {
   operations: "/api/v1/operations/"
 };
 const REFRESH_INTERVAL_MS = 5000;
-const LOG_DISPLAY_LIMIT = 512 * 1024;
+const LOG_DISPLAY_LIMIT = 64 * 1024;
 const KEEP_ALIVE_ARGUMENTS = ["/bin/bash", "-lc", "exec sleep infinity"];
 const DIALOG_EXIT_DURATION_MS = 180;
 const DETAIL_ENTER_DURATION_MS = 420;
@@ -78,6 +78,7 @@ const state = {
   activeView: "containers",
   containers: [], selectedID: null, selectedDetail: null, selectedSSHStatus: null, detailController: null,
   refreshing: false, submitting: false, eventSource: null,
+  logText: "", logTruncated: false, logRenderTimer: null,
   systemHealth: null, startingSystem: false,
   reconnectAttempts: 0, reconnectTimer: null, metricsByID: new Map(), metricsStatus: "loading",
   metricsSnapshot: null,
@@ -1164,7 +1165,7 @@ async function loadDetail(id, { quiet = false } = {}) {
     elements.sshConnectionPanel.hidden = true;
     elements.operationStatus.hidden = true;
     elements.rawDetail.textContent = "";
-    elements.logOutput.textContent = "";
+    setLogOutput("");
     elements.logStatus.textContent = "尚未读取";
     elements.loadLogsButton.disabled = true;
     elements.followLogsButton.disabled = true;
@@ -2065,8 +2066,8 @@ async function loadRecentLogs() {
   try {
     const logs = await fetchJSON(`${ENDPOINTS.containers}/${encodeURIComponent(selectedID)}/logs?tail=200`);
     if (state.selectedID !== selectedID) return;
-    elements.logOutput.textContent = logs.text;
-    elements.logStatus.textContent = logs.truncated ? "最近日志（已截断）" : `读取于 ${formatTime(logs.observedAt)}`;
+    setLogOutput(logs.text, logs.truncated);
+    elements.logStatus.textContent = state.logTruncated ? "最近日志（已截断）" : `读取于 ${formatTime(logs.observedAt)}`;
   } catch (error) {
     if (state.selectedID === selectedID) elements.logStatus.textContent = formatProblem(error);
   } finally {
@@ -2086,7 +2087,9 @@ function startFollowingLogs({ reconnect = false } = {}) {
     state.reconnectAttempts = 0;
     elements.logStatus.textContent = "正在实时跟随";
   });
-  source.addEventListener("log", (event) => appendLog(parseEventText(event.data)));
+  source.addEventListener("log", (event) => {
+    if (state.eventSource === source && state.selectedID === selectedID) appendLog(parseEventText(event.data));
+  });
   source.addEventListener("warning", (event) => {
     const message = parseEventMessage(event.data);
     elements.logStatus.textContent = `警告：${message}`;
@@ -2120,14 +2123,29 @@ function stopFollowingLogs(message = "尚未跟随") {
   window.clearTimeout(state.reconnectTimer);
   state.eventSource?.close();
   state.eventSource = null;
+  if (state.logRenderTimer !== null) flushLogOutput();
   elements.followLogsButton.textContent = "实时跟随";
   if (message) elements.logStatus.textContent = message;
 }
 
 function appendLog(text) {
-  const combined = `${elements.logOutput.textContent}${text}`;
-  elements.logOutput.textContent = combined.length > LOG_DISPLAY_LIMIT
-    ? `［较早日志已从页面移除］\n${combined.slice(-LOG_DISPLAY_LIMIT)}` : combined;
+  if (typeof text !== "string" || !text) return;
+  const combined = state.logText + text.slice(-LOG_DISPLAY_LIMIT);
+  state.logTruncated ||= text.length > LOG_DISPLAY_LIMIT || combined.length > LOG_DISPLAY_LIMIT;
+  state.logText = combined.slice(-LOG_DISPLAY_LIMIT);
+  if (state.logRenderTimer === null) state.logRenderTimer = window.setTimeout(flushLogOutput, 100);
+}
+
+function setLogOutput(text, truncated = false) {
+  state.logText = typeof text === "string" ? text.slice(-LOG_DISPLAY_LIMIT) : "";
+  state.logTruncated = Boolean(truncated) || (typeof text === "string" && text.length > LOG_DISPLAY_LIMIT);
+  flushLogOutput();
+}
+
+function flushLogOutput() {
+  window.clearTimeout(state.logRenderTimer);
+  state.logRenderTimer = null;
+  elements.logOutput.textContent = (state.logTruncated ? "［较早日志已从页面移除］\n" : "") + state.logText;
   elements.logOutput.scrollTop = elements.logOutput.scrollHeight;
 }
 
