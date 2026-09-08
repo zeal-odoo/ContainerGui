@@ -720,6 +720,109 @@ tbody tr.is-selected {
   font-size: 12px;
   margin-bottom: 10px;
 }
+.ai-logs {
+  margin-top: 20px;
+  padding: 18px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 10px;
+  background: var(--md-sys-color-surface-container-low);
+}
+.ai-logs-header,
+.ai-logs-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.ai-logs-header h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.ai-logs p {
+  margin: 10px 0 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.ai-logs-header p {
+  margin-top: 4px;
+}
+.ai-logs-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 0;
+  color: var(--md-sys-color-on-surface);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ai-logs-toggle:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.ai-logs-switch {
+  display: inline-flex;
+  align-items: center;
+  width: 34px;
+  height: 20px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--md-sys-color-outline);
+}
+.ai-logs-switch::after {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--md-sys-color-surface);
+}
+.ai-logs-toggle[aria-checked="true"] .ai-logs-switch {
+  justify-content: flex-end;
+  background: var(--md-sys-color-primary);
+}
+.ai-logs-error {
+  color: var(--md-sys-color-error);
+}
+.ai-logs-consent,
+.ai-logs-result {
+  margin-top: 14px;
+  padding-top: 4px;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+}
+.ai-logs-actions {
+  justify-content: flex-start;
+  margin-top: 12px;
+}
+.ai-logs progress {
+  width: 100%;
+  height: 6px;
+  margin-top: 14px;
+  accent-color: var(--md-sys-color-primary);
+}
+.ai-logs pre {
+  max-height: 280px;
+  margin: 12px 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 12px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+#aiLogsAnswer {
+  font-family: inherit;
+  font-size: 13px;
+}
+.ai-logs summary {
+  margin-top: 10px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 12px;
+  cursor: pointer;
+}
 #logOutput,
 #rawDetail {
   margin: 0;

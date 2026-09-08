@@ -6,7 +6,7 @@ A lightweight local web interface for Apple [`container`](https://github.com/app
 
 [中文](#中文说明) · [English](#english-guide)
 
-**GUI v2.18.0** · Apple `container` `1.3.x` · `http://127.0.0.1:8787`
+**Source v2.21.0 · 本地源码，尚未发布 / Local source, unreleased** · Apple `container` `1.3.x` · `http://127.0.0.1:8787`
 
 > Container GUI is a local, single-user tool. It never listens on the LAN or public Internet and is not a replacement for Docker Desktop, Compose, Kubernetes, or a multi-user remote administration platform.
 >
@@ -26,6 +26,7 @@ Container GUI 为 Apple `container` CLI 提供浏览器管理界面。后端直�
 | 查看容器 | 展示运行状态、镜像、IPv4/IPv6、CPU、内存和根文件系统容量，每 5 秒刷新 |
 | 主机用量汇总 | 容器页展示所有运行中容器合计占 Mac CPU、物理内存的比例，每 5 秒刷新，不受搜索筛选影响 |
 | 查看详情 | 同一个按钮展开或收起详情；支持脱敏原始信息、最近日志和实时日志 |
+| 本地 AI 日志分析 | 默认关闭；确认下载后使用固定 Qwen3-1.7B 分析所选容器日志，提供中英文建议；关闭后确认模型进程退出 |
 | 生命周期管理 | 启动、正常停止、重启和安全删除，并进行目标确认与状态回读 |
 | 本机镜像 | 折叠/展开、每页 10 条数字分页、真实拉取进度、安全删除未引用镜像 |
 | Docker Hub | 搜索公开仓库和标签，每页 10 条数字分页；选择标签不会自动拉取 |
@@ -55,21 +56,22 @@ container system status
 
 ### 安装 .pkg（推荐）
 
-从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 下载 `ContainerGUI-2.17.0-arm64.pkg` 和对应的 `.sha256` 文件，然后校验并安装：
+从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 选择已发布的版本，下载 `ContainerGUI-<VERSION>-arm64.pkg` 和对应的 `.sha256` 文件。下面的版本号应替换成实际下载文件中的版本；本地源码版本 `2.21.0` 尚未发布安装包。
 
 ```bash
-shasum -a 256 -c ContainerGUI-2.17.0-arm64.pkg.sha256
-sudo installer -pkg ContainerGUI-2.17.0-arm64.pkg -target /
+CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"
+shasum -a 256 -c "ContainerGUI-${CONTAINER_GUI_VERSION}-arm64.pkg.sha256"
+sudo installer -pkg "ContainerGUI-${CONTAINER_GUI_VERSION}-arm64.pkg" -target /
 open http://127.0.0.1:8787/
 ```
 
-安装包把只读运行文件放到 `/Library/Application Support/ContainerGUI/versions/2.17.0`，并为当前控制台用户安装 LaunchAgent。服务仍以该用户身份运行，不会以 root 身份运行。若安装时没有登录的图形界面用户，登录后执行：
+安装包把只读运行文件放到 `/Library/Application Support/ContainerGUI/versions/<VERSION>`，并为当前控制台用户安装 LaunchAgent。服务仍以该用户身份运行，不会以 root 身份运行。若安装时没有登录的图形界面用户，登录后执行：
 
 ```bash
 sudo container-gui-enable
 ```
 
-当前发布包未使用 Developer ID Installer 签名，也未经过 Apple 公证。macOS 拦截时可在 Finder 中右键安装包选择“打开”，或使用上面的 `installer` 命令。完整卸载命令为：
+本项目默认构建的安装包未使用 Developer ID Installer 签名，也未经过 Apple 公证；所下载安装包的实际签名及公证状态以对应 Release 说明为准。macOS 拦截时可在 Finder 中右键安装包选择“打开”，或使用上面的 `installer` 命令。完整卸载命令为：
 
 ```bash
 sudo container-gui-uninstall
@@ -172,6 +174,20 @@ GUI 也支持显式 root 公钥登录。root 模式仍禁用密码、键盘交�
 
 停止并重新启动同一个容器会保留端口、授权公钥和 SSH 主机密钥；删除并重建后主机指纹可能改变。自动 SSH 初始化目前只支持能够以 root 执行 `apt-get` 的 Debian/Ubuntu 系镜像。
 
+### 可选的本地 AI 日志分析（源码 v2.21.0）
+
+在所选容器的详情中打开“本地 AI 分析”，点击“启用 AI”。首次使用需要确认下载固定版本的 Qwen3-1.7B Core ML 模型，共 1,954,040,277 字节（约 1.95 GB）；下载和文件校验完成后才会加载模型。AI 每次服务启动都默认关闭，普通日志查看不依赖 AI。
+
+模型缓存在 `~/Library/Application Support/ContainerGUI/Models/qwen3-1.7b-ane-0977a61d/`。下载中断后可重试，已校验文件会复用；空间预检只计算尚未下载的文件并保留额外余量。安装时需要访问 Hugging Face，日志分析在本机进行，没有云端回退。
+
+每次只读取所选容器最近 200 行日志，脱敏后证据最多 6,144 字节；超长日志行会被省略。输入与输出合计最多 2,048 个 token，输出最多 256 个 token。全局只运行一个模型进程，串行分析，批次间隔至少 10 秒；相同证据不会重复触发分析。日志按不可信数据处理，结果仅提供可能原因和建议，不会执行命令、调用工具或修改容器。自动脱敏只能识别已知形式的敏感信息，不能保证移除所有秘密。
+
+点击“关闭 AI”会取消待处理工作，并在确认模型进程退出后显示关闭；下载文件会保留。页面隐藏时会立即请求关闭；连接中断等导致请求未送达时，最后一次心跳约 60–65 秒后会触发兜底关闭。macOS 管理的文件缓存和编译缓存可能继续保留，系统内存数字不一定立即回落。
+
+AI 仅面向 Apple silicon、macOS 26+，启用和分析前要求至少 8 GB 物理内存及 3 GiB 可用内存。Core ML 配置使用 CPU 和 Neural Engine，不使用 GPU；这一配置不能证明每个运算都在 ANE 上执行。实际模型目前只在 M4 Max、128 GB 内存的 Mac 上验证，首次冷加载实测约 71 秒；低内存机器尚未验证。完整耗时、内存和退出证据见 [AI 验证记录](specs/014-local-ai-logs/validation.md)。
+
+模型来源：[Qwen3-1.7B](https://huggingface.co/Qwen/Qwen3-1.7B)（Apache-2.0）及 [ANEMLL Core ML 转换](https://huggingface.co/anemll/anemll-Qwen-Qwen3-1.7B-ctx2048_0.3.5/tree/0977a61d00e39118aab5ed1e510f1d228df5eefd)（转换模型卡标注 MIT）。安装器固定版本和文件哈希，不下载或执行仓库中的 Python 脚本。
+
 ### 检查 Container GUI 更新
 
 页面首次可用后会在后台检查 GitHub 最新稳定版；同一浏览器 24 小时内不会重复自动查询。顶部“检查更新”可随时手动检查，不受该间隔限制。
@@ -258,6 +274,7 @@ Key capabilities:
 | Inspect containers | View runtime state, image, IPv4/IPv6, CPU, memory, and root-filesystem capacity with a five-second refresh interval |
 | Host usage summary | Show all running containers' combined share of the Mac's CPU and physical memory, refreshed every five seconds independently of search filters |
 | Inspect details | Use the same button to open or close details, with redacted raw data, recent logs, and live logs |
+| Analyse logs with local AI | Off by default; after a confirmed download, fixed Qwen3-1.7B analyses the selected container's logs in Chinese or English; turning it off verifies model-process exit |
 | Manage lifecycle | Start, gracefully stop, restart, and safely delete containers with target confirmation and authoritative readback |
 | Manage local images | Collapse or expand the section, browse numbered 10-item pages, view real pull progress, and safely delete unused images |
 | Browse Docker Hub | Search public repositories and tags using numbered 10-item pages; selecting a tag does not pull it automatically |
@@ -287,21 +304,22 @@ container system status
 
 ### Install the .pkg (recommended)
 
-Download `ContainerGUI-2.17.0-arm64.pkg` and its `.sha256` file from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest), then verify and install them:
+Choose a published version from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) and download `ContainerGUI-<VERSION>-arm64.pkg` with its `.sha256` file. Replace the version below with the version in the downloaded filename. The local source version `2.21.0` does not yet have a published installer.
 
 ```bash
-shasum -a 256 -c ContainerGUI-2.17.0-arm64.pkg.sha256
-sudo installer -pkg ContainerGUI-2.17.0-arm64.pkg -target /
+CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"
+shasum -a 256 -c "ContainerGUI-${CONTAINER_GUI_VERSION}-arm64.pkg.sha256"
+sudo installer -pkg "ContainerGUI-${CONTAINER_GUI_VERSION}-arm64.pkg" -target /
 open http://127.0.0.1:8787/
 ```
 
-The package installs its read-only runtime at `/Library/Application Support/ContainerGUI/versions/2.17.0` and creates LaunchAgents for the current console user. The service continues to run as that user, never as root. If no graphical user is logged in during installation, run this after signing in:
+The package installs its read-only runtime at `/Library/Application Support/ContainerGUI/versions/<VERSION>` and creates LaunchAgents for the current console user. The service continues to run as that user, never as root. If no graphical user is logged in during installation, run this after signing in:
 
 ```bash
 sudo container-gui-enable
 ```
 
-The current package is not signed with a Developer ID Installer certificate and has not been notarized by Apple. If macOS blocks it, right-click the package in Finder and choose Open, or use the `installer` command above. To remove the system runtime and current user's LaunchAgents:
+Packages built by this project are unsigned and not notarized by default; check the downloaded Release notes for that package's actual signing and notarization status. If macOS blocks it, right-click the package in Finder and choose Open, or use the `installer` command above. To remove the system runtime and current user's LaunchAgents:
 
 ```bash
 sudo container-gui-uninstall
@@ -404,6 +422,20 @@ The GUI also offers an explicit root public-key mode. Password, keyboard-interac
 
 Stopping and starting the same container preserves its port, authorized key, and SSH host keys. Deleting and recreating it may change the host fingerprint. Automatic SSH bootstrap currently supports Debian/Ubuntu-family images that can run `apt-get` as root.
 
+### Optional local AI log analysis (source v2.21.0)
+
+Open the selected container's details and select “Enable AI” under “Local AI analysis.” First use requires confirmation to download the fixed Qwen3-1.7B Core ML model: 1,954,040,277 bytes, approximately 1.95 GB. Loading begins only after download and file verification succeed. AI defaults to off whenever the service starts; ordinary log viewing works independently.
+
+Model files are cached under `~/Library/Application Support/ContainerGUI/Models/qwen3-1.7b-ane-0977a61d/`. Interrupted downloads can be retried, reusing verified files; the disk-space check reserves the missing bytes plus additional headroom. Installation connects to Hugging Face. Log analysis runs locally without a cloud fallback.
+
+Each batch reads only the selected container's latest 200 log lines. Redacted evidence is limited to 6,144 bytes, with oversized lines omitted. Input and output together fit within 2,048 tokens, including at most 256 output tokens. One model process serves serial analyses globally, with at least 10 seconds between batches; identical evidence does not trigger another analysis. Logs are untrusted data, and answers are advisory: the model cannot execute commands, call tools, or modify containers. Automatic redaction detects known secret formats and cannot guarantee removal of every secret.
+
+“Turn off AI” cancels pending work and shows the off state only after confirming that the model process exited. Downloaded files remain cached. Hiding the page immediately requests shutdown; if that request cannot arrive, such as after a lost connection, a fallback stops the worker approximately 60–65 seconds after the last heartbeat. macOS-managed file and compilation caches may remain, so system memory readings may not fall immediately.
+
+AI targets Apple silicon and macOS 26+, with at least 8 GB physical memory and 3 GiB available memory required before enabling or analysing. Core ML is configured for CPU and Neural Engine, excluding GPU; this does not prove that every operation executes on the ANE. The actual model has so far been tested only on an M4 Max Mac with 128 GB memory, where the first cold load took approximately 71 seconds. Low-memory machines remain unverified. See the [AI validation record](specs/014-local-ai-logs/validation.md) for timing, memory, and process-exit evidence.
+
+Model attribution: [Qwen3-1.7B](https://huggingface.co/Qwen/Qwen3-1.7B) under Apache-2.0, with the [ANEMLL Core ML conversion](https://huggingface.co/anemll/anemll-Qwen-Qwen3-1.7B-ctx2048_0.3.5/tree/0977a61d00e39118aab5ed1e510f1d228df5eefd) labelled MIT in its model card. The installer pins the revision and file hashes and does not download or execute repository Python scripts.
+
 ### Check for Container GUI updates
 
 After the page becomes usable, it checks the latest stable GitHub Release in the background. The same browser will not repeat an automatic check within 24 hours. The “Check for updates” action in the header always performs an immediate manual check.
@@ -484,6 +516,8 @@ flowchart LR
     Server -->|Fixed commands and arguments| CLI[Apple container CLI]
     CLI --> API[container-apiserver]
     Server -->|GET-only search| Hub[Docker Hub API]
+    Server -->|Confirmed fixed model download| Models[Hugging Face]
+    Server -->|Optional local analysis| AI[Qwen3 model child process]
 ```
 
 Source code is under `Sources/ContainerGUI`, static frontend resources are under `Sources/ContainerGUI/Resources/Public`, and behavior specifications and validation evidence are under [`specs`](specs).
@@ -498,3 +532,4 @@ Source code is under `Sources/ContainerGUI`, static frontend resources are under
 - [容器重启 / Container restart](specs/007-container-restart/spec.md)
 - [存储容量 / Storage capacity](specs/008-container-storage-capacity/spec.md)
 - [Material 3、glass 与分页 / Material 3, glass, and pagination](specs/011-glass-detail-pagination/spec.md)
+- [可选本地 AI 日志分析 / Optional local AI log analysis](specs/014-local-ai-logs/spec.md)

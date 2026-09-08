@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#191b20" media="(prefers-color-scheme: dark)">
   <title>Container GUI</title>
   <link rel="icon" href="/icons/cube.svg">
-  <link rel="stylesheet" href="/app.css?v=2.20.0">
+  <link rel="stylesheet" href="/app.css?v=2.21.0">
 </head>
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
@@ -145,6 +145,35 @@
             </div>
             <div id="logStatus" class="quiet" aria-live="polite">尚未读取</div>
             <pre id="logOutput" tabindex="0" aria-label="容器日志输出" data-empty-label="日志将在这里显示"></pre>
+            <section id="aiLogsPanel" class="ai-logs" aria-labelledby="aiLogsTitle" hidden>
+              <div class="ai-logs-header">
+                <div><h4 id="aiLogsTitle">本地 AI 分析</h4><p id="aiLogsModel" class="quiet">Qwen3-1.7B · 按需下载</p></div>
+                <button id="aiLogsToggle" class="ai-logs-toggle" type="button" role="switch" aria-checked="false" aria-label="启用 AI" disabled>
+                  <span id="aiLogsToggleLabel">启用 AI</span><span class="ai-logs-switch" aria-hidden="true"></span>
+                </button>
+              </div>
+              <p id="aiLogsStatus" class="ai-logs-status" role="status" aria-live="polite">正在读取 AI 状态…</p>
+              <p id="aiLogsTarget" class="quiet" hidden></p>
+              <p id="aiLogsError" class="ai-logs-error" role="alert" hidden></p>
+              <button id="aiLogsRetryStatus" class="button secondary small" type="button" hidden>重试</button>
+              <div id="aiLogsConsent" class="ai-logs-consent" hidden>
+                <p id="aiLogsDownloadSize"></p>
+                <div class="ai-logs-actions">
+                  <button id="aiLogsConfirmDownload" class="button primary small" type="button">确认下载并启用</button>
+                  <button id="aiLogsCancelDownload" class="button secondary small" type="button">取消</button>
+                </div>
+              </div>
+              <progress id="aiLogsProgress" aria-label="AI 模型下载进度" hidden></progress>
+              <p id="aiLogsProgressText" class="quiet" hidden></p>
+              <div id="aiLogsResult" class="ai-logs-result" hidden>
+                <p id="aiLogsAdvice" class="quiet"></p>
+                <pre id="aiLogsAnswer" tabindex="0"></pre>
+                <details><summary id="aiLogsEvidenceTitle">本次分析的日志（已脱敏）</summary><pre id="aiLogsEvidence" tabindex="0"></pre></details>
+                <p id="aiLogsResultMeta" class="quiet"></p>
+              </div>
+              <p id="aiLogsPrivacy" class="quiet">日志仅在本机分析，不上传；会遮盖可识别的秘密，但可能有遗漏。</p>
+              <details class="ai-logs-limits"><summary id="aiLogsLimitsTitle">资源与兼容性</summary><p id="aiLogsLimits" class="quiet"></p></details>
+            </section>
           </section>
           <details class="raw-detail">
             <summary>原始详情（已脱敏）</summary>
@@ -469,8 +498,9 @@
   <script src="/ssh-key-generator.js" defer></script>
   <script src="/odoo-create-form.js" defer></script>
   <script src="/pagination.js" defer></script>
-  <script src="/update-check.js?v=2.20.0" defer></script>
-  <script src="/i18n.js?v=2.20.0" defer></script>
-  <script src="/app.js?v=2.20.0" defer></script>
+  <script src="/update-check.js?v=2.21.0" defer></script>
+  <script src="/i18n.js?v=2.21.0" defer></script>
+  <script src="/ai-logs.js?v=2.21.0" defer></script>
+  <script src="/app.js?v=2.21.0" defer></script>
 </body>
 </html>

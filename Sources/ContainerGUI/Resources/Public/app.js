@@ -102,7 +102,11 @@ const healthLabels = {
 function renderWorkspace() {
   const requested = window.location.hash.slice(1);
   const view = ["containers", "images", "registry"].includes(requested) ? requested : "containers";
-  if (state.activeView === "containers" && view !== "containers") stopFollowingLogs("已停止跟随");
+  if (state.activeView === "containers" && view !== "containers") {
+    stopFollowingLogs("已停止跟随");
+    globalThis.ContainerGUIAILogs?.setContainer(null);
+  }
+  if (view === "containers") globalThis.ContainerGUIAILogs?.setContainer(state.selectedID || null);
   state.activeView = view;
   elements.containersSection.hidden = view !== "containers";
   elements.imagesSection.hidden = view !== "images";
@@ -1098,6 +1102,7 @@ async function loadDetail(id, { quiet = false } = {}) {
     elements.followLogsButton.disabled = true;
   }
   state.selectedID = id;
+  globalThis.ContainerGUIAILogs?.setContainer(id);
   if (shouldReveal) revealDetailContent();
   syncDetailButtons();
   if (!quiet) elements.detailTitle.textContent = "正在读取…";
@@ -1268,6 +1273,7 @@ function closeDetail() {
   state.detailController?.abort();
   stopFollowingLogs("已停止跟随");
   state.selectedID = null;
+  globalThis.ContainerGUIAILogs?.setContainer(null);
   state.selectedDetail = null;
   state.selectedSSHStatus = null;
   syncDetailButtons();
@@ -2189,6 +2195,7 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") refreshDashboard();
 });
 document.addEventListener("container-gui-language-change", () => {
+  globalThis.ContainerGUIAILogs?.languageChanged();
   renderWorkspace();
   renderContainers();
   renderHostUsage();
