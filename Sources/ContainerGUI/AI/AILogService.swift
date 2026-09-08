@@ -29,10 +29,13 @@ struct AILogStatus: Codable, Sendable {
     let workerPID: Int32?
     let error: String?
     let result: AILogResult?
+    let historyError: String?
+    let historyRecordId: UUID?
 }
 
 actor AILogService {
     private let reader: any ContainerLogReading
+    private let history: AILogHistoryStore
     private let store: any AIModelStoring
     private let worker: any AIWorkerRunning
     private let memoryAvailable: @Sendable () -> Bool
@@ -44,6 +47,8 @@ actor AILogService {
     private var language = "zh"
     private var error: String?
     private var result: AILogResult?
+    private var historyError: String?
+    private var historyRecordID: UUID?
     private var generation = 0
     private var work: Task<Void, Never>?
     private var leaseTask: Task<Void, Never>?
@@ -52,11 +57,12 @@ actor AILogService {
     private var lastAnalysis = ContinuousClock.now.advanced(by: .seconds(-3_600))
     private var lastDigest: SHA256.Digest?
 
-    init(reader: any ContainerLogReading, store: any AIModelStoring = AIModelStore(),
+    init(reader: any ContainerLogReading, history: AILogHistoryStore, store: any AIModelStoring = AIModelStore(),
          worker: any AIWorkerRunning = AIWorkerProcess(),
          memoryAvailable: @escaping @Sendable () -> Bool = AILogService.hasMemoryHeadroom,
          leaseSeconds: Double = 60, minimumInterval: Double = 10) {
         self.reader = reader
+        self.history = history
         self.store = store
         self.worker = worker
         self.memoryAvailable = memoryAvailable
@@ -68,7 +74,8 @@ actor AILogService {
         let model = await store.status()
         let pid = await worker.pid()
         return AILogStatus(enabled: enabled, phase: phase, containerId: containerID,
-                           language: language, model: model, workerPID: pid, error: error, result: result)
+                           language: language, model: model, workerPID: pid, error: error, result: result,
+                           historyError: historyError, historyRecordId: historyRecordID)
     }
 
     func install(confirmed: Bool) throws {
@@ -176,9 +183,22 @@ actor AILogService {
                 }
                 let answer = try await worker.generate(evidence: evidence, language: language)
                 guard current == generation, enabled else { return }
-                result = AILogResult(text: AILogEvidence.prepare(answer.text), evidence: evidence,
+                let completed = AILogResult(text: AILogEvidence.prepare(answer.text), evidence: evidence,
                                      observedAt: logs.observedAt, inputTokens: answer.inputTokens,
                                      outputTokens: answer.outputTokens, elapsedSeconds: answer.elapsedSeconds)
+                let record = AILogHistoryRecord(containerId: containerID, language: language, result: completed)
+                // A completed result can be archived while disable awaits old work, but
+                // no late save may revive the model/session or its temporary result.
+                do {
+                    try await history.append(record)
+                    historyError = nil
+                    historyRecordID = record.id
+                } catch {
+                    historyError = "history_save_failed"
+                    historyRecordID = nil
+                }
+                guard current == generation, enabled else { return }
+                result = completed
                 lastDigest = digest
                 phase = "ready"
                 work = nil

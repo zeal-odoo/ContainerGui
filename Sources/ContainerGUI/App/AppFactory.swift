@@ -81,7 +81,9 @@ enum AppFactory {
             reader: reader,
             limiter: LogSessionLimiter(maximumSessions: configuration.maximumLogSessions)
         )
-        AILogRoutes.register(on: router, service: AILogService(reader: reader))
+        let history = AILogHistoryStore()
+        AILogRoutes.register(on: router, service: AILogService(reader: reader, history: history))
+        AILogRoutes.registerHistory(on: router, history: history)
         return router
     }
 

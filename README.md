@@ -6,7 +6,7 @@ A lightweight local web interface for Apple [`container`](https://github.com/app
 
 [中文](#中文说明) · [English](#english-guide)
 
-**Source v2.22.0 · 本地源码，尚未发布 / Local source, unreleased** · Apple `container` `1.3.x` · `http://127.0.0.1:8787`
+**Source v2.23.0 · 本地源码，尚未发布 / Local source, unreleased** · Apple `container` `1.3.x` · `http://127.0.0.1:8787`
 
 > Container GUI is a local, single-user tool. It never listens on the LAN or public Internet and is not a replacement for Docker Desktop, Compose, Kubernetes, or a multi-user remote administration platform.
 >
@@ -28,6 +28,7 @@ Container GUI 为 Apple `container` CLI 提供浏览器管理界面。后端直�
 | 整机 ANE | 独立展示 ANE 估算功耗（W），可见容器页约每 5 秒刷新；计算使用率明确显示不可用 |
 | 查看详情 | 同一个按钮展开或收起详情；支持脱敏原始信息、最近日志和实时日志 |
 | 本地 AI 日志分析 | 默认关闭；确认下载后使用固定 Qwen3-1.7B 分析所选容器日志，提供中英文建议；关闭后确认模型进程退出 |
+| AI 分析历史 | 自动保存结果和脱敏日志；关闭 AI 后可回看，每页 10 条，支持单条 JSON 导出和确认删除 |
 | 生命周期管理 | 启动、正常停止、重启和安全删除，并进行目标确认与状态回读 |
 | 本机镜像 | 折叠/展开、每页 10 条数字分页、真实拉取进度、安全删除未引用镜像 |
 | Docker Hub | 搜索公开仓库和标签，每页 10 条数字分页；选择标签不会自动拉取 |
@@ -59,7 +60,7 @@ container system status
 
 ### 安装 .pkg（推荐）
 
-从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 选择已发布的版本，下载 `ContainerGUI-<VERSION>-arm64.pkg` 和对应的 `.sha256` 文件。下面的版本号应替换成实际下载文件中的版本；本地源码版本 `2.22.0` 尚未发布安装包。
+从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 选择已发布的版本，下载 `ContainerGUI-<VERSION>-arm64.pkg` 和对应的 `.sha256` 文件。下面的版本号应替换成实际下载文件中的版本；本地源码版本 `2.23.0` 尚未发布安装包。
 
 ```bash
 CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"
@@ -191,6 +192,14 @@ AI 仅面向 Apple silicon、macOS 26+，启用和分析前要求至少 8 GB 物
 
 模型来源：[Qwen3-1.7B](https://huggingface.co/Qwen/Qwen3-1.7B)（Apache-2.0）及 [ANEMLL Core ML 转换](https://huggingface.co/anemll/anemll-Qwen-Qwen3-1.7B-ctx2048_0.3.5/tree/0977a61d00e39118aab5ed1e510f1d228df5eefd)（转换模型卡标注 MIT）。安装器固定版本和文件哈希，不下载或执行仓库中的 Python 脚本。
 
+### AI 分析历史（源码 v2.23.0）
+
+从此版本开始，每次成功分析会自动把结果和对应脱敏日志保存在 `~/Library/Application Support/ContainerGUI/AILogHistory/`，包括容器标识、分析/日志采样时间、模型版本和语言。关闭 AI、刷新页面或重启 GUI 不会删除历史；“分析历史”独立读取，不会加载模型或读取新的容器日志。
+
+在容器详情的“本地 AI 分析 → 分析历史”中查看，每页 10 条，按时间倒序；展开记录可回看结果与证据，选择“导出 JSON”下载用于进一步分析，或二次确认后删除单条记录。历史目录权限为 `0700`，文件为 `0600`，仍应使用受信任的单用户 Mac。
+
+所有容器合计保留最近 1,000 条，超出会清理最旧记录；需长期保留的记录请先导出。结果与日志各最多 6,144 UTF-8 字节，不是全量日志录制；不会恢复旧版本中已被清空的结果。同名重建容器按相同标识归组，请结合时间区分。自动脱敏可能遗漏敏感内容，导出分享前请检查。磁盘/权限错误会提示未能保存，不会把当前结果误报为已归档。
+
 ### 检查 Container GUI 更新
 
 页面首次可用后会在后台检查 GitHub 最新稳定版；同一浏览器 24 小时内不会重复自动查询。顶部“检查更新”可随时手动检查，不受该间隔限制。
@@ -279,6 +288,7 @@ Key capabilities:
 | Host ANE | Independently show estimated ANE power (W), refreshing about every five seconds on the visible container page; compute utilization is explicitly unavailable |
 | Inspect details | Use the same button to open or close details, with redacted raw data, recent logs, and live logs |
 | Analyse logs with local AI | Off by default; after a confirmed download, fixed Qwen3-1.7B analyses the selected container's logs in Chinese or English; turning it off verifies model-process exit |
+| AI analysis history | Automatically save results and redacted logs; browse with AI off, 10 records per page, export individual JSON records, or delete after confirmation |
 | Manage lifecycle | Start, gracefully stop, restart, and safely delete containers with target confirmation and authoritative readback |
 | Manage local images | Collapse or expand the section, browse numbered 10-item pages, view real pull progress, and safely delete unused images |
 | Browse Docker Hub | Search public repositories and tags using numbered 10-item pages; selecting a tag does not pull it automatically |
@@ -310,7 +320,7 @@ container system status
 
 ### Install the .pkg (recommended)
 
-Choose a published version from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) and download `ContainerGUI-<VERSION>-arm64.pkg` with its `.sha256` file. Replace the version below with the version in the downloaded filename. The local source version `2.22.0` does not yet have a published installer.
+Choose a published version from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) and download `ContainerGUI-<VERSION>-arm64.pkg` with its `.sha256` file. Replace the version below with the version in the downloaded filename. The local source version `2.23.0` does not yet have a published installer.
 
 ```bash
 CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"
@@ -442,6 +452,14 @@ AI targets Apple silicon and macOS 26+, with at least 8 GB physical memory and 3
 
 Model attribution: [Qwen3-1.7B](https://huggingface.co/Qwen/Qwen3-1.7B) under Apache-2.0, with the [ANEMLL Core ML conversion](https://huggingface.co/anemll/anemll-Qwen-Qwen3-1.7B-ctx2048_0.3.5/tree/0977a61d00e39118aab5ed1e510f1d228df5eefd) labelled MIT in its model card. The installer pins the revision and file hashes and does not download or execute repository Python scripts.
 
+### AI analysis history (source v2.23.0)
+
+Starting with this version, each successful analysis automatically saves its result and redacted log evidence in `~/Library/Application Support/ContainerGUI/AILogHistory/`, including the container ID, save/log observation times, model revision and language. History survives disabling AI, refreshing the browser and restarting the GUI. History browsing does not load the model or read fresh container logs.
+
+Open “Local AI analysis → Analysis history” in the container details. Records are newest first, with 10 per page. Expand a record to inspect its answer and evidence, download it with “Export JSON” for further analysis, or delete that individual record after confirmation. The directory uses mode `0700` and files use `0600`; a trusted single-user Mac is still required.
+
+The latest 1,000 records are retained across all containers; older entries are removed when the limit is exceeded. Export anything you need to keep longer. Answers and log excerpts are each limited to 6,144 UTF-8 bytes, not full log recordings. Previously discarded results cannot be recovered. Recreated containers with the same ID share history, so check timestamps. Redaction may miss sensitive data: review before sharing exports. Disk or permission failures show a save warning and do not falsely mark the current result as archived.
+
 ### Check for Container GUI updates
 
 After the page becomes usable, it checks the latest stable GitHub Release in the background. The same browser will not repeat an automatic check within 24 hours. The “Check for updates” action in the header always performs an immediate manual check.
@@ -539,3 +557,4 @@ Source code is under `Sources/ContainerGUI`, static frontend resources are under
 - [存储容量 / Storage capacity](specs/008-container-storage-capacity/spec.md)
 - [Material 3、glass 与分页 / Material 3, glass, and pagination](specs/011-glass-detail-pagination/spec.md)
 - [可选本地 AI 日志分析 / Optional local AI log analysis](specs/014-local-ai-logs/spec.md)
+- [AI 分析历史 / AI analysis history](specs/016-ai-log-history/spec.md)

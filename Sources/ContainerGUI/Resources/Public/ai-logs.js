@@ -25,7 +25,7 @@ globalThis.ContainerGUIAILogs = (() => {
     ai_model_verification_failed: "模型文件校验失败，请重新下载。",
     ai_model_download_failed: "模型下载失败，请检查网络后重试。"
   });
-  const ids = ["Panel", "Title", "Model", "Toggle", "ToggleLabel", "Status", "Target", "Error", "RetryStatus", "Consent", "DownloadSize", "ConfirmDownload", "CancelDownload", "Progress", "ProgressText", "Privacy", "LimitsTitle", "Limits", "Result", "Advice", "Answer", "EvidenceTitle", "Evidence", "ResultMeta"];
+  const ids = ["Panel", "Title", "Model", "Toggle", "ToggleLabel", "Status", "Target", "Error", "RetryStatus", "Consent", "DownloadSize", "ConfirmDownload", "CancelDownload", "Progress", "ProgressText", "Privacy", "LimitsTitle", "Limits", "Result", "Advice", "Answer", "EvidenceTitle", "Evidence", "ResultMeta", "HistoryError"];
   const elements = Object.fromEntries(ids.map((id) => [id, document.getElementById(`aiLogs${id}`)]));
   let containerId = null;
   let snapshot = null;
@@ -114,6 +114,8 @@ globalThis.ContainerGUIAILogs = (() => {
     elements.EvidenceTitle.textContent = t("本次分析的日志（已脱敏）");
     elements.Evidence.textContent = result?.evidence || "";
     elements.ResultMeta.textContent = result?.observedAt ? format("分析时间：{time}", { time: result.observedAt }) : "";
+    elements.HistoryError.hidden = !snapshot?.historyError;
+    elements.HistoryError.textContent = t("分析结果未能保存到本机历史，请检查目录权限或磁盘空间；当前结果仍可查看。");
   }
 
   async function request(path, body, { keepalive = false } = {}) {
@@ -141,6 +143,7 @@ globalThis.ContainerGUIAILogs = (() => {
     if (token !== version || response.sequence < appliedSequence) return false;
     appliedSequence = response.sequence;
     snapshot = response.data;
+    if (snapshot.containerId === containerId) globalThis.ContainerGUIAILogHistory?.notify(snapshot.historyRecordId);
     if (stopping && released(snapshot)) {
       stopping = false;
       message = "";
@@ -307,6 +310,7 @@ globalThis.ContainerGUIAILogs = (() => {
     if (id === containerId) return;
     const mustStop = owned || desired;
     containerId = id;
+    globalThis.ContainerGUIAILogHistory?.setContainer(id);
     version += 1;
     message = "";
     if (mustStop) await disable();
@@ -334,5 +338,5 @@ globalThis.ContainerGUIAILogs = (() => {
   });
   globalThis.addEventListener("pagehide", releaseOnLeave);
   render();
-  return Object.freeze({ setContainer, refresh, languageChanged: render });
+  return Object.freeze({ setContainer, refresh, languageChanged() { render(); globalThis.ContainerGUIAILogHistory?.languageChanged(); } });
 })();

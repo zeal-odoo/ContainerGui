@@ -841,6 +841,29 @@ tbody tr.is-selected {
   font-family: inherit;
   font-size: 13px;
 }
+.ai-history {
+  margin-top: 16px;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+}
+.ai-history-list {
+  max-height: 620px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+.ai-history-record {
+  margin-top: 12px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+.ai-history-actions,
+.ai-history-pages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.ai-history-pages span { flex: 1; text-align: center; }
 .ai-logs summary {
   margin-top: 10px;
   color: var(--md-sys-color-on-surface-variant);

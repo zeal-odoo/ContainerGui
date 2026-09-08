@@ -153,7 +153,62 @@ final class AILogServiceTests: XCTestCase {
     }
 
     private func service(worker: FakeAILogWorker = FakeAILogWorker(), reader: FakeAILogReader = FakeAILogReader(), memoryAvailable: Bool = true, leaseSeconds: Double = 60) -> AILogService {
-        AILogService(reader: reader, store: FakeAIModelStore(), worker: worker, memoryAvailable: { memoryAvailable }, leaseSeconds: leaseSeconds, minimumInterval: 0)
+        AILogService(reader: reader, history: AILogHistoryStore(directory: try! historyDirectory()), store: FakeAIModelStore(), worker: worker, memoryAvailable: { memoryAvailable }, leaseSeconds: leaseSeconds, minimumInterval: 0)
+    }
+
+    func testCompletedHistorySurvivesDisableWithoutFurtherModelOrLogReads() async throws {
+        let directory = try historyDirectory()
+        let history = AILogHistoryStore(directory: directory)
+        let reader = FakeAILogReader()
+        let worker = FakeAILogWorker()
+        let service = AILogService(reader: reader, history: history, store: FakeAIModelStore(), worker: worker, memoryAvailable: { true }, minimumInterval: 0)
+        try await service.enable(containerID: "demo", language: "en")
+        try await waitFor(service, phase: "ready")
+        await service.analyse()
+        try await waitForResult(service)
+        try await waitFor(service, phase: "ready")
+        await service.analyse()
+        try await waitFor(service, phase: "ready")
+        try await service.disable()
+        let reads = await reader.reads
+        let starts = await worker.starts
+        let page = try await AILogHistoryStore(directory: directory).list(containerID: "demo", page: 1)
+        XCTAssertEqual(page.total, 1)
+        XCTAssertEqual(page.items.first?.language, "en")
+        XCTAssertFalse(page.items[0].result.evidence.contains("PASSWORD=secret"))
+        let finalReads = await reader.reads
+        let finalStarts = await worker.starts
+        XCTAssertEqual(finalReads, reads)
+        XCTAssertEqual(finalStarts, starts)
+    }
+
+    func testCancelledAnalysisNeverBecomesHistory() async throws {
+        let history = AILogHistoryStore(directory: try historyDirectory())
+        let service = AILogService(reader: FakeAILogReader(), history: history, store: FakeAIModelStore(), worker: FakeAILogWorker(generationDelay: .milliseconds(200)), memoryAvailable: { true })
+        try await service.enable(containerID: "demo", language: "en")
+        try await waitFor(service, phase: "ready")
+        await service.analyse()
+        try await Task.sleep(for: .milliseconds(20))
+        try await service.disable()
+        let page = try await history.list(containerID: "demo", page: 1)
+        XCTAssertEqual(page.total, 0)
+    }
+
+    func testSaveFailurePreservesResultAndDoesNotStopWorker() async throws {
+        let directory = try historyDirectory()
+        try Data("not a directory".utf8).write(to: directory)
+        let service = AILogService(reader: FakeAILogReader(), history: AILogHistoryStore(directory: directory), store: FakeAIModelStore(), worker: FakeAILogWorker(), memoryAvailable: { true })
+        try await service.enable(containerID: "demo", language: "en")
+        try await waitFor(service, phase: "ready")
+        await service.analyse()
+        try await waitForResult(service)
+        try await waitFor(service, phase: "ready")
+        let state = await service.status()
+        XCTAssertEqual(state.historyError, "history_save_failed")
+        XCTAssertNil(state.historyRecordId)
+        XCTAssertTrue(state.enabled)
+        XCTAssertNotNil(state.result)
+        try await service.disable()
     }
 
     private func waitFor(_ service: AILogService, phase: String) async throws {
