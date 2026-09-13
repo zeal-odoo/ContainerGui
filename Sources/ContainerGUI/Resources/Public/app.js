@@ -2311,3 +2311,4 @@ loadApplicationVersion();
 updateImageSpecificCreateFields();
 updateSSHFields();
 refreshDashboard().finally(() => checkForUpdates({ automatic: true }));
+globalThis.ContainerGUIEngineUpdate.start(fetchJSON);

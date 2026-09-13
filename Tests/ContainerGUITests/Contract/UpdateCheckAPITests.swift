@@ -6,6 +6,29 @@ import XCTest
 @testable import ContainerGUI
 
 final class UpdateCheckAPITests: XCTestCase {
+    func testContainerUpdateRouteIsReadOnlyAndSeparate() async throws {
+        let checker = StubUpdateChecker()
+        let router = Router()
+        router.middlewares.add(ErrorMiddleware())
+        UpdateCheckRoutes.registerContainer(on: router, checker: checker)
+        let app = Application(router: router)
+        try await app.testLocal { client in
+            try await client.execute(uri: "/api/v1/container-update-check", method: .get) { response in
+                XCTAssertEqual(response.status, .ok)
+                let summary = try JSONDecoder.containerGUI.decode(UpdateSummary.self, from: response.body)
+                XCTAssertTrue(summary.updateAvailable)
+            }
+            try await client.execute(uri: "/api/v1/update-check", method: .get) { response in
+                XCTAssertEqual(response.status, .notFound)
+            }
+            try await client.execute(uri: "/api/v1/container-update-check", method: .post) { response in
+                XCTAssertNotEqual(response.status, .ok)
+            }
+        }
+        let calls = await checker.callCount
+        XCTAssertEqual(calls, 1)
+    }
+
     func testReadOnlyRouteReturnsVersionComparisonAndOfficialReleaseURL() async throws {
         let checker = StubUpdateChecker()
         let app = makeApplication(checker: checker)

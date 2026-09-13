@@ -6,7 +6,7 @@ A lightweight local web interface for Apple [`container`](https://github.com/app
 
 [中文](#中文说明) · [English](#english-guide)
 
-**Source v2.23.2 · 本地源码，尚未发布 / Local source, unreleased** · Apple `container` `1.3.x / 1.4.x (≥1.4.1)` · `http://127.0.0.1:8787`
+**Source v2.24.0 · 本地源码，尚未发布 / Local source, unreleased** · Apple `container` `1.3.x / 1.4.x (≥1.4.1)` · `http://127.0.0.1:8787`
 
 > Container GUI is a local, single-user tool. It never listens on the LAN or public Internet and is not a replacement for Docker Desktop, Compose, Kubernetes, or a multi-user remote administration platform.
 >
@@ -62,7 +62,7 @@ container system status
 
 ### 安装 .pkg（推荐）
 
-从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 选择已发布的版本，下载 `ContainerGUI-<VERSION>-arm64.pkg` 和对应的 `.sha256` 文件。下面的版本号应替换成实际下载文件中的版本；本地源码版本 `2.23.2` 尚未发布安装包。
+从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 选择已发布的版本，下载 `ContainerGUI-<VERSION>-arm64.pkg` 和对应的 `.sha256` 文件。下面的版本号应替换成实际下载文件中的版本；本地源码版本 `2.24.0` 尚未发布安装包。
 
 ```bash
 CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"
@@ -215,6 +215,12 @@ AI 仅面向 Apple silicon、macOS 26+，启用和分析前要求至少 8 GB 物
 - GitHub 暂时不可用不会影响容器列表或管理功能；手动检查会显示可重试提示。
 - 下载后仍应使用 Release 中的 `.sha256` 文件校验 PKG，再自行确认安装。
 
+### 检查 Apple Container 引擎更新
+
+v2.24.0 起，打开 GUI 会自动检查 `apple/container` 官方最新稳定版；页面可见时每 6 小时再次检查，检查失败后 30 分钟重试，切回页面时也会检查是否到期。侧栏“检查 Container 更新”可手动检查（服务端成功结果缓存 5 分钟）。
+
+发现新版会显示独立提示条、当前 → 最新版本和官方发布链接。不会自动下载、安装或重启，也不会把新版标记为已经兼容；升级前请查看发布说明并安排停机。此功能仅在 GUI 页面打开时检查，不发送 macOS 系统通知；只向 GitHub 请求公开发布元数据，不上传容器或日志信息。
+
 ### 安全模型
 
 - 服务固定监听 `127.0.0.1`，不接受局域网或公网连接。
@@ -326,7 +332,7 @@ container system status
 
 ### Install the .pkg (recommended)
 
-Choose a published version from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) and download `ContainerGUI-<VERSION>-arm64.pkg` with its `.sha256` file. Replace the version below with the version in the downloaded filename. The local source version `2.23.2` does not yet have a published installer.
+Choose a published version from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) and download `ContainerGUI-<VERSION>-arm64.pkg` with its `.sha256` file. Replace the version below with the version in the downloaded filename. The local source version `2.24.0` does not yet have a published installer.
 
 ```bash
 CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"
@@ -478,6 +484,12 @@ When a newer release is available, the interface shows the current and latest ve
 - It opens only the official `zeal-odoo/ContainerGui` GitHub Release page.
 - A temporary GitHub failure does not affect container listing or management; a manual check shows a retryable message.
 - After downloading, verify the PKG with the `.sha256` file from the Release before deciding to install it.
+
+### Check for Apple Container engine updates
+
+Starting in v2.24.0, opening the GUI checks the latest stable release from the official `apple/container` repository. Visible pages check again every six hours; failures retry after 30 minutes, and returning to the page checks whether a retry is due. Use “Check Container updates” in the sidebar for a manual check (successful server results are cached for five minutes).
+
+A separate banner shows current → latest versions and the official release link. Nothing is automatically downloaded, installed, or restarted, and discovery does not imply compatibility with that release. Review release notes and schedule downtime before upgrading. Checks run only while the GUI page is open, without macOS system notifications. Only public release metadata is requested from GitHub; container details and logs are not uploaded.
 
 ### Security model
 

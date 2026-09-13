@@ -11,6 +11,14 @@ globalThis.ContainerGUIUpdate = (() => {
   }
 
   function validatedReleaseURL(value) {
+    return validatedURL(value, RELEASE_PATH_PREFIX);
+  }
+
+  function validatedContainerReleaseURL(value) {
+    return validatedURL(value, "/apple/container/releases/");
+  }
+
+  function validatedURL(value, prefix) {
     try {
       const url = new URL(value);
       if (url.protocol !== "https:" ||
@@ -20,7 +28,7 @@ globalThis.ContainerGUIUpdate = (() => {
           url.password ||
           url.search ||
           url.hash ||
-          !url.pathname.startsWith(RELEASE_PATH_PREFIX)) return null;
+          !url.pathname.startsWith(prefix)) return null;
       return url.href;
     } catch {
       return null;
@@ -31,6 +39,7 @@ globalThis.ContainerGUIUpdate = (() => {
     AUTO_UPDATE_CHECK_INTERVAL_MS,
     STORAGE_KEY,
     shouldRunAutomaticCheck,
-    validatedReleaseURL
+    validatedReleaseURL,
+    validatedContainerReleaseURL
   });
 })();

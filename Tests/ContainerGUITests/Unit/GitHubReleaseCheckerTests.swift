@@ -6,6 +6,66 @@ import XCTest
 final class GitHubReleaseCheckerTests: XCTestCase {
     private let publishedAt = Date(timeIntervalSince1970: 1_788_192_000)
 
+    func testContainerCheckerCachesResultsButRecomparesAfterCLIUpgrade() async throws {
+        let version = MutableInstalledVersion("1.3.1")
+        let transport = RecordingReleaseTransport(responses: [
+            response(tag: "1.4.1", url: "https://github.com/apple/container/releases/tag/1.4.1"),
+            response(tag: "1.4.1", url: "https://github.com/apple/container/releases/tag/1.4.1")
+        ])
+        let checker = ContainerReleaseChecker(transport: transport, maximumResponseBytes: 128 * 1024,
+                                              installedVersion: { await version.value })
+        let first = try await checker.checkForUpdates()
+        let cached = try await checker.checkForUpdates()
+        XCTAssertEqual(first, cached)
+        var requests = await transport.requests
+        XCTAssertEqual(requests.count, 1)
+        await version.set("1.4.1")
+        let upgraded = try await checker.checkForUpdates()
+        XCTAssertFalse(upgraded.updateAvailable)
+        XCTAssertEqual(upgraded.currentVersion, "1.4.1")
+        requests = await transport.requests
+        XCTAssertEqual(requests.count, 2)
+        await version.set(nil)
+        do {
+            _ = try await checker.checkForUpdates()
+            XCTFail("Missing CLI must not return cached up-to-date result")
+        } catch let problem as ProblemDetail {
+            XCTAssertEqual(problem.code, .updateCheckUnavailable)
+        }
+    }
+
+    func testAppleContainerUsesSeparateOfficialEndpointAndNumericComparison() async throws {
+        for (current, latest, available) in [("1.3.1", "1.4.1", true), ("1.4.1", "1.4.1", false), ("1.10.0", "1.9.0", false)] {
+            let transport = RecordingReleaseTransport(responses: [
+                response(tag: latest, url: "https://github.com/apple/container/releases/tag/\(latest)")
+            ])
+            let checker = GitHubReleaseChecker(transport: transport, maximumResponseBytes: 128 * 1024,
+                                              currentVersion: current, repository: .appleContainer)
+            let summary = try await checker.checkForUpdates()
+            XCTAssertEqual(summary.updateAvailable, available)
+            let requests = await transport.requests
+            XCTAssertEqual(requests.first?.url.absoluteString, "https://api.github.com/repos/apple/container/releases/latest")
+        }
+    }
+
+    func testAppleContainerRejectsOtherRepositoriesAndPreviewReleases() async throws {
+        for body in [
+            response(tag: "1.5.0", url: "https://github.com/zeal-odoo/ContainerGui/releases/tag/1.5.0"),
+            response(tag: "1.5.0", url: "https://github.com/apple/container/releases/tag/1.5.0", prerelease: true),
+            response(tag: "1.5.0", url: "https://github.com/apple/container/releases/tag/1.5.0", draft: true)
+        ] {
+            let checker = GitHubReleaseChecker(transport: RecordingReleaseTransport(responses: [body]),
+                                              maximumResponseBytes: 128 * 1024, currentVersion: "1.4.1",
+                                              repository: .appleContainer)
+            do {
+                _ = try await checker.checkForUpdates()
+                XCTFail("Untrusted release should be rejected")
+            } catch let problem as ProblemDetail {
+                XCTAssertEqual(problem.code, .updateCheckUnavailable)
+            }
+        }
+    }
+
     func testSemanticVersionUsesNumericPrecedenceAndNormalizesStableTags() throws {
         XCTAssertEqual(try XCTUnwrap(SemanticVersion(" v2.17.0 ")).description, "2.17.0")
         XCTAssertEqual(try XCTUnwrap(SemanticVersion("2.17.0+build.4")).description, "2.17.0")
@@ -166,4 +226,10 @@ private actor RecordingReleaseTransport: RegistryHTTPTransport {
 
 private enum RecordingReleaseTransportError: Error {
     case noResponse
+}
+
+private actor MutableInstalledVersion {
+    var value: String?
+    init(_ value: String?) { self.value = value }
+    func set(_ value: String?) { self.value = value }
 }

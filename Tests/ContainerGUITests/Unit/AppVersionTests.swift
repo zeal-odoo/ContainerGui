@@ -4,6 +4,6 @@ import XCTest
 
 final class AppVersionTests: XCTestCase {
     func testCurrentVersionReflectsThisUpdate() {
-        XCTAssertEqual(AppVersion.current, "2.23.2")
+        XCTAssertEqual(AppVersion.current, "2.24.0")
     }
 }

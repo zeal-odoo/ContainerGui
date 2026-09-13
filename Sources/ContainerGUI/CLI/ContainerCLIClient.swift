@@ -109,8 +109,9 @@ final class ContainerCLIClient: ContainerReading, SystemControlling, ContainerMe
         self.maximumConcurrentFilesystemProbes = maximumConcurrentFilesystemProbes
     }
 
-    func installation(now: Date = Date()) async throws -> CLIInstallation {
-        try await installationCache.value { [self] in
+    func installation(now: Date = Date(), refresh: Bool = false) async throws -> CLIInstallation {
+        if refresh { await installationCache.invalidate() }
+        return try await installationCache.value { [self] in
             try await probeInstallation(now: now)
         }
     }

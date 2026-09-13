@@ -75,6 +75,14 @@ enum AppFactory {
                 maximumResponseBytes: configuration.maximumUpdateResponseBytes
             )
         )
+        UpdateCheckRoutes.registerContainer(
+            on: router,
+            checker: ContainerReleaseChecker(
+                transport: FoundationRegistryHTTPTransport(timeoutSeconds: configuration.updateTimeoutSeconds),
+                maximumResponseBytes: configuration.maximumUpdateResponseBytes,
+                installedVersion: { try await reader.installation(refresh: true).semanticVersion }
+            )
+        )
         ContainerControlRoutes.registerControl(on: router, service: controlService)
         ContainerControlRoutes.registerLogs(
             on: router,

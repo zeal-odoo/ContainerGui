@@ -330,6 +330,22 @@ img {
   margin-left: var(--sidebar-width);
   min-width: 0;
 }
+.container-update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 16px 24px;
+  padding: 16px;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: 8px;
+  background: var(--md-sys-color-surface-container);
+}
+.container-update-banner p { margin: 8px 0 0; }
+#containerUpdateVersions { margin-inline-start: 12px; }
+#checkContainerUpdatesButton { text-align: start; padding-inline: 0; }
+#containerUpdateStatus { font-size: 12px; overflow-wrap: anywhere; }
 .page-heading {
   min-height: 88px;
   display: flex;

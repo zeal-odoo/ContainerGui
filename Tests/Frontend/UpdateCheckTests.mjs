@@ -12,6 +12,20 @@ const script = readFileSync(
 );
 const api = runInNewContext(`${script}; ContainerGUIUpdate`, { URL });
 
+test("Container engine links are isolated from GUI release links", () => {
+  const official = "https://github.com/apple/container/releases/tag/1.4.1";
+  assert.equal(api.validatedContainerReleaseURL(official), official);
+  assert.equal(api.validatedReleaseURL(official), null);
+  for (const value of ["https://github.com/zeal-odoo/ContainerGui/releases/tag/1.4.1",
+    "https://github.com/apple/container-evil/releases/tag/1.4.1",
+    "https://github.com@evil.example/apple/container/releases/tag/1.4.1",
+    "http://github.com/apple/container/releases/tag/1.4.1",
+    "https://github.com/apple/container/releases/tag/1.4.1?redirect=evil",
+    "https://github.com/apple/container/releases/../../other"]) {
+    assert.equal(api.validatedContainerReleaseURL(value), null);
+  }
+});
+
 test("the helper is exposed on globalThis for the application runtime", () => {
   const exposed = runInNewContext(`${script}; globalThis.ContainerGUIUpdate`, { URL });
   assert.equal(typeof exposed?.validatedReleaseURL, "function");

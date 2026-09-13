@@ -1,22 +1,30 @@
 import Foundation
 
+enum UpdateRepository: String, Sendable {
+    case containerGUI = "zeal-odoo/ContainerGui"
+    case appleContainer = "apple/container"
+}
+
 struct GitHubReleaseChecker<Transport: RegistryHTTPTransport>: UpdateChecking {
-    private static var latestReleaseURL: URL {
-        URL(string: "https://api.github.com/repos/zeal-odoo/ContainerGui/releases/latest")!
+    private var latestReleaseURL: URL {
+        URL(string: "https://api.github.com/repos/\(repository.rawValue)/releases/latest")!
     }
 
     private let transport: Transport
     private let maximumResponseBytes: Int
     private let currentVersion: String
+    private let repository: UpdateRepository
 
     init(
         transport: Transport,
         maximumResponseBytes: Int,
-        currentVersion: String = AppVersion.current
+        currentVersion: String = AppVersion.current,
+        repository: UpdateRepository = .containerGUI
     ) {
         self.transport = transport
         self.maximumResponseBytes = maximumResponseBytes
         self.currentVersion = currentVersion
+        self.repository = repository
     }
 
     func checkForUpdates() async throws -> UpdateSummary {
@@ -26,7 +34,7 @@ struct GitHubReleaseChecker<Transport: RegistryHTTPTransport>: UpdateChecking {
         let response: RegistryHTTPResponse
         do {
             response = try await transport.get(RegistryHTTPRequest(
-                url: Self.latestReleaseURL,
+                url: latestReleaseURL,
                 headers: [
                     "Accept": "application/vnd.github+json",
                     "X-GitHub-Api-Version": "2022-11-28",
@@ -45,7 +53,7 @@ struct GitHubReleaseChecker<Transport: RegistryHTTPTransport>: UpdateChecking {
               !payload.draft,
               !payload.prerelease,
               let latest = SemanticVersion(payload.tagName),
-              let releaseURL = validatedReleaseURL(payload.htmlURL) else {
+              let releaseURL = validatedReleaseURL(payload.htmlURL, repository: repository) else {
             throw ProblemDetail(code: .updateCheckUnavailable)
         }
 
@@ -74,7 +82,7 @@ private struct GitHubReleasePayload: Decodable {
     }
 }
 
-private func validatedReleaseURL(_ url: URL) -> URL? {
+private func validatedReleaseURL(_ url: URL, repository: UpdateRepository) -> URL? {
     guard url.scheme?.lowercased() == "https",
           url.host?.lowercased() == "github.com",
           url.user == nil,
@@ -82,6 +90,6 @@ private func validatedReleaseURL(_ url: URL) -> URL? {
           url.port == nil,
           url.query == nil,
           url.fragment == nil,
-          url.path.hasPrefix("/zeal-odoo/ContainerGui/releases/") else { return nil }
+          url.path.hasPrefix("/\(repository.rawValue)/releases/") else { return nil }
     return url
 }

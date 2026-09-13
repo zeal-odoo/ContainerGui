@@ -4,6 +4,23 @@ import XCTest
 @testable import ContainerGUI
 
 final class UpdateReminderAssetTests: XCTestCase {
+    func testEngineUpdatesHaveSeparateNonModalBilingualReminder() throws {
+        let html = try asset("index.html")
+        let script = try asset("container-update.js")
+        let localization = try asset("i18n.js")
+        XCTAssertTrue(html.contains("id=\"checkContainerUpdatesButton\""))
+        XCTAssertTrue(html.contains("id=\"containerUpdateBanner\""))
+        XCTAssertTrue(html.contains("src=\"/container-update.js?v=\(AppVersion.current)\""))
+        XCTAssertTrue(script.contains("/api/v1/container-update-check"))
+        XCTAssertTrue(script.contains("validatedContainerReleaseURL"))
+        XCTAssertFalse(script.contains("innerHTML"))
+        XCTAssertFalse(script.contains("showModal"))
+        for copy in ["检查 Container 更新", "Apple Container 有新版本", "查看 Container 官方发布",
+                     "Check Container updates", "Apple Container update available", "View official Container release"] {
+            XCTAssertTrue(localization.contains(copy))
+        }
+    }
+
     func testHeaderAndDialogExposeManualAndAutomaticUpdateFlow() throws {
         let html = try asset("index.html")
 
