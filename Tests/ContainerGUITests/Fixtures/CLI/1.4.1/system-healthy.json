@@ -1,0 +1,9 @@
+{
+  "client": {"appName": "container", "build": "release", "commit": "fixture-client", "version": "1.4.1"},
+  "host": {"architecture": "arm64", "cpus": 8, "operatingSystem": "Version 26"},
+  "paths": {"appRoot": "/Users/example/Library/Application Support/com.apple.container/", "installRoot": "/usr/local/"},
+  "resources": {"containersRunning": 1, "containersTotal": 2, "images": 3},
+  "server": {"appName": "container-apiserver", "build": "release", "commit": "fixture-server", "version": "container-apiserver version 1.4.1"},
+  "status": "running",
+  "futureField": {"ignored": true}
+}

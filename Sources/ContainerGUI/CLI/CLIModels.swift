@@ -77,12 +77,14 @@ enum CLIOutputParser {
         } else {
             serviceState = .unknown
         }
+        // 1.4.1 nests daemon metadata under server; 1.3.x uses flat fields.
+        let server = object["server"]?.objectValue
         return SystemHealth(
             tool: installation,
             serviceState: serviceState,
-            apiServerVersion: object["apiServerVersion"]?.stringValue,
-            apiServerBuild: object["apiServerBuild"]?.stringValue,
-            apiServerCommit: object["apiServerCommit"]?.stringValue,
+            apiServerVersion: server?["version"]?.stringValue ?? object["apiServerVersion"]?.stringValue,
+            apiServerBuild: server?["build"]?.stringValue ?? object["apiServerBuild"]?.stringValue,
+            apiServerCommit: server?["commit"]?.stringValue ?? object["apiServerCommit"]?.stringValue,
             diagnosticCode: nil,
             diagnosticMessage: nil,
             observedAt: observedAt

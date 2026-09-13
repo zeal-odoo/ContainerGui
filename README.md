@@ -6,7 +6,7 @@ A lightweight local web interface for Apple [`container`](https://github.com/app
 
 [中文](#中文说明) · [English](#english-guide)
 
-**Source v2.23.1 · 本地源码，尚未发布 / Local source, unreleased** · Apple `container` `1.3.x` · `http://127.0.0.1:8787`
+**Source v2.23.2 · 本地源码，尚未发布 / Local source, unreleased** · Apple `container` `1.3.x / 1.4.x (≥1.4.1)` · `http://127.0.0.1:8787`
 
 > Container GUI is a local, single-user tool. It never listens on the LAN or public Internet and is not a replacement for Docker Desktop, Compose, Kubernetes, or a multi-user remote administration platform.
 >
@@ -48,7 +48,9 @@ ANE 是**整机所有应用**的估算功耗，不计入容器合计，也不是
 - Apple silicon Mac
 - macOS 26
 - Xcode 提供的 Swift 6.1 或更高版本（仅从源码运行或打包时需要；安装 `.pkg` 不需要）
-- Apple `container` CLI `1.3.x`；当前验证基线为 `1.3.1`
+- Apple `container` CLI `1.3.x` 或 `1.4.x`（从 `1.4.1` 起）；兼容性测试覆盖 `1.3.1` 与 `1.4.1`。`1.4.0` 未正式发布，更新的次版本需另行验证。
+
+v2.23.2 兼容 Container 1.4.1 的嵌套系统状态输出，仍支持 1.3.x。GUI 不会自动升级引擎；升级应使用 [Apple 官方安装包](https://github.com/apple/container/releases/tag/1.4.1)，先安排容器停机，安装后重新启动服务并核对客户端和服务端版本。完整验证范围见 [兼容性记录](specs/001-container-web-gui/verification/container-1.4.1.md)。
 
 从 Apple 官方 [Releases](https://github.com/apple/container/releases) 安装签名安装包，然后确认 CLI 和系统服务可用：
 
@@ -60,7 +62,7 @@ container system status
 
 ### 安装 .pkg（推荐）
 
-从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 选择已发布的版本，下载 `ContainerGUI-<VERSION>-arm64.pkg` 和对应的 `.sha256` 文件。下面的版本号应替换成实际下载文件中的版本；本地源码版本 `2.23.1` 尚未发布安装包。
+从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 选择已发布的版本，下载 `ContainerGUI-<VERSION>-arm64.pkg` 和对应的 `.sha256` 文件。下面的版本号应替换成实际下载文件中的版本；本地源码版本 `2.23.2` 尚未发布安装包。
 
 ```bash
 CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"
@@ -310,7 +312,9 @@ ANE power covers **all applications on the host**, not container totals or Conta
 - Apple silicon Mac
 - macOS 26
 - Swift 6.1 or later from Xcode (required only to run from source or build a package; not required for `.pkg` installation)
-- Apple `container` CLI `1.3.x`; the current verified baseline is `1.3.1`
+- Apple `container` CLI `1.3.x` or `1.4.x` (starting at `1.4.1`); compatibility tests cover `1.3.1` and `1.4.1`. Version `1.4.0` was never released; newer minor versions require separate validation.
+
+v2.23.2 supports Container 1.4.1's nested system-status output while retaining 1.3.x support. The GUI does not automatically upgrade the engine. Use the [official Apple installer](https://github.com/apple/container/releases/tag/1.4.1), schedule container downtime, then restart services and verify both client and server versions. See the [compatibility record](specs/001-container-web-gui/verification/container-1.4.1.md) for the exact validation scope.
 
 Install the signed package from Apple’s official [Releases](https://github.com/apple/container/releases), then verify the CLI and system service:
 
@@ -322,7 +326,7 @@ container system status
 
 ### Install the .pkg (recommended)
 
-Choose a published version from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) and download `ContainerGUI-<VERSION>-arm64.pkg` with its `.sha256` file. Replace the version below with the version in the downloaded filename. The local source version `2.23.1` does not yet have a published installer.
+Choose a published version from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) and download `ContainerGUI-<VERSION>-arm64.pkg` with its `.sha256` file. Replace the version below with the version in the downloaded filename. The local source version `2.23.2` does not yet have a published installer.
 
 ```bash
 CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"

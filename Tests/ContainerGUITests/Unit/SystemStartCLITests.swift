@@ -4,6 +4,19 @@ import XCTest
 @testable import ContainerGUI
 
 final class SystemStartCLITests: XCTestCase {
+    func test141RecognizesNonzeroClosedStatesAndCanReadBackStart() async throws {
+        for status in ["not running", "unregistered"] {
+            let executor = SystemStartExecutor(status: status, statusExitCode: 1, version: "1.4.1")
+            let client = makeClient(executor)
+            let closed = try await client.systemHealth()
+            XCTAssertTrue([SystemServiceState.stopped, .unregistered].contains(closed.serviceState))
+            XCTAssertNil(closed.diagnosticCode)
+            let started = try await client.startSystem()
+            XCTAssertEqual(started.serviceState, .healthy)
+            XCTAssertEqual(started.tool.semanticVersion, "1.4.1")
+        }
+    }
+
     func testNonzeroExitWithClosedStatusIsStillRecognized() async throws {
         for status in ["stopped", "unregistered"] {
             let executor = SystemStartExecutor(status: status, statusExitCode: 1)
@@ -94,20 +107,22 @@ private actor SystemStartExecutor: CommandExecuting {
     private let readback: String
     private let failure: Failure?
     private var statusExitCode: Int32
+    private let version: String
     private(set) var requests: [CommandRequest] = []
 
-    init(status: String = "stopped", readback: String = "running", failure: Failure? = nil, statusExitCode: Int32 = 0) {
+    init(status: String = "stopped", readback: String = "running", failure: Failure? = nil, statusExitCode: Int32 = 0, version: String = "1.3.1") {
         self.status = status
         self.readback = readback
         self.failure = failure
         self.statusExitCode = statusExitCode
+        self.version = version
     }
 
     func run(_ request: CommandRequest) async throws -> CommandResult {
         requests.append(request)
         let output: String
         switch request.arguments {
-        case ["--version"]: output = "container CLI version 1.3.1"
+        case ["--version"]: output = "container CLI version \(version)"
         case ["system", "status", "--format", "json"]:
             return CommandResult(stdout: Data("{\"status\":\"\(status)\"}".utf8), stderr: Data(), exitCode: statusExitCode, duration: .zero)
         case ["system", "start", "--disable-kernel-install", "--timeout", "20"]:

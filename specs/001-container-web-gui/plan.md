@@ -159,3 +159,12 @@ Phase 1 设计仍满足全部五项原则。API 合同未暴露原始命令入�
 > **Fill ONLY if Constitution Check has violations that must be justified**
 
 No constitutional violations.
+
+## Compatibility follow-up — Container 1.4.1 (2026-09-13)
+
+- Scope: retain 1.3.x support and accept 1.4.x starting at the first official release, 1.4.1; do not enable unverified 1.5/2.x or the discarded 1.4.0 tag.
+- Normalize `server.version/build/commit` from 1.4.1 system status into the existing health API, retaining the 1.3.x flat-field fallback. Never substitute client version for server version; ignore new host/path/resource metadata.
+- Test version gates, nested/legacy status, minimal nonzero stopped/unregistered status, invalid output, and the existing system-start command/readback. Run full tests, both read-only CLI baselines, release build and browser health/list/detail checks.
+- Package installation is an operator action, not a new GUI endpoint. Verify Apple's PKG checksum, signature and notarization before use. Stop existing containers only after downtime confirmation; preserve data and configuration, restart PostgreSQL before Odoo, and verify both independently afterward.
+- Bump GUI to 2.23.2 and commit verified compatibility work locally. No GitHub publication is included in this request.
+- Reference: [Apple Container 1.4.1 release](https://github.com/apple/container/releases/tag/1.4.1) and its `Sources/ContainerCommands/System/SystemStatus.swift` schema.

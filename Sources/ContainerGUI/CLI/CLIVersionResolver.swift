@@ -56,9 +56,10 @@ struct CLIVersionResolver {
         }
 
         let version = SemanticVersion(major: major, minor: minor, patch: patch)
+        let supported = major == 1 && (minor == 3 || (minor == 4 && patch >= 1))
         return CLIVersionClassification(
             semanticVersion: version,
-            compatibility: major == 1 && minor == 3 ? .supported : .unsupported
+            compatibility: supported ? .supported : .unsupported
         )
     }
 }

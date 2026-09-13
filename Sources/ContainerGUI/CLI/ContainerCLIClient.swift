@@ -166,7 +166,7 @@ final class ContainerCLIClient: ContainerReading, SystemControlling, ContainerMe
             throw error
         }
         guard result.exitCode == 0 else {
-            // CLI 1.3.x exits nonzero for a valid stopped/unregistered status.
+            // Supported CLI versions exit nonzero for a valid stopped/unregistered status.
             if let health = try? CLIOutputParser.parseSystemHealth(
                 data: result.stdout, installation: tool, observedAt: observedAt
             ), health.serviceState == .stopped || health.serviceState == .unregistered {

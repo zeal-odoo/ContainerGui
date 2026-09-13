@@ -253,6 +253,16 @@ the model/client, then T027 and T028 complete the API/browser slice.
 
 Each checkpoint retains the local-only, no-arbitrary-command and post-mutation-readback boundaries.
 
+## Container 1.4.1 compatibility follow-up (2026-09-13)
+
+This scoped follow-up does not reopen or mark historical MVP tasks as accepted.
+
+- [X] T064 Add and run failing 1.4.1 version/status fixtures and tests in `Tests/ContainerGUITests/Unit/CLIVersionResolverTests.swift`, `ContainerCLIReadTests.swift`, `SystemStartCLITests.swift`, and `Fixtures/CLI/1.4.1/system-healthy.json`.
+- [X] T065 Adapt only the compatibility gate and system-health parser in `Sources/ContainerGUI/CLI/CLIVersionResolver.swift` and `CLIModels.swift`; preserve the health API and existing CLI command boundaries.
+- [X] T066 Bump `AppVersion.swift`/version assets/tests to 2.23.2, update bilingual `README.md` compatibility guidance, and make `Integration/ReadOnlyCLISmokeTests.swift` accept both verified baselines.
+- [X] T067 Run full automated tests, release build and non-mutating 1.3.1/1.4.1 CLI/browser validation; record exact mixed-version versus installed-version evidence in `verification/container-1.4.1.md` and create a focused local commit.
+- [ ] T068 After explicit downtime approval and administrator installation, upgrade the official engine, restore the previously running containers and verify CLI/server 1.4.1 plus GUI health. Do not publish to GitHub as part of this request.
+
 ## Task Summary
 
 | Area | Tasks |

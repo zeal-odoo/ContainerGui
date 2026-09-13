@@ -21,10 +21,15 @@ final class ReadOnlyCLISmokeTests: XCTestCase {
 
         let installation = try await client.installation()
         XCTAssertEqual(installation.compatibility, .supported)
-        XCTAssertEqual(installation.semanticVersion, "1.3.1")
+        XCTAssertTrue(["1.3.1", "1.4.1"].contains(installation.semanticVersion ?? ""))
 
         let health = try await client.systemHealth()
         XCTAssertNotEqual(health.serviceState, .unknown)
+        if health.serviceState == .healthy {
+            XCTAssertFalse(health.apiServerVersion?.isEmpty ?? true)
+            XCTAssertNotNil(health.apiServerBuild)
+            XCTAssertNotNil(health.apiServerCommit)
+        }
 
         let list = try await client.listContainers()
         XCTAssertLessThanOrEqual(list.items.count, 1_000)

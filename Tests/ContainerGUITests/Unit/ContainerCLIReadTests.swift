@@ -54,6 +54,49 @@ final class ContainerCLIReadTests: XCTestCase {
         XCTAssertTrue(empty.items.isEmpty)
     }
 
+    func testParses141NestedServerWithoutChangingHealthContract() throws {
+        let health = try CLIOutputParser.parseSystemHealth(
+            data: fixture("system-healthy.json", version: "1.4.1"),
+            installation: installation,
+            observedAt: observedAt
+        )
+        XCTAssertEqual(health.serviceState, .healthy)
+        XCTAssertEqual(health.apiServerVersion, "container-apiserver version 1.4.1")
+        XCTAssertEqual(health.apiServerBuild, "release")
+        XCTAssertEqual(health.apiServerCommit, "fixture-server")
+        XCTAssertEqual(health.tool, installation)
+        XCTAssertEqual(health.observedAt, observedAt)
+        let encoded = String(decoding: try JSONEncoder.containerGUI.encode(health), as: UTF8.self)
+        XCTAssertFalse(encoded.contains("/Users/example"))
+        XCTAssertFalse(encoded.contains("futureField"))
+    }
+
+    func testNestedServerVersionIsNotInferredFromClientDuringUpgrade() throws {
+        for server in [#"{"version":"1.3.1","build":"release","commit":"old-server"}"#, "null", "{}"] {
+            let health = try CLIOutputParser.parseSystemHealth(
+                data: Data(#"{"status":"running","client":{"version":"1.4.1"},"server":\#(server)}"#.utf8),
+                installation: installation
+            )
+            XCTAssertEqual(health.serviceState, .healthy)
+            XCTAssertEqual(health.apiServerVersion, server.contains("1.3.1") ? "1.3.1" : nil)
+        }
+    }
+
+    func test141MinimalClosedStatesAndInvalidHealthOutput() throws {
+        for (status, expected) in [("not running", SystemServiceState.stopped), ("unregistered", .unregistered)] {
+            let health = try CLIOutputParser.parseSystemHealth(
+                data: Data("{\"status\":\"\(status)\"}".utf8), installation: installation
+            )
+            XCTAssertEqual(health.serviceState, expected)
+            XCTAssertNil(health.apiServerVersion)
+        }
+        for json in ["{}", "[]", #"{"status":null}"#, "not JSON"] {
+            XCTAssertThrowsError(try CLIOutputParser.parseSystemHealth(
+                data: Data(json.utf8), installation: installation
+            ))
+        }
+    }
+
     func testToleratesUnknownFieldsAndNormalizesUnknownState() throws {
         let list = try CLIOutputParser.parseContainerList(
             data: fixture("containers-unknown-fields.json"),
@@ -116,12 +159,12 @@ final class ContainerCLIReadTests: XCTestCase {
         )
     }
 
-    private func fixture(_ name: String) throws -> Data {
+    private func fixture(_ name: String, version: String = "1.3.1") throws -> Data {
         let url = try XCTUnwrap(
             Bundle.module.url(
                 forResource: name,
                 withExtension: nil,
-                subdirectory: "Fixtures/CLI/1.3.1"
+                subdirectory: "Fixtures/CLI/\(version)"
             )
         )
         return try Data(contentsOf: url)
