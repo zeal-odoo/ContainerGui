@@ -46,7 +46,8 @@ done
 /usr/bin/plutil -insert RunAtLoad -bool true "$service_plist"
 /usr/bin/plutil -insert KeepAlive -bool true "$service_plist"
 /usr/bin/plutil -insert ThrottleInterval -integer 5 "$service_plist"
-/usr/bin/plutil -insert ProcessType -string "Background" "$service_plist"
+# HTTP requests need interactive scheduling; XPC-based Adaptive promotion does not apply.
+/usr/bin/plutil -insert ProcessType -string "Interactive" "$service_plist"
 /usr/bin/plutil -insert StandardOutPath -string "$log_directory/service.log" "$service_plist"
 /usr/bin/plutil -insert StandardErrorPath -string "$log_directory/service-error.log" "$service_plist"
 

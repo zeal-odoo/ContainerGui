@@ -6,7 +6,11 @@ A lightweight local web interface for Apple [`container`](https://github.com/app
 
 [中文](#中文说明) · [English](#english-guide)
 
-**Source v2.24.0 · 本地源码，尚未发布 / Local source, unreleased** · Apple `container` `1.3.x / 1.4.x (≥1.4.1)` · `http://127.0.0.1:8787`
+**Source v2.24.1 · 本地源码，尚未发布 / Local source, unreleased** · Apple `container` `1.3.x / 1.4.x (≥1.4.1)` · `http://127.0.0.1:8787`
+
+v2.24.1 修复 macOS 27 下安装服务因后台调度限流而出现的接口超时；GUI 服务使用交互式调度，守护检查仍在后台运行。不更改容器资源配额或阻止 Mac 睡眠。
+
+v2.24.1 fixes API timeouts caused by background scheduling of the installed service on macOS 27. The GUI service uses interactive scheduling; its watchdog remains a background task. Container resource limits and Mac sleep settings are unchanged.
 
 > Container GUI is a local, single-user tool. It never listens on the LAN or public Internet and is not a replacement for Docker Desktop, Compose, Kubernetes, or a multi-user remote administration platform.
 >

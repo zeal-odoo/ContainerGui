@@ -38,6 +38,7 @@ final class LaunchAgentAssetsTests: XCTestCase {
         XCTAssertEqual(service["RunAtLoad"] as? Bool, true)
         XCTAssertEqual(service["KeepAlive"] as? Bool, true)
         XCTAssertEqual(service["ThrottleInterval"] as? Int, 5)
+        XCTAssertEqual(service["ProcessType"] as? String, "Interactive")
 
         let environment = try XCTUnwrap(service["EnvironmentVariables"] as? [String: String])
         XCTAssertEqual(environment["CONTAINER_GUI_PORT"], "8787")
@@ -54,6 +55,7 @@ final class LaunchAgentAssetsTests: XCTestCase {
         ])
         XCTAssertEqual(watchdog["RunAtLoad"] as? Bool, true)
         XCTAssertEqual(watchdog["StartInterval"] as? Int, 30)
+        XCTAssertEqual(watchdog["ProcessType"] as? String, "Background")
 
         for name in ["com.msj.container-gui.plist", "com.msj.container-gui.watchdog.plist"] {
             let attributes = try FileManager.default.attributesOfItem(atPath: temporaryDirectory.appendingPathComponent(name).path)
