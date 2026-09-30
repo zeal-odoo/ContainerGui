@@ -21,7 +21,7 @@ final class ReadOnlyCLISmokeTests: XCTestCase {
 
         let installation = try await client.installation()
         XCTAssertEqual(installation.compatibility, .supported)
-        XCTAssertTrue(["1.3.1", "1.4.1"].contains(installation.semanticVersion ?? ""))
+        XCTAssertTrue(["1.3.1", "1.4.1", "1.5.0"].contains(installation.semanticVersion ?? ""))
 
         let health = try await client.systemHealth()
         XCTAssertNotEqual(health.serviceState, .unknown)
