@@ -6,40 +6,74 @@ enum OdooConfigurationFile {
     static let maximumBytes = 128 * 1024
 
     static func read(_ url: URL) throws -> OdooDatabaseEndpoint {
-        try withDirectory(url) { directory, name in
-            let (data, _) = try contents(directory: directory, name: name)
-            return try Document(data).endpoint
-        }
+        try Document(readData(url)).endpoint
+    }
+
+    static func readData(_ url: URL) throws -> Data {
+        try withDirectory(url) { directory, name in try contents(directory: directory, name: name).0 }
     }
 
     static func write(_ url: URL, request: OdooDatabaseSaveRequest) throws {
         let request = try request.validated(for: request.confirmationTarget)
+        try writeData(url) { original in
+            let document = try Document(original)
+            guard document.endpoint.revision == request.expectedRevision else { throw OdooConfigurationError.stale }
+            return try document.replacing(host: request.host, port: request.port)
+        }
+        let observed = try read(url)
+        guard observed.host == request.host, observed.port == request.port else { throw OdooConfigurationError.invalid }
+    }
+
+    static func writeData(_ url: URL, preserveInode: Bool = false, transform: (Data) throws -> Data) throws {
         try withDirectory(url) { directory, name in
-            let descriptor = openat(directory, name, O_RDONLY | O_NOFOLLOW | O_NONBLOCK)
+            let descriptor = openat(directory, name, (preserveInode ? O_RDWR : O_RDONLY) | O_NOFOLLOW | O_NONBLOCK)
             guard descriptor >= 0 else { throw OdooConfigurationError.unavailable }
             defer { close(descriptor) }
             guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else { throw OdooConfigurationError.unavailable }
             let (original, attributes) = try contents(descriptor: descriptor)
             guard attributes.st_mode & 0o200 != 0 else { throw OdooConfigurationError.unavailable }
-            let document = try Document(original)
-            guard document.endpoint.revision == request.expectedRevision else { throw OdooConfigurationError.stale }
-            let replacement = try document.replacing(host: request.host, port: request.port)
+            let replacement = try transform(original)
+            guard replacement.count <= maximumBytes else { throw OdooConfigurationError.invalid }
             let token = UUID().uuidString
             let backup = ".\(name).container-gui-\(token).bak"
             let temporary = ".\(name).container-gui-\(token).tmp"
             try create(directory: directory, name: backup, data: original, mode: 0o600)
             defer { unlinkat(directory, temporary, 0) }
-            try create(directory: directory, name: temporary, data: replacement, mode: attributes.st_mode & 0o777, owner: attributes)
+            if !preserveInode { try create(directory: directory, name: temporary, data: replacement, mode: attributes.st_mode & 0o777, owner: attributes) }
             let (latest, latestAttributes) = try contents(directory: directory, name: name)
             guard latest == original, latestAttributes.st_ino == attributes.st_ino,
                   latestAttributes.st_dev == attributes.st_dev,
                   latestAttributes.st_mode == attributes.st_mode,
                   latestAttributes.st_gid == attributes.st_gid else { throw OdooConfigurationError.stale }
-            guard renameat(directory, temporary, directory, name) == 0 else { throw OdooConfigurationError.unavailable }
+            if preserveInode {
+                do { try replaceContents(descriptor, data: replacement) }
+                catch {
+                    // Restore the private backup through the same descriptor, never another path.
+                    try? replaceContents(descriptor, data: original)
+                    throw error
+                }
+            } else {
+                guard renameat(directory, temporary, directory, name) == 0 else { throw OdooConfigurationError.unavailable }
+            }
             _ = fsync(directory)
-            let observed = try Document(contents(directory: directory, name: name).0).endpoint
-            guard observed.host == request.host, observed.port == request.port else { throw OdooConfigurationError.invalid }
+            let (observed, observedAttributes) = try contents(directory: directory, name: name)
+            guard observed == replacement, observedAttributes.st_uid == attributes.st_uid,
+                  observedAttributes.st_gid == attributes.st_gid, observedAttributes.st_mode == attributes.st_mode,
+                  !preserveInode || observedAttributes.st_ino == attributes.st_ino else { throw OdooConfigurationError.stale }
         }
+    }
+
+    private static func replaceContents(_ descriptor: Int32, data: Data) throws {
+        guard lseek(descriptor, 0, SEEK_SET) == 0 else { throw OdooConfigurationError.unavailable }
+        try data.withUnsafeBytes { buffer in
+            var offset = 0
+            while offset < buffer.count {
+                let count = Darwin.write(descriptor, buffer.baseAddress!.advanced(by: offset), buffer.count - offset)
+                guard count > 0 else { throw OdooConfigurationError.unavailable }
+                offset += count
+            }
+        }
+        guard ftruncate(descriptor, off_t(data.count)) == 0, fsync(descriptor) == 0 else { throw OdooConfigurationError.unavailable }
     }
 
     private static func withDirectory<T>(_ url: URL, body: (Int32, String) throws -> T) throws -> T {

@@ -6,11 +6,11 @@ A lightweight local web interface for Apple [`container`](https://github.com/app
 
 [中文](#中文说明) · [English](#english-guide)
 
-**Source v2.25.0 · 本地源码，尚未发布 / Local source, unreleased** · Apple `container` `1.3.x / 1.4.x (≥1.4.1) / 1.5.x` · `http://127.0.0.1:8787`
+**Source v2.26.0 · 本地源码，尚未发布 / Local source, unreleased** · Apple `container` `1.3.x / 1.4.x (≥1.4.1) / 1.5.x` · `http://127.0.0.1:8787`
 
-v2.25.0 增加已有 Odoo 容器的数据库地址与端口编辑，可选择运行中的 PostgreSQL 地址，保留其他配置并创建私有备份；不迁移配置或自动启停容器。继续支持 Container 1.5.0、1.3.x、1.4.1 以上 1.4.x 和 macOS 27。
+v2.26.0 为所有容器增加统一“连接配置”入口：支持已有 Odoo、已识别的数据库环境配置和 Nginx 直连后端，其他形式明确提示限制。仅修改选中地址/端口并创建私有备份；不改密码、不迁移、不自动启停，也不将保存成功当作连接成功。继续支持 Container 1.5.0、1.3.x、1.4.1 以上 1.4.x 和 macOS 27。
 
-v2.25.0 adds database endpoint editing for existing Odoo containers, optional autofill from running PostgreSQL containers, preservation of other settings, and private backups. It does not migrate configuration or automatically start/restart containers. Container 1.5.0, 1.3.x, 1.4.x from 1.4.1 onward, and macOS 27 remain supported.
+v2.26.0 adds a universal Connection configuration entry for existing Odoo, recognized database environment files, and direct Nginx backends. Unsupported forms show explicit limitations. Saves change only the selected address/port, retain credentials and private backups, and never migrate or automatically start/restart containers. A verified save is not a connectivity test. Container 1.5.0, 1.3.x, 1.4.x from 1.4.1 onward, and macOS 27 remain supported.
 
 > Container GUI is a local, single-user tool. It never listens on the LAN or public Internet and is not a replacement for Docker Desktop, Compose, Kubernetes, or a multi-user remote administration platform.
 >
@@ -39,6 +39,7 @@ Container GUI 为 Apple `container` CLI 提供浏览器管理界面。后端直�
 | 创建容器 | 配置名称、CPU、内存、回环端口、环境变量、进程参数和一个共享目录 |
 | SSH 快速配置 | Debian/Ubuntu 镜像仅公钥登录、自定义本机端口、普通用户或显式 root 模式 |
 | Odoo 快速配置 | 官方 Odoo 镜像显示数据库地址、端口及 `/mnt/extra-addons` 自定义模块目录 |
+| 已有容器连接配置 | 所有详情均提供入口；支持 Odoo、已识别 DB_HOST/DB_PORT 环境文件、逐项 Nginx 后端编辑；不自动启停 |
 | 中英文界面 | 首次访问跟随浏览器语言，顶部可切换中文/English 并记住选择；动态状态和弹窗同步切换 |
 | 版本更新提醒 | 页面加载后每天自动检查一次稳定版，也可从顶部手动检查；发现新版时跳转官方 GitHub Release 下载 PKG |
 | 现代界面 | Material 3 浅色/深色主题、克制 glass 表面、渐进动效及无障碍回退 |
@@ -66,7 +67,7 @@ container system status
 
 ### 安装 .pkg（推荐）
 
-从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 选择已发布的版本，下载 `ContainerGUI-<VERSION>-arm64.pkg` 和对应的 `.sha256` 文件。下面的版本号应替换成实际下载文件中的版本；本地源码版本 `2.25.0` 尚未发布安装包。
+从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 选择已发布的版本，下载 `ContainerGUI-<VERSION>-arm64.pkg` 和对应的 `.sha256` 文件。下面的版本号应替换成实际下载文件中的版本；本地源码版本 `2.26.0` 尚未发布安装包。
 
 ```bash
 CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"
@@ -168,11 +169,20 @@ PostgreSQL、Nginx、Odoo 等已有常驻主进程的镜像不需要启用该选
 
 实际数据库主机名取决于 Apple Container 网络配置。容器显示“运行中”并不代表 Odoo 已成功连接数据库；出现 HTTP 500 时应先检查 Odoo 日志和数据库可达性。
 
-已有 Odoo 容器可在“查看详情 → 修改数据库连接”中修改地址和端口，或选择运行中的 PostgreSQL 容器填入当前 IPv4 和 5432。仅修改 `/etc/odoo/odoo.conf` 的这两个设置，保留密码等其他内容和权限；保存前创建同目录的私有 `.odoo.conf.container-gui-<UUID>.bak` 备份，保存后独立回读。不会自动启动或重启，需自行操作使其生效。
+已有 Odoo 容器可在“查看详情 → 连接配置”中修改地址和端口，或选择运行中的 PostgreSQL 容器填入当前 IPv4 和 5432。仅修改 `/etc/odoo/odoo.conf` 的这两个设置，保留密码等其他内容和权限；保存前创建同目录的私有 `.odoo.conf.container-gui-<UUID>.bak` 备份，保存后独立回读。不会自动启动或重启，需自行操作使其生效。
 
 整个 `/etc/odoo` 目录已挂载自本机且配置文件由当前用户拥有、可安全写入时，停止状态也可修改；内部配置只支持运行中的容器。已停止的内部配置、单文件挂载、自定义配置位置/命令行覆盖、链接或重复键会明确拒绝编辑，不会迁移或重建。刷新页面/语言不会覆盖未保存输入；“重新读取配置”会丢弃草稿并读取最新版本。选择地址是一次性填入，不承诺未来地址自动跟踪。
 
 若配置位于外接宗卷，macOS 可能要求允许 ContainerGUI 访问该宗卷；等待系统授权期间，配置读取可能显示加载中。请自行确认系统提示后再操作，GUI 不会绕过系统权限。
+
+### 配置其他容器的数据库与后端连接
+
+所有容器详情均提供“连接配置”，但不会为任意镜像凭空添加数据库参数。当前新增支持：
+
+- 数据库：启动命令明确将 `/app-config/app.env` 链接为 `/app/.env` 并运行 `python app.py` 的应用（如当前 BettaFish），且 `/app-config` 是目录挂载；仅编辑已有、无歧义的 `DB_HOST` 和 `DB_PORT`，不提取、展示或修改密码/API 密钥。
+- Nginx：已挂载的 `nginx.conf` 或单一 `conf.d/default.conf`，逐项选择直接 HTTP(S) `proxy_pass` 后端，保留协议、URI、尾斜杠、其他端口和认证/TLS 设置。
+
+目录挂载使用原子替换；Nginx 单文件挂载只在已停止/已创建状态允许保持原 inode 写回，运行中禁用保存。动态变量、upstream 组、模板、额外 include、自定义位置及其他格式不猜测、不迁移、不安装额外工具。保存前创建同目录 0600 私有备份并检查完整文件 revision，保存后回读验证。保存不会测试网络或重载服务；应用生效需自行启动/重启。
 
 ### 配置仅公钥 SSH
 
@@ -315,6 +325,7 @@ Key capabilities:
 | Create containers | Configure name, CPU, memory, loopback ports, environment variables, process arguments, and one shared directory |
 | Configure SSH | Bootstrap public-key-only SSH for supported Debian/Ubuntu images with a custom host port and normal-user or explicit root mode |
 | Configure Odoo | Show database host/port and the `/mnt/extra-addons` custom-module directory only for the official Odoo image |
+| Existing connections | Universal detail entry; edit Odoo, recognized DB_HOST/DB_PORT files, and individual Nginx backends without automatic lifecycle actions |
 | Use Chinese or English | Follow the browser language on first visit, switch from the header, remember the choice, and localize dynamic states and dialogs together |
 | Discover updates | Check the latest stable release once per day after load or on demand from the header, then open the official GitHub Release to download the PKG |
 | Use a modern UI | Material 3 light/dark themes, restrained glass surfaces, progressive motion, and accessibility fallbacks |
@@ -342,7 +353,7 @@ container system status
 
 ### Install the .pkg (recommended)
 
-Choose a published version from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) and download `ContainerGUI-<VERSION>-arm64.pkg` with its `.sha256` file. Replace the version below with the version in the downloaded filename. The local source version `2.25.0` does not yet have a published installer.
+Choose a published version from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) and download `ContainerGUI-<VERSION>-arm64.pkg` with its `.sha256` file. Replace the version below with the version in the downloaded filename. The local source version `2.26.0` does not yet have a published installer.
 
 ```bash
 CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"
@@ -444,11 +455,20 @@ Container module directory: /mnt/extra-addons
 
 The correct database hostname depends on the Apple Container network configuration. A running Odoo container does not prove database connectivity. If Odoo returns HTTP 500, inspect the Odoo logs and database reachability first.
 
-For an existing Odoo container, use “View details → Edit database connection” to change its address and port, or select a running PostgreSQL container to fill its observed IPv4 and port 5432. Only those two settings in `/etc/odoo/odoo.conf` change; passwords, other contents, and permissions are preserved. A private sibling `.odoo.conf.container-gui-<UUID>.bak` backup is created and the result is independently read back. Start/restart manually to apply it.
+For an existing Odoo container, use “View details → Connection configuration” to change its address and port, or select a running PostgreSQL container to fill its observed IPv4 and port 5432. Only those two settings in `/etc/odoo/odoo.conf` change; passwords, other contents, and permissions are preserved. A private sibling `.odoo.conf.container-gui-<UUID>.bak` backup is created and the result is independently read back. Start/restart manually to apply it.
 
 A safely writable, user-owned configuration mounted as the whole `/etc/odoo` directory can be edited while stopped; internal configuration requires a running container. Stopped internal configuration, single-file mounts, custom locations/command-line overrides, links, and duplicate keys are explicitly rejected without migration or recreation. Dashboard/language refresh preserves drafts; “Reload configuration” discards them and reads the latest revision. Address selection is a one-time fill, not automatic tracking of future changes.
 
 For configuration on an external volume, macOS may ask you to allow ContainerGUI to access that volume. Configuration loading may remain pending while the system waits for consent. Review the system prompt yourself before proceeding; the GUI does not bypass OS permissions.
+
+### Configure other database and backend connections
+
+Every detail has Connection configuration, but arbitrary images are not given invented database settings. Newly supported forms:
+
+- Database: applications whose startup explicitly links `/app-config/app.env` to `/app/.env` and runs `python app.py` (such as the current BettaFish setup), with a directory mount at `/app-config`. Only existing unambiguous literal `DB_HOST` and `DB_PORT` change; passwords/API keys are never shown.
+- Nginx: a mounted `nginx.conf` or single `conf.d/default.conf`. Select one direct HTTP(S) `proxy_pass` target while preserving protocol, URI/trailing slash, other ports, and authentication/TLS settings.
+
+Directory mounts use atomic replacement. A single-file Nginx mount is editable only while stopped/created, preserving its inode; saving is disabled while running. Dynamic variables, upstream groups, templates, extra includes, custom locations and other formats are not guessed, migrated or supported by installing tools. A private sibling 0600 backup and whole-file revision guard precede saving; independent readback follows. Saving never probes the network or reloads services. Apply changes manually by starting/restarting the application.
 
 ### Configure public-key-only SSH
 

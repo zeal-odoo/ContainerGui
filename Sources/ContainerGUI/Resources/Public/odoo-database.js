@@ -3,11 +3,14 @@
 globalThis.ContainerGUIOdooDatabase = (() => {
   const restrictions = {
     stoppedInternal: "配置保存在已停止容器内部，官方 CLI 无法直接编辑。只有容器运行时才能修改；本工具不会自动启动、迁移或重建容器。",
-    unsupportedLocation: "此容器使用自定义配置位置或命令行覆盖，暂不支持安全编辑。",
+    unsupportedLocation: "未找到唯一可安全编辑的已挂载连接配置，或使用模板、自定义位置、命令行覆盖。暂不支持安全编辑。",
     singleFileMount: "单文件挂载暂不支持安全替换；仅支持挂载整个 /etc/odoo 目录。",
     configUnavailable: "配置文件不可安全编辑，请检查位置、权限和容器状态。",
     invalidConfig: "配置格式不受支持，无法安全编辑数据库地址。",
-    notOdoo: "此功能仅适用于 Odoo 容器。"
+    notOdoo: "此功能仅适用于 Odoo 容器。",
+    unsupported: "未识别到此容器可编辑的连接配置，不会添加未经应用支持的参数。",
+    runningSingleFile: "此配置是单文件挂载。请先自行停止容器后再编辑；本工具不会自动停止或重建容器。",
+    invalidConnectionConfig: "配置包含不支持或不明确的连接格式。动态地址、上游组、模板及额外 include 暂不支持安全编辑。"
   };
 
   function isOdoo(detail) {
@@ -22,13 +25,14 @@ globalThis.ContainerGUIOdooDatabase = (() => {
       .map((item) => ({ id: item.id, name: item.displayName || item.id, host: item.ipv4Address.split("/")[0], port: 5432 }));
   }
 
-  function createSession({ request, onChange, wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)) }) {
-    let state = { containerId: null, view: null, host: "", port: "5432", busy: false, error: "", saved: false };
+  function createSession({ request, onChange, unified = false, wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)) }) {
+    let state = { containerId: null, view: null, endpointId: "", host: "", port: "5432", busy: false, error: "", saved: false };
     let generation = 0;
     let controller = null;
     let retry = null;
     const notify = () => onChange({ ...state });
-    const endpointURL = (id) => `/api/v1/containers/${encodeURIComponent(id)}/odoo/database-config`;
+    const endpointURL = (id) => `/api/v1/containers/${encodeURIComponent(id)}/${unified ? "connections" : "odoo/database-config"}`;
+    const adaptOdoo = (view) => view && ({ containerId: view.containerId, kind: "database", editable: view.editable, revision: view.revision, storage: view.storage, restriction: view.restriction, endpoints: view.host == null ? [] : [{ id: "database", label: "Odoo", host: view.host, port: view.port }] });
     const current = (token, id) => generation === token && state.containerId === id;
     const begin = () => { controller?.abort(); controller = new AbortController(); return ++generation; };
 
@@ -41,8 +45,9 @@ globalThis.ContainerGUIOdooDatabase = (() => {
       try {
         const view = await request(endpointURL(id), { signal: controller.signal });
         if (!current(token, id)) return;
-        if (view.containerId !== id) throw new Error("数据库配置目标不一致，请重新读取。");
-        state = { ...state, view, host: view.host || "", port: String(view.port || 5432) };
+        if (view.containerId !== id) throw new Error(unified ? "连接配置目标不一致，请重新读取。" : "数据库配置目标不一致，请重新读取。");
+        const endpoint = unified ? view.endpoints?.find((item) => item.id === state.endpointId) || view.endpoints?.[0] : view;
+        state = { ...state, view, endpointId: unified ? endpoint?.id || "" : "", host: endpoint?.host || "", port: String(endpoint?.port || 5432) };
         retry = null;
       } catch (error) {
         if (current(token, id)) state.error = error.message;
@@ -55,7 +60,7 @@ globalThis.ContainerGUIOdooDatabase = (() => {
       controller?.abort();
       generation++;
       retry = null;
-      state = { containerId: id, view: null, host: "", port: "5432", busy: false, error: "", saved: false };
+      state = { containerId: id, view: null, endpointId: "", host: "", port: "5432", busy: false, error: "", saved: false };
       await reload();
     }
 
@@ -63,7 +68,7 @@ globalThis.ContainerGUIOdooDatabase = (() => {
       controller?.abort();
       generation++;
       retry = null;
-      state = { containerId: null, view: null, host: "", port: "5432", busy: false, error: "", saved: false };
+      state = { containerId: null, view: null, endpointId: "", host: "", port: "5432", busy: false, error: "", saved: false };
       notify();
     }
 
@@ -73,10 +78,19 @@ globalThis.ContainerGUIOdooDatabase = (() => {
       notify();
     }
 
+    function selectEndpoint(id) {
+      if (state.busy) return;
+      const endpoint = state.view?.endpoints?.find((item) => item.id === id);
+      if (!endpoint) return;
+      retry = null;
+      edit({ endpointId: id, host: endpoint.host, port: String(endpoint.port) });
+    }
+
     async function save() {
-      if (state.busy || !state.view?.editable) return;
+      if (state.busy || !state.view?.editable || (unified && !state.view.endpoints?.some((item) => item.id === state.endpointId))) return;
       const id = state.containerId;
-      const body = JSON.stringify({ host: state.host.trim(), port: Number(state.port), confirmationTarget: id, expectedRevision: state.view.revision });
+      const captured = { ...(unified ? { endpointId: state.endpointId } : {}), host: state.host.trim(), port: Number(state.port), confirmationTarget: id, expectedRevision: state.view.revision };
+      const body = JSON.stringify(captured);
       if (!retry || retry.body !== body) retry = { body, key: crypto.randomUUID() };
       const key = retry.key;
       const token = begin();
@@ -93,12 +107,13 @@ globalThis.ContainerGUIOdooDatabase = (() => {
           operation = await request(`/api/v1/operations/${encodeURIComponent(operation.id)}`, { signal });
         }
         if (!current(token, id)) return;
-        if (operation.state !== "succeeded") throw new Error(operation.error?.message || "数据库配置保存失败，请重新读取后重试。");
-        const observed = operation.readback?.observedOdooDatabase;
-        if (!operation.readback?.matchedExpectation || observed?.containerId !== id || observed.host !== JSON.parse(body).host || observed.port !== JSON.parse(body).port) {
+        if (operation.state !== "succeeded") throw new Error(operation.error?.message || (unified ? "连接配置保存失败，请重新读取后重试。" : "数据库配置保存失败，请重新读取后重试。"));
+        const observed = unified ? operation.readback?.observedConnections || adaptOdoo(operation.readback?.observedOdooDatabase) : operation.readback?.observedOdooDatabase;
+        const endpoint = unified ? observed?.endpoints?.find((item) => item.id === captured.endpointId) : observed;
+        if (!operation.readback?.matchedExpectation || observed?.containerId !== id || endpoint?.host !== captured.host || endpoint?.port !== captured.port) {
           throw new Error("保存尚未确认，请重新读取配置核对，不要重复创建操作。");
         }
-        state = { ...state, view: observed, host: observed.host, port: String(observed.port), saved: true };
+        state = { ...state, view: observed, host: endpoint.host, port: String(endpoint.port), saved: true };
         retry = null;
       } catch (error) {
         if (current(token, id)) state.error = error.message;
@@ -107,7 +122,7 @@ globalThis.ContainerGUIOdooDatabase = (() => {
       }
     }
 
-    return { get snapshot() { return { ...state }; }, open, close, edit, save, reload };
+    return { get snapshot() { return { ...state }; }, open, close, edit, selectEndpoint, save, reload };
   }
 
   function attach({ request, openDialog, closeDialog, getContainers }) {
@@ -117,21 +132,39 @@ globalThis.ContainerGUIOdooDatabase = (() => {
     const host = element("odooDatabaseHost");
     const port = element("odooDatabasePort");
     const select = element("odooDatabasePostgres");
+    const endpoints = element("odooDatabaseEndpoint");
     const status = element("odooDatabaseStatus");
-    const session = createSession({ request, onChange: (state) => {
+    let renderedView = null;
+    const session = createSession({ request, unified: true, onChange: (state) => {
       if (!state.containerId) return;
       element("odooDatabaseTarget").textContent = state.containerId;
       if (host.value !== state.host) host.value = state.host;
       if (port.value !== state.port) port.value = state.port;
+      if (renderedView !== state.view) {
+        renderedView = state.view;
+        endpoints.replaceChildren();
+        for (const endpoint of state.view?.endpoints || []) {
+          const option = document.createElement("option");
+          option.value = endpoint.id;
+          option.textContent = `${endpoint.label} · ${endpoint.host}:${endpoint.port}`;
+          endpoints.append(option);
+        }
+      }
+      endpoints.value = state.endpointId;
+      element("odooDatabaseEndpointField").hidden = (state.view?.endpoints?.length || 0) < 2;
+      const database = state.view?.kind === "database";
+      element("odooDatabaseType").textContent = database ? "数据库连接" : state.view?.kind === "backend" ? "后端服务" : "连接配置";
+      element("odooDatabasePostgresField").hidden = !database;
       const editable = state.view?.editable === true && !state.busy;
-      host.disabled = port.disabled = select.disabled = !editable;
+      host.disabled = port.disabled = select.disabled = endpoints.disabled = !editable;
       element("saveOdooDatabaseButton").disabled = !editable;
       element("reloadOdooDatabaseButton").disabled = state.busy;
       status.className = state.error ? "inline-error" : "quiet";
-      status.textContent = state.error || (state.busy ? "正在读取或保存数据库配置…" : state.saved ? "配置已保存并回读验证，私有备份已创建。请自行启动或重启容器使其生效。" : state.view?.restriction ? restrictions[state.view.restriction] || restrictions.configUnavailable : "只修改数据库地址和端口，保留密码等其他配置。保存不会自动启动或重启容器。");
+      status.textContent = state.error || (state.busy ? "正在读取或保存连接配置…" : state.saved ? "配置已保存并回读验证，私有备份已创建。请自行启动或重启容器使其生效。" : state.view?.restriction ? restrictions[state.view.restriction] || restrictions.unsupportedLocation : "只修改选中连接的地址和端口，保留密码、协议、路径及其他配置。保存不会自动启动、重启或检测连接。");
     } });
     host.addEventListener("input", () => session.edit({ host: host.value }));
     port.addEventListener("input", () => session.edit({ port: port.value }));
+    endpoints.addEventListener("change", () => session.selectEndpoint(endpoints.value));
     select.addEventListener("change", () => {
       const chosen = postgresOptions(getContainers()).find((item) => item.id === select.value);
       if (chosen) session.edit({ host: chosen.host, port: String(chosen.port) });

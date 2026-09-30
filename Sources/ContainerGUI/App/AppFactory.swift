@@ -85,10 +85,9 @@ enum AppFactory {
             )
         )
         ContainerControlRoutes.registerControl(on: router, service: controlService)
-        ContainerControlRoutes.registerOdooDatabase(
-            on: router,
-            service: OdooDatabaseService(reader: reader, executor: executor, executableURL: executableURL, coordinator: coordinator, queryTimeout: configuration.queryTimeout, mutationTimeout: configuration.mutationTimeout)
-        )
+        let odooDatabase = OdooDatabaseService(reader: reader, executor: executor, executableURL: executableURL, coordinator: coordinator, queryTimeout: configuration.queryTimeout, mutationTimeout: configuration.mutationTimeout)
+        ContainerControlRoutes.registerOdooDatabase(on: router, service: odooDatabase)
+        ContainerControlRoutes.registerConnections(on: router, service: ContainerConnectionService(reader: reader, odoo: odooDatabase, coordinator: coordinator))
         ContainerControlRoutes.registerLogs(
             on: router,
             reader: reader,

@@ -1326,11 +1326,11 @@ function renderActions(summary) {
     button.disabled = true;
   }
   elements.containerActions.append(button);
-  if (globalThis.ContainerGUIOdooDatabase?.isOdoo(state.selectedDetail || summary)) {
+  if (globalThis.ContainerGUIOdooEditor) {
     const databaseButton = document.createElement("button");
     databaseButton.type = "button";
     databaseButton.className = "button secondary";
-    databaseButton.textContent = "修改数据库连接";
+    databaseButton.textContent = "连接配置";
     databaseButton.disabled = state.submitting;
     databaseButton.addEventListener("click", () => globalThis.ContainerGUIOdooEditor?.open(summary.id));
     elements.containerActions.append(databaseButton);

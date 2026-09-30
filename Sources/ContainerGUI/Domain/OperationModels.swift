@@ -11,6 +11,7 @@ enum OperationKind: String, Codable, Sendable {
     case deleteImage
     case createContainer
     case updateOdooDatabaseConfig
+    case updateContainerConnection
 }
 
 enum OperationTarget: Codable, Equatable, Hashable, Sendable {
@@ -76,9 +77,10 @@ struct OperationReadback: Codable, Equatable, Sendable {
     let targetAbsent: Bool?
     let observedAt: Date
     let observedOdooDatabase: OdooDatabaseView?
+    let observedConnections: ContainerConnectionView?
 
     enum CodingKeys: String, CodingKey {
-        case observedContainer, observedImage, observedSystemState, targetAbsent, observedAt, observedOdooDatabase
+        case observedContainer, observedImage, observedSystemState, targetAbsent, observedAt, observedOdooDatabase, observedConnections
         case expectationMatched = "matchedExpectation"
     }
 
@@ -89,7 +91,8 @@ struct OperationReadback: Codable, Equatable, Sendable {
         observedImage: JSONValue? = nil,
         targetAbsent: Bool? = nil,
         observedAt: Date = Date(),
-        observedOdooDatabase: OdooDatabaseView? = nil
+        observedOdooDatabase: OdooDatabaseView? = nil,
+        observedConnections: ContainerConnectionView? = nil
     ) {
         self.expectationMatched = expectationMatched
         self.observedContainer = observedContainer
@@ -98,6 +101,7 @@ struct OperationReadback: Codable, Equatable, Sendable {
         self.targetAbsent = targetAbsent
         self.observedAt = observedAt
         self.observedOdooDatabase = observedOdooDatabase
+        self.observedConnections = observedConnections
     }
 }
 
