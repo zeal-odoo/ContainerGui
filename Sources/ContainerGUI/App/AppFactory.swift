@@ -20,8 +20,9 @@ enum AppFactory {
             executableURL = nil
             unavailableCompatibility = .missing
         }
+        let executor = FoundationProcessExecutor()
         let reader = ContainerCLIClient(
-            executor: FoundationProcessExecutor(),
+            executor: executor,
             executableURL: executableURL,
             unavailableCompatibility: unavailableCompatibility,
             queryTimeout: configuration.queryTimeout,
@@ -84,6 +85,10 @@ enum AppFactory {
             )
         )
         ContainerControlRoutes.registerControl(on: router, service: controlService)
+        ContainerControlRoutes.registerOdooDatabase(
+            on: router,
+            service: OdooDatabaseService(reader: reader, executor: executor, executableURL: executableURL, coordinator: coordinator, queryTimeout: configuration.queryTimeout, mutationTimeout: configuration.mutationTimeout)
+        )
         ContainerControlRoutes.registerLogs(
             on: router,
             reader: reader,

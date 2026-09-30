@@ -115,12 +115,15 @@ enum CLIOutputParser {
         let summary = try summary(from: raw, observedAt: observedAt)
         let configuration = object["configuration"] ?? .object([:])
         let status = object["status"] ?? .object([:])
+        let environment = configuration.objectValue?["initProcess"]?.objectValue?["environment"]?.arrayValue ?? []
+        let configPaths = environment.compactMap(\.stringValue).filter { $0.hasPrefix("ODOO_RC=") }
         return ContainerDetail(
             summary: summary,
             configuration: configuration.redacted(),
             status: status.redacted(),
             raw: raw.redacted(),
-            observedAt: observedAt
+            observedAt: observedAt,
+            odooConfigurationIsDefault: configPaths.allSatisfy { $0 == "ODOO_RC=/etc/odoo/odoo.conf" }
         )
     }
 

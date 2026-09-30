@@ -6,11 +6,11 @@ A lightweight local web interface for Apple [`container`](https://github.com/app
 
 [中文](#中文说明) · [English](#english-guide)
 
-**Source v2.24.2 · 本地源码，尚未发布 / Local source, unreleased** · Apple `container` `1.3.x / 1.4.x (≥1.4.1) / 1.5.x` · `http://127.0.0.1:8787`
+**Source v2.25.0 · 本地源码，尚未发布 / Local source, unreleased** · Apple `container` `1.3.x / 1.4.x (≥1.4.1) / 1.5.x` · `http://127.0.0.1:8787`
 
-v2.24.2 增加 Container 1.5.0 兼容支持，保留 1.3.x 和 1.4.1 以上 1.4.x 支持，以及 macOS 27 的交互式 GUI 服务调度。GUI 不会自动升级或重启容器引擎。
+v2.25.0 增加已有 Odoo 容器的数据库地址与端口编辑，可选择运行中的 PostgreSQL 地址，保留其他配置并创建私有备份；不迁移配置或自动启停容器。继续支持 Container 1.5.0、1.3.x、1.4.1 以上 1.4.x 和 macOS 27。
 
-v2.24.2 adds Container 1.5.0 compatibility while retaining 1.3.x, 1.4.x from 1.4.1 onward, and interactive GUI service scheduling on macOS 27. The GUI does not automatically upgrade or restart the container engine.
+v2.25.0 adds database endpoint editing for existing Odoo containers, optional autofill from running PostgreSQL containers, preservation of other settings, and private backups. It does not migrate configuration or automatically start/restart containers. Container 1.5.0, 1.3.x, 1.4.x from 1.4.1 onward, and macOS 27 remain supported.
 
 > Container GUI is a local, single-user tool. It never listens on the LAN or public Internet and is not a replacement for Docker Desktop, Compose, Kubernetes, or a multi-user remote administration platform.
 >
@@ -66,7 +66,7 @@ container system status
 
 ### 安装 .pkg（推荐）
 
-从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 选择已发布的版本，下载 `ContainerGUI-<VERSION>-arm64.pkg` 和对应的 `.sha256` 文件。下面的版本号应替换成实际下载文件中的版本；本地源码版本 `2.24.2` 尚未发布安装包。
+从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 选择已发布的版本，下载 `ContainerGUI-<VERSION>-arm64.pkg` 和对应的 `.sha256` 文件。下面的版本号应替换成实际下载文件中的版本；本地源码版本 `2.25.0` 尚未发布安装包。
 
 ```bash
 CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"
@@ -167,6 +167,12 @@ PostgreSQL、Nginx、Odoo 等已有常驻主进程的镜像不需要启用该选
 ```
 
 实际数据库主机名取决于 Apple Container 网络配置。容器显示“运行中”并不代表 Odoo 已成功连接数据库；出现 HTTP 500 时应先检查 Odoo 日志和数据库可达性。
+
+已有 Odoo 容器可在“查看详情 → 修改数据库连接”中修改地址和端口，或选择运行中的 PostgreSQL 容器填入当前 IPv4 和 5432。仅修改 `/etc/odoo/odoo.conf` 的这两个设置，保留密码等其他内容和权限；保存前创建同目录的私有 `.odoo.conf.container-gui-<UUID>.bak` 备份，保存后独立回读。不会自动启动或重启，需自行操作使其生效。
+
+整个 `/etc/odoo` 目录已挂载自本机且配置文件由当前用户拥有、可安全写入时，停止状态也可修改；内部配置只支持运行中的容器。已停止的内部配置、单文件挂载、自定义配置位置/命令行覆盖、链接或重复键会明确拒绝编辑，不会迁移或重建。刷新页面/语言不会覆盖未保存输入；“重新读取配置”会丢弃草稿并读取最新版本。选择地址是一次性填入，不承诺未来地址自动跟踪。
+
+若配置位于外接宗卷，macOS 可能要求允许 ContainerGUI 访问该宗卷；等待系统授权期间，配置读取可能显示加载中。请自行确认系统提示后再操作，GUI 不会绕过系统权限。
 
 ### 配置仅公钥 SSH
 
@@ -336,7 +342,7 @@ container system status
 
 ### Install the .pkg (recommended)
 
-Choose a published version from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) and download `ContainerGUI-<VERSION>-arm64.pkg` with its `.sha256` file. Replace the version below with the version in the downloaded filename. The local source version `2.24.2` does not yet have a published installer.
+Choose a published version from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) and download `ContainerGUI-<VERSION>-arm64.pkg` with its `.sha256` file. Replace the version below with the version in the downloaded filename. The local source version `2.25.0` does not yet have a published installer.
 
 ```bash
 CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"
@@ -437,6 +443,12 @@ Container module directory: /mnt/extra-addons
 ```
 
 The correct database hostname depends on the Apple Container network configuration. A running Odoo container does not prove database connectivity. If Odoo returns HTTP 500, inspect the Odoo logs and database reachability first.
+
+For an existing Odoo container, use “View details → Edit database connection” to change its address and port, or select a running PostgreSQL container to fill its observed IPv4 and port 5432. Only those two settings in `/etc/odoo/odoo.conf` change; passwords, other contents, and permissions are preserved. A private sibling `.odoo.conf.container-gui-<UUID>.bak` backup is created and the result is independently read back. Start/restart manually to apply it.
+
+A safely writable, user-owned configuration mounted as the whole `/etc/odoo` directory can be edited while stopped; internal configuration requires a running container. Stopped internal configuration, single-file mounts, custom locations/command-line overrides, links, and duplicate keys are explicitly rejected without migration or recreation. Dashboard/language refresh preserves drafts; “Reload configuration” discards them and reads the latest revision. Address selection is a one-time fill, not automatic tracking of future changes.
+
+For configuration on an external volume, macOS may ask you to allow ContainerGUI to access that volume. Configuration loading may remain pending while the system waits for consent. Review the system prompt yourself before proceeding; the GUI does not bypass OS permissions.
 
 ### Configure public-key-only SSH
 

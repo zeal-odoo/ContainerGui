@@ -1151,6 +1151,7 @@ async function refreshDashboard({ announce = false } = {}) {
 }
 
 async function loadDetail(id, { quiet = false } = {}) {
+  globalThis.ContainerGUIOdooEditor?.syncTarget(id);
   state.detailController?.abort();
   const controller = new AbortController();
   state.detailController = controller;
@@ -1325,6 +1326,15 @@ function renderActions(summary) {
     button.disabled = true;
   }
   elements.containerActions.append(button);
+  if (globalThis.ContainerGUIOdooDatabase?.isOdoo(state.selectedDetail || summary)) {
+    const databaseButton = document.createElement("button");
+    databaseButton.type = "button";
+    databaseButton.className = "button secondary";
+    databaseButton.textContent = "修改数据库连接";
+    databaseButton.disabled = state.submitting;
+    databaseButton.addEventListener("click", () => globalThis.ContainerGUIOdooEditor?.open(summary.id));
+    elements.containerActions.append(databaseButton);
+  }
   if (["stopped", "created"].includes(summary.state)) {
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
@@ -1337,6 +1347,7 @@ function renderActions(summary) {
 }
 
 function closeDetail() {
+  globalThis.ContainerGUIOdooEditor?.close();
   const selectedID = state.selectedID;
   const returnFocus = elements.detailPanel.contains(document.activeElement);
   state.detailController?.abort();
@@ -2223,6 +2234,12 @@ elements.checkUpdatesButton.addEventListener("click", () => checkForUpdates());
 elements.startSystemButton.addEventListener("click", startSystem);
 elements.closeUpdateDialogButton.addEventListener("click", () => closeDialog(elements.updateDialog, "dismiss"));
 elements.closeDetailButton.addEventListener("click", closeDetail);
+globalThis.ContainerGUIOdooEditor = globalThis.ContainerGUIOdooDatabase?.attach({
+  request: fetchJSON,
+  openDialog,
+  closeDialog,
+  getContainers: () => state.containers
+});
 elements.copySSHCommandButton.addEventListener("click", copySSHCommand);
 elements.loadLogsButton.addEventListener("click", loadRecentLogs);
 elements.followLogsButton.addEventListener("click", () => {

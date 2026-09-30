@@ -99,6 +99,19 @@ actor OperationCoordinator {
         return operations[record.operationID]
     }
 
+    func createWithDisposition(
+        idempotencyKey: String,
+        fingerprint: String,
+        kind: OperationKind,
+        target: OperationTarget,
+        safeRequestSummary: [String: JSONValue]
+    ) throws -> (operation: Operation, created: Bool) {
+        if let operation = try existing(idempotencyKey: idempotencyKey, fingerprint: fingerprint) {
+            return (operation, false)
+        }
+        return (try create(idempotencyKey: idempotencyKey, fingerprint: fingerprint, kind: kind, target: target, safeRequestSummary: safeRequestSummary), true)
+    }
+
     func markRunning(_ id: UUID, now: Date = Date()) throws {
         guard var operation = operations[id] else { throw OperationCoordinatorError.operationNotFound }
         guard operation.state == .queued else { throw OperationCoordinatorError.illegalTransition }

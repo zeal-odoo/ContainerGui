@@ -9,6 +9,21 @@ private struct ConfirmedTargetRequest: Decodable {
 enum ContainerControlRoutes {
     private static let idempotencyName = HTTPField.Name("Idempotency-Key")!
 
+    static func registerOdooDatabase<Reader: ContainerReading>(on router: Router<BasicRequestContext>, service: OdooDatabaseService<Reader>) {
+        router.get("/api/v1/containers/:containerId/odoo/database-config") { _, context in
+            let id = try validContainerID(context.parameters.require("containerId"))
+            return try makeJSONResponse(try await service.read(id: id))
+        }
+        router.post("/api/v1/containers/:containerId/odoo/database-config") { request, context in
+            let id = try validContainerID(context.parameters.require("containerId"))
+            let key = try idempotencyKey(request)
+            let body: OdooDatabaseSaveRequest
+            do { body = try await request.decode(as: OdooDatabaseSaveRequest.self, context: context) }
+            catch { throw ProblemDetail(code: .validationFailed) }
+            return try accepted(try await service.submit(id: id, request: body, idempotencyKey: key))
+        }
+    }
+
     static func registerControl<Controller: ContainerControlling>(
         on router: Router<BasicRequestContext>,
         service: ContainerControlService<Controller>

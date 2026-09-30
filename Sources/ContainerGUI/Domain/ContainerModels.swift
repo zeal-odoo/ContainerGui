@@ -98,6 +98,7 @@ struct ContainerDetail: Codable, Equatable, Sendable {
     let status: JSONValue
     let raw: JSONValue
     let observedAt: Date
+    var odooConfigurationIsDefault: Bool? = nil
 }
 
 struct RecentLogs: Codable, Equatable, Sendable {
