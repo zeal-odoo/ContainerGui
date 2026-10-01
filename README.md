@@ -6,11 +6,11 @@ A lightweight local web interface for Apple [`container`](https://github.com/app
 
 [中文](#中文说明) · [English](#english-guide)
 
-**Source v2.26.0 · 本地源码，尚未发布 / Local source, unreleased** · Apple `container` `1.3.x / 1.4.x (≥1.4.1) / 1.5.x` · `http://127.0.0.1:8787`
+**v2.26.1 · [PKG 下载 / Download](https://github.com/zeal-odoo/ContainerGui/releases/tag/v2.26.1)** · Apple `container` `1.3.x / 1.4.x (≥1.4.1) / 1.5.x` · `http://127.0.0.1:8787`
 
-v2.26.0 为所有容器增加统一“连接配置”入口：支持已有 Odoo、已识别的数据库环境配置和 Nginx 直连后端，其他形式明确提示限制。仅修改选中地址/端口并创建私有备份；不改密码、不迁移、不自动启停，也不将保存成功当作连接成功。继续支持 Container 1.5.0、1.3.x、1.4.1 以上 1.4.x 和 macOS 27。
+v2.26.1 发布此前 v2.25.0/v2.26.0 的连接配置功能，并同步安装包与中英文说明：所有容器均提供统一“连接配置”入口，支持已有 Odoo、已识别的数据库环境配置和 Nginx 直连后端，其他形式明确提示限制。仅修改选中地址/端口并创建私有备份；不改密码、不迁移、不自动启停，也不将保存成功当作连接成功。继续支持 Container 1.5.0、1.3.x、1.4.1 以上 1.4.x 和 macOS 27。
 
-v2.26.0 adds a universal Connection configuration entry for existing Odoo, recognized database environment files, and direct Nginx backends. Unsupported forms show explicit limitations. Saves change only the selected address/port, retain credentials and private backups, and never migrate or automatically start/restart containers. A verified save is not a connectivity test. Container 1.5.0, 1.3.x, 1.4.x from 1.4.1 onward, and macOS 27 remain supported.
+v2.26.1 publishes the connection features developed in v2.25.0/v2.26.0 with synchronized packaging and bilingual documentation. Every container has a Connection configuration entry for existing Odoo, recognized database environment files, and direct Nginx backends. Unsupported forms show explicit limitations. Saves change only the selected address/port, retain credentials and private backups, and never migrate or automatically start/restart containers. A verified save is not a connectivity test. Container 1.5.0, 1.3.x, 1.4.x from 1.4.1 onward, and macOS 27 remain supported.
 
 > Container GUI is a local, single-user tool. It never listens on the LAN or public Internet and is not a replacement for Docker Desktop, Compose, Kubernetes, or a multi-user remote administration platform.
 >
@@ -67,7 +67,7 @@ container system status
 
 ### 安装 .pkg（推荐）
 
-从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 选择已发布的版本，下载 `ContainerGUI-<VERSION>-arm64.pkg` 和对应的 `.sha256` 文件。下面的版本号应替换成实际下载文件中的版本；本地源码版本 `2.26.0` 尚未发布安装包。
+从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 下载 `ContainerGUI-<VERSION>-arm64.pkg` 和对应的 `.sha256` 文件。当前版本为 `2.26.1`，下面的版本号应替换成实际下载文件中的版本。
 
 ```bash
 CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"
@@ -353,7 +353,7 @@ container system status
 
 ### Install the .pkg (recommended)
 
-Choose a published version from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) and download `ContainerGUI-<VERSION>-arm64.pkg` with its `.sha256` file. Replace the version below with the version in the downloaded filename. The local source version `2.26.0` does not yet have a published installer.
+Download `ContainerGUI-<VERSION>-arm64.pkg` with its `.sha256` file from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest). The current version is `2.26.1`; replace the version below with the version in the downloaded filename.
 
 ```bash
 CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"
