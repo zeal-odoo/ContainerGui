@@ -66,26 +66,135 @@ test("the selected row and accessible toggle state stay in sync", () => {
 });
 
 function containerListContext(containers) {
-  const node = () => ({
-    children: [], dataset: {},
+  const document = { activeElement: null };
+  const node = (tagName) => ({
+    tagName, children: [], dataset: {}, attributes: {}, listeners: {},
     append(...children) { this.children.push(...children); },
     replaceChildren() { this.children = []; },
     contains(target) { return this.children.some((child) => child === target || child.contains(target)); },
-    setAttribute() {}, addEventListener() {},
+    setAttribute(name, value) { this.attributes[name] = String(value); },
+    addEventListener(name, handler) { this.listeners[name] = handler; },
+    focus() { document.activeElement = this; },
   });
+  document.createElement = node;
+  document.createElementNS = (_, tagName) => node(tagName);
   const elements = Object.fromEntries([
     "containerRows", "runningContainerRows", "inactiveContainerRows", "runningContainerGroup", "inactiveContainerGroup",
-    "runningContainerCount", "inactiveContainerCount", "loadingState", "errorState", "emptyState", "tableWrap"
+    "runningContainerCount", "inactiveContainerCount", "loadingState", "errorState", "emptyState", "tableWrap", "workspaceOperationStatus"
   ].map((id) => [id, node()]));
   elements.containerRows.append(elements.runningContainerRows, elements.inactiveContainerRows);
   elements.searchInput = { value: "" };
   return {
-    elements, state: { containers }, document: { activeElement: null, createElement: node },
+    elements, state: { containers, submitting: false }, document,
     stateLabels: { running: "运行中", stopped: "已停止", created: "已创建", unknown: "未知" },
     shortImageReference: (value) => value || "—", cpuDisplay: () => ({ value: "—" }),
     memoryDisplay: () => ({ value: "—" }), renderMetricCell() {}, syncDetailButtons() {},
   };
 }
+
+test("row icons offer only valid start or stop actions and route feedback to the list", () => {
+  const containers = ["running", "stopped", "created", "stopping", "error", "unknown"].map((state) => ({ id: state, displayName: state, state }));
+  const context = containerListContext(containers);
+  const calls = [];
+  context.startContainer = (summary, target) => calls.push({ action: "start", summary, target });
+  context.stopContainer = (summary, target) => calls.push({ action: "stop", summary, target });
+  const render = loadFunction("renderContainers", context);
+  render();
+  const rows = [...context.elements.runningContainerRows.children, ...context.elements.inactiveContainerRows.children];
+  for (const row of rows) {
+    const action = row.dataset.containerId === "running" ? "stop" : ["stopped", "created"].includes(row.dataset.containerId) ? "start" : null;
+    const controls = row.children[4].children[0].children;
+    const button = controls.find((item) => item.dataset.containerAction);
+    if (!action) { assert.equal(button, undefined); continue; }
+    assert.equal(button.dataset.containerAction, action);
+    assert.equal(button.disabled, false);
+    assert.equal(button.attributes["aria-label"], `${action === "start" ? "启动" : "停止"}容器 ${row.dataset.containerId}`);
+    assert.equal(button.children[0].tagName, "svg");
+    assert.equal(button.children[0].attributes["aria-hidden"], "true");
+    button.listeners.click();
+    assert.equal(calls.at(-1).summary.id, row.dataset.containerId);
+    assert.equal(calls.at(-1).target, context.elements.workspaceOperationStatus);
+  }
+  assert.deepEqual(calls.map((call) => call.action), ["stop", "start", "start"]);
+  context.state.submitting = true;
+  render();
+  for (const row of [...context.elements.runningContainerRows.children, ...context.elements.inactiveContainerRows.children]) {
+    const button = row.children[4].children[0].children.find((item) => item.dataset.containerAction);
+    if (button) assert.equal(button.disabled, true);
+  }
+});
+
+test("row controls retain keyboard focus across refreshes without focusing the opposite action", () => {
+  const container = { id: "demo", displayName: "Demo", state: "stopped" };
+  const context = containerListContext([container]);
+  const render = loadFunction("renderContainers", context);
+  render();
+  const previous = context.elements.inactiveContainerRows.children[0].children[4].children[0].children[0];
+  context.document.activeElement = previous;
+  render();
+  assert.notEqual(context.document.activeElement, previous);
+  assert.equal(context.document.activeElement.dataset.containerAction, "start");
+  container.state = "running";
+  render();
+  assert.equal(context.document.activeElement.dataset.detailId, "demo");
+  assert.equal(context.document.activeElement.dataset.containerAction, undefined);
+});
+
+test("start and stop still require confirmation and preserve the exact target and feedback location", async () => {
+  const summary = { id: "demo", displayName: "Demo" };
+  const target = {};
+  const calls = [];
+  let confirmed = false;
+  const context = {
+    elements: { operationStatus: {} }, requestConfirmation: async () => confirmed,
+    submitContainerOperation: (action, id, body, statusElement) => calls.push({ action, id, body, statusElement })
+  };
+  const start = loadFunction("startContainer", context);
+  const stop = loadFunction("stopContainer", context);
+  await start(summary, target);
+  await stop(summary, target);
+  assert.equal(calls.length, 0);
+  confirmed = true;
+  await start(summary, target);
+  await stop(summary, target);
+  assert.deepEqual(calls.map(({ action, id, body }) => [action, id, JSON.stringify(body)]), [
+    ["start", "demo", "{}"], ["stop", "demo", '{"confirmationTarget":"demo"}']
+  ]);
+  assert.ok(calls.every((call) => call.statusElement === target));
+});
+
+test("list operations block duplicate submissions and show errors without opening details", async () => {
+  const target = {};
+  const messages = [];
+  const buttons = [{ disabled: false }, { disabled: false }];
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  const requests = [];
+  const context = {
+    state: { submitting: false, selectedDetail: null },
+    elements: { operationStatus: {}, containerRows: { querySelectorAll: () => buttons } },
+    ENDPOINTS: { containers: "/api/v1/containers" }, crypto: { randomUUID: () => "test-key" },
+    showOperationStatus: (message, isError, statusElement) => messages.push({ message, isError, statusElement }),
+    fetchJSON: async (url, options) => { requests.push({ url, options }); return pending; },
+    pollOperation: async (id, statusElement) => { assert.equal(statusElement, target); return { readback: {} }; },
+    formatProblem: (error) => error.message
+  };
+  const submit = loadFunction("submitContainerOperation", context);
+  const first = submit("start", "demo", {}, target);
+  await submit("start", "demo", {}, target);
+  assert.equal(requests.length, 1);
+  assert.ok(buttons.every((button) => button.disabled));
+  assert.equal(requests[0].url, "/api/v1/containers/demo/start");
+  assert.equal(requests[0].options.headers["Idempotency-Key"], "test-key");
+  release({ id: "operation-id" });
+  await first;
+  assert.ok(buttons.every((button) => !button.disabled));
+  context.fetchJSON = async () => { throw new Error("operation failed"); };
+  await submit("stop", "demo", { confirmationTarget: "demo" }, target);
+  assert.equal(context.state.submitting, false);
+  assert.ok(buttons.every((button) => !button.disabled));
+  assert.ok(messages.some((item) => item.message === "operation failed" && item.isError && item.statusElement === target));
+});
 
 test("containers are grouped by running state while retaining their order and exact status", () => {
   const containers = ["stopped", "running", "created", "running", "error", "unknown"].map((state, index) => ({

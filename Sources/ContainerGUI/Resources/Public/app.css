@@ -651,6 +651,42 @@ tbody tr.is-selected {
   background: currentColor;
   flex-shrink: 0;
 }
+.container-row-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.container-control-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  padding: 8px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container-low);
+  color: var(--md-sys-color-primary);
+  cursor: pointer;
+}
+.container-control-button.stop {
+  color: var(--md-sys-color-error);
+}
+.container-control-button:not(:disabled):hover {
+  background: var(--md-sys-color-surface-container-high);
+  border-color: currentColor;
+}
+.container-control-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.container-control-button svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
 .detail-link {
   border: 0;
   background: none;

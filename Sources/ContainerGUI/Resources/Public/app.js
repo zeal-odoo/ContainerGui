@@ -339,7 +339,9 @@ function renderContainers() {
       .some((value) => value.toLocaleLowerCase(locale).includes(query))
   );
 
-  const focusedID = elements.containerRows.contains(document.activeElement) ? document.activeElement.dataset.detailId : null;
+  const focusedButton = elements.containerRows.contains(document.activeElement) ? document.activeElement : null;
+  const focusedID = focusedButton?.dataset.detailId || focusedButton?.dataset.containerId;
+  const focusedAction = focusedButton?.dataset.containerAction;
   elements.runningContainerRows.replaceChildren();
   elements.inactiveContainerRows.replaceChildren();
   for (const container of visible) {
@@ -369,6 +371,33 @@ function renderContainers() {
     memoryCell.textContent = memory.detail || memory.value;
     memoryCell.title = memory.value;
     const actionCell = document.createElement("td");
+    const rowActions = document.createElement("div");
+    rowActions.className = "container-row-actions";
+    const action = container.state === "running" ? "stop" : ["stopped", "created"].includes(container.state) ? "start" : null;
+    let controlButton = null;
+    if (action) {
+      controlButton = document.createElement("button");
+      controlButton.type = "button";
+      controlButton.className = `container-control-button ${action}`;
+      controlButton.dataset.containerAction = action;
+      controlButton.dataset.containerId = container.id;
+      controlButton.disabled = state.submitting;
+      controlButton.title = action === "start" ? "启动容器" : "停止容器";
+      controlButton.setAttribute("aria-label", `${controlButton.title} ${container.displayName}`);
+      const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      icon.setAttribute("viewBox", "0 0 24 24");
+      icon.setAttribute("fill", "currentColor");
+      icon.setAttribute("aria-hidden", "true");
+      icon.setAttribute("focusable", "false");
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", action === "start" ? "M6 3l15 9-15 9Z" : "M5 5h14v14H5Z");
+      icon.append(path);
+      controlButton.append(icon);
+      controlButton.addEventListener("click", () => action === "start"
+        ? startContainer(container, elements.workspaceOperationStatus)
+        : stopContainer(container, elements.workspaceOperationStatus));
+      rowActions.append(controlButton);
+    }
     const detailButton = document.createElement("button");
     detailButton.type = "button";
     detailButton.className = "detail-link";
@@ -379,11 +408,16 @@ function renderContainers() {
     detailButton.setAttribute("aria-expanded", "false");
     detailButton.setAttribute("aria-label", `查看 ${container.displayName} 的详情`);
     detailButton.addEventListener("click", () => toggleDetail(container.id));
-    actionCell.append(detailButton);
+    rowActions.append(detailButton);
+    actionCell.append(rowActions);
     row.append(nameCell, stateCell, cpuCell, memoryCell, actionCell);
     const groupRows = container.state === "running" ? elements.runningContainerRows : elements.inactiveContainerRows;
     groupRows.append(row);
-    if (focusedID === container.id) detailButton.focus({ preventScroll: true });
+    if (focusedID === container.id) {
+      const target = focusedAction && controlButton?.dataset.containerAction === focusedAction && !controlButton.disabled
+        ? controlButton : detailButton;
+      target.focus({ preventScroll: true });
+    }
   }
 
   const runningCount = visible.filter((container) => container.state === "running").length;
@@ -1398,7 +1432,7 @@ function closeDetail() {
   }
 }
 
-async function startContainer(summary) {
+async function startContainer(summary, statusElement = elements.operationStatus) {
   const confirmed = await requestConfirmation(
     "启动容器",
     `将启动“${summary.displayName}”，完成后会重新读取 CLI 状态。`,
@@ -1406,10 +1440,10 @@ async function startContainer(summary) {
     "确认启动",
     false
   );
-  if (confirmed) await submitContainerOperation("start", summary.id, {});
+  if (confirmed) await submitContainerOperation("start", summary.id, {}, statusElement);
 }
 
-async function stopContainer(summary) {
+async function stopContainer(summary, statusElement = elements.operationStatus) {
   const confirmed = await requestConfirmation(
     "正常停止容器",
     "将发送正常停止请求并等待最多 10 秒，不会使用 --all 或 --force。",
@@ -1418,7 +1452,7 @@ async function stopContainer(summary) {
     true
   );
   if (confirmed) {
-    await submitContainerOperation("stop", summary.id, { confirmationTarget: summary.id });
+    await submitContainerOperation("stop", summary.id, { confirmationTarget: summary.id }, statusElement);
   }
 }
 
@@ -1498,11 +1532,12 @@ function requestConfirmation(title, message, target, confirmLabel, destructive) 
   });
 }
 
-async function submitContainerOperation(action, id, body) {
+async function submitContainerOperation(action, id, body, statusElement = elements.operationStatus) {
   if (state.submitting) return;
   state.submitting = true;
+  for (const button of elements.containerRows.querySelectorAll("[data-container-action]")) button.disabled = true;
   if (state.selectedDetail) renderActions(state.selectedDetail.summary);
-  showOperationStatus("正在提交操作…");
+  showOperationStatus("正在提交操作…", false, statusElement);
   try {
     const operation = await fetchJSON(
       `${ENDPOINTS.containers}/${encodeURIComponent(id)}/${action}`,
@@ -1515,13 +1550,14 @@ async function submitContainerOperation(action, id, body) {
         body: JSON.stringify(body)
       }
     );
-    const completed = await pollOperation(operation.id);
+    const completed = await pollOperation(operation.id, statusElement);
     if (action === "delete" && completed.readback?.targetAbsent === true) closeDetail();
   } catch (error) {
-    showOperationStatus(formatProblem(error), true);
+    showOperationStatus(formatProblem(error), true, statusElement);
     if (action === "restart") await refreshDashboard();
   } finally {
     state.submitting = false;
+    for (const button of elements.containerRows.querySelectorAll("[data-container-action]")) button.disabled = false;
     if (state.selectedDetail) renderActions(state.selectedDetail.summary);
   }
 }

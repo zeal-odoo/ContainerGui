@@ -22,6 +22,7 @@ test("preferred language follows a valid saved choice before browser language", 
 test("static interface copy translates in both directions", () => {
   assert.equal(api.translate("容器运行状态", "en"), "Container runtime status");
   assert.equal(api.translate("运行中", "en"), "Running");
+  assert.equal(api.translate("停止容器", "en"), "Stop container");
   assert.equal(api.translate("检查更新", "en"), "Check for updates");
   assert.equal(api.translate("前往 GitHub 下载 PKG", "en"), "Open GitHub to download the PKG");
   assert.equal(api.translate("Container runtime status", "zh"), "容器运行状态");
@@ -29,6 +30,8 @@ test("static interface copy translates in both directions", () => {
 
 test("dynamic interface patterns preserve user-owned identifiers and counts", () => {
   assert.equal(api.translate("查看 postgres 的详情", "en"), "View details for postgres");
+  assert.equal(api.translate("启动容器 postgres", "en"), "Start container postgres");
+  assert.equal(api.translate("停止容器 postgres", "en"), "Stop container postgres");
   assert.equal(api.translate("本页 10 条 · 共 75 条", "en"), "10 on this page · 75 total");
   assert.equal(api.translate("第 3 页", "en"), "Page 3");
   assert.equal(api.translate("100% = 3 核", "en"), "100% = 3 cores");
