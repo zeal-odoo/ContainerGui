@@ -350,8 +350,13 @@ final class ContainerCLIClient: ContainerReading, SystemControlling, ContainerMe
     func deleteImage(reference: String) async throws -> ImageDeleteOutcome {
         _ = try ImageDeleteRequest(reference: reference, confirmationTarget: reference).validated()
         let currentImages = try await listImages()
-        guard let target = currentImages.items.first(where: { imageMatchesReference($0, reference: reference) }) else {
+        let candidates = currentImages.items.filter { imageMatchesReference($0, reference: reference) }
+        guard !candidates.isEmpty else {
             throw ProblemDetail(code: .targetNotFound, message: "未找到指定镜像。")
+        }
+        guard let target = candidates.first(where: { $0.name == reference })
+            ?? (candidates.count == 1 ? candidates.first : nil) else {
+            throw ProblemDetail(code: .stateConflict)
         }
         guard !isProtectedSystemImage(target) else {
             throw ProblemDetail(code: .stateConflict, message: "Apple container 系统镜像不能删除。")
@@ -366,7 +371,7 @@ final class ContainerCLIClient: ContainerReading, SystemControlling, ContainerMe
         let result = try await execute(["image", "delete", target.name], timeout: mutationTimeout)
         guard result.exitCode == 0 else { throw ContainerCLIError.nonZeroExit(result.exitCode) }
         let readback = try await listImages()
-        let targetAbsent = !readback.items.contains { imageMatchesReference($0, reference: target.name) }
+        let targetAbsent = !readback.items.contains { $0.name == target.name }
         return ImageDeleteOutcome(
             exitCode: result.exitCode,
             targetAbsent: targetAbsent,

@@ -202,8 +202,7 @@ enum CLIOutputParser {
         let images = try rawImages.map { raw in
             try imageSummary(from: raw, observedAt: observedAt)
         }
-        guard Set(images.map(\.id)).count == images.count,
-              Set(images.map(\.name)).count == images.count else {
+        guard Set(images.map(\.name)).count == images.count else {
             throw ContainerCLIError.invalidOutput
         }
         return ImageList(items: images, observedAt: observedAt)

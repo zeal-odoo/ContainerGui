@@ -72,31 +72,39 @@ final class ContainerCLIReadTests: XCTestCase {
     }
 
     func testNestedServerVersionIsNotInferredFromClientDuringUpgrade() throws {
-        for server in [#"{"version":"1.3.1","build":"release","commit":"old-server"}"#, #"{"version":"1.4.1","build":"release","commit":"old-server"}"#, "null", "{}"] {
-            let health = try CLIOutputParser.parseSystemHealth(
-                data: Data(#"{"status":"running","client":{"version":"1.5.0"},"server":\#(server)}"#.utf8),
-                installation: installation
-            )
-            XCTAssertEqual(health.serviceState, .healthy)
-            let expectedVersion = server.contains("1.3.1") ? "1.3.1" : (server.contains("1.4.1") ? "1.4.1" : nil)
-            XCTAssertEqual(health.apiServerVersion, expectedVersion)
+        for clientVersion in ["1.5.0", "1.6.1"] {
+            for serverVersion in ["1.3.1", "1.4.1", "1.5.0", "1.6.1", nil] {
+                let servers = serverVersion.map {
+                    [#"{"version":"\#($0)","build":"release","commit":"fixture-server"}"#]
+                } ?? ["null", "{}"]
+                for server in servers {
+                    let health = try CLIOutputParser.parseSystemHealth(
+                        data: Data(#"{"status":"running","client":{"version":"\#(clientVersion)"},"server":\#(server)}"#.utf8),
+                        installation: installation
+                    )
+                    XCTAssertEqual(health.serviceState, .healthy)
+                    XCTAssertEqual(health.apiServerVersion, serverVersion)
+                }
+            }
         }
     }
 
-    func testParses150NestedServerWithoutExposingHostMetadata() throws {
-        let health = try CLIOutputParser.parseSystemHealth(
-            data: fixture("system-healthy.json", version: "1.5.0"),
-            installation: installation,
-            observedAt: observedAt
-        )
-        XCTAssertEqual(health.serviceState, .healthy)
-        XCTAssertEqual(health.apiServerVersion, "1.5.0")
-        XCTAssertEqual(health.apiServerBuild, "release")
-        XCTAssertEqual(health.apiServerCommit, "fixture-server")
-        XCTAssertEqual(health.tool, installation)
-        let encoded = String(decoding: try JSONEncoder.containerGUI.encode(health), as: UTF8.self)
-        XCTAssertFalse(encoded.contains("/Users/example"))
-        XCTAssertFalse(encoded.contains("installRoot"))
+    func testParsesRecentNestedServerWithoutExposingHostMetadata() throws {
+        for version in ["1.5.0", "1.6.1"] {
+            let health = try CLIOutputParser.parseSystemHealth(
+                data: fixture("system-healthy.json", version: version),
+                installation: installation,
+                observedAt: observedAt
+            )
+            XCTAssertEqual(health.serviceState, .healthy)
+            XCTAssertEqual(health.apiServerVersion, version)
+            XCTAssertEqual(health.apiServerBuild, "release")
+            XCTAssertEqual(health.apiServerCommit, "fixture-server")
+            XCTAssertEqual(health.tool, installation)
+            let encoded = String(decoding: try JSONEncoder.containerGUI.encode(health), as: UTF8.self)
+            XCTAssertFalse(encoded.contains("/Users/example"))
+            XCTAssertFalse(encoded.contains("installRoot"))
+        }
     }
 
     func test141MinimalClosedStatesAndInvalidHealthOutput() throws {

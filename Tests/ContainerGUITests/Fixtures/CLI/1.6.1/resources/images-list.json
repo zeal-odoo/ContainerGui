@@ -1,0 +1,26 @@
+[
+  {
+    "configuration": {
+      "descriptor": { "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+      "name": "example.invalid/demo:1"
+    },
+    "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "variants": [{ "platform": { "architecture": "arm64", "os": "linux" }, "size": 1024 }]
+  },
+  {
+    "configuration": {
+      "descriptor": { "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+      "name": "example.invalid/demo:stable"
+    },
+    "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "variants": [{ "platform": { "architecture": "arm64", "os": "linux" }, "size": 1024 }]
+  },
+  {
+    "configuration": {
+      "descriptor": { "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+      "name": "example.invalid/demo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "variants": [{ "platform": { "architecture": "arm64", "os": "linux" }, "size": 1024 }]
+  }
+]

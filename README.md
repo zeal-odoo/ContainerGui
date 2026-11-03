@@ -6,11 +6,11 @@ A lightweight local web interface for Apple [`container`](https://github.com/app
 
 [中文](#中文说明) · [English](#english-guide)
 
-**v2.26.1 · [PKG 下载 / Download](https://github.com/zeal-odoo/ContainerGui/releases/tag/v2.26.1)** · Apple `container` `1.3.x / 1.4.x (≥1.4.1) / 1.5.x` · `http://127.0.0.1:8787`
+**v2.26.2 · [PKG 下载 / Download](https://github.com/zeal-odoo/ContainerGui/releases/tag/v2.26.2)** · Apple `container` `1.3.x / 1.4.x (≥1.4.1) / 1.5.x / 1.6.x` · `http://127.0.0.1:8787`
 
-v2.26.1 发布此前 v2.25.0/v2.26.0 的连接配置功能，并同步安装包与中英文说明：所有容器均提供统一“连接配置”入口，支持已有 Odoo、已识别的数据库环境配置和 Nginx 直连后端，其他形式明确提示限制。仅修改选中地址/端口并创建私有备份；不改密码、不迁移、不自动启停，也不将保存成功当作连接成功。继续支持 Container 1.5.0、1.3.x、1.4.1 以上 1.4.x 和 macOS 27。
+v2.26.2 兼容 Apple Container 1.6.1，保留 1.3.x、1.4.1 以上 1.4.x、1.5.x 和 macOS 27 支持。延续统一“连接配置”入口和现有容器管理功能；引擎升级期间分别显示 CLI 与服务端的实际版本，不会把客户端升级当作服务端升级。同时修复多标签镜像的列表读取与精确引用删除。GUI 不会自动安装或重启引擎。
 
-v2.26.1 publishes the connection features developed in v2.25.0/v2.26.0 with synchronized packaging and bilingual documentation. Every container has a Connection configuration entry for existing Odoo, recognized database environment files, and direct Nginx backends. Unsupported forms show explicit limitations. Saves change only the selected address/port, retain credentials and private backups, and never migrate or automatically start/restart containers. A verified save is not a connectivity test. Container 1.5.0, 1.3.x, 1.4.x from 1.4.1 onward, and macOS 27 remain supported.
+v2.26.2 supports Apple Container 1.6.1 while retaining 1.3.x, 1.4.x from 1.4.1 onward, 1.5.x, and macOS 27 compatibility. Existing container management and Connection configuration remain available. CLI and server versions are reported independently during an engine upgrade; upgrading the client is not reported as a server upgrade. Image lists and exact-reference deletion now handle multiple aliases sharing one content ID. The GUI does not automatically install or restart the engine.
 
 > Container GUI is a local, single-user tool. It never listens on the LAN or public Internet and is not a replacement for Docker Desktop, Compose, Kubernetes, or a multi-user remote administration platform.
 >
@@ -53,9 +53,9 @@ ANE 是**整机所有应用**的估算功耗，不计入容器合计，也不是
 - Apple silicon Mac
 - macOS 26
 - Xcode 提供的 Swift 6.1 或更高版本（仅从源码运行或打包时需要；安装 `.pkg` 不需要）
-- Apple `container` CLI `1.3.x`、`1.4.x`（从 `1.4.1` 起）或 `1.5.x`；兼容性测试覆盖 `1.3.1`、`1.4.1` 与 `1.5.0`。`1.4.0` 未正式发布，更新的次版本需另行验证。
+- Apple `container` CLI `1.3.x`、`1.4.x`（从 `1.4.1` 起）、`1.5.x` 或 `1.6.x`；兼容性测试覆盖 `1.3.1`、`1.4.1`、`1.5.0` 与 `1.6.1`。`1.4.0` 未正式发布，更新的次版本需另行验证。
 
-v2.24.2 兼容 Container 1.5.0，保留旧版输出解析。GUI 不会自动升级引擎；升级应使用 [Apple 官方安装包](https://github.com/apple/container/releases/tag/1.5.0)，先安排容器停机，安装后重新启动服务并核对客户端和服务端版本。完整验证范围见 [1.5.0 兼容性记录](specs/001-container-web-gui/verification/container-1.5.0.md) 和 [1.4.1 历史记录](specs/001-container-web-gui/verification/container-1.4.1.md)。
+v2.26.2 兼容 Container 1.6.1，保留旧版输出解析。GUI 不会自动升级引擎；升级应使用 [Apple 官方安装包](https://github.com/apple/container/releases/tag/1.6.1)，先等待数据库恢复、建库等操作结束并安排容器停机，安装后重新启动服务并核对客户端和服务端版本。完整验证范围见 [1.6.1 兼容性记录](specs/001-container-web-gui/verification/container-1.6.1.md) 和 [1.5.0 历史记录](specs/001-container-web-gui/verification/container-1.5.0.md)。
 
 从 Apple 官方 [Releases](https://github.com/apple/container/releases) 安装签名安装包，然后确认 CLI 和系统服务可用：
 
@@ -67,7 +67,7 @@ container system status
 
 ### 安装 .pkg（推荐）
 
-从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 下载 `ContainerGUI-<VERSION>-arm64.pkg` 和对应的 `.sha256` 文件。当前版本为 `2.26.1`，下面的版本号应替换成实际下载文件中的版本。
+从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 下载 `ContainerGUI-<VERSION>-arm64.pkg` 和对应的 `.sha256` 文件。当前版本为 `2.26.2`，下面的版本号应替换成实际下载文件中的版本。
 
 ```bash
 CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"
@@ -339,9 +339,9 @@ ANE power covers **all applications on the host**, not container totals or Conta
 - Apple silicon Mac
 - macOS 26
 - Swift 6.1 or later from Xcode (required only to run from source or build a package; not required for `.pkg` installation)
-- Apple `container` CLI `1.3.x`, `1.4.x` (starting at `1.4.1`), or `1.5.x`; compatibility tests cover `1.3.1`, `1.4.1`, and `1.5.0`. Version `1.4.0` was never released; newer minor versions require separate validation.
+- Apple `container` CLI `1.3.x`, `1.4.x` (starting at `1.4.1`), `1.5.x`, or `1.6.x`; compatibility tests cover `1.3.1`, `1.4.1`, `1.5.0`, and `1.6.1`. Version `1.4.0` was never released; newer minor versions require separate validation.
 
-v2.24.2 supports Container 1.5.0 while retaining legacy output parsing. The GUI does not automatically upgrade the engine. Use the [official Apple installer](https://github.com/apple/container/releases/tag/1.5.0), schedule container downtime, then restart services and verify both client and server versions. See the [1.5.0 compatibility record](specs/001-container-web-gui/verification/container-1.5.0.md) and [historical 1.4.1 record](specs/001-container-web-gui/verification/container-1.4.1.md) for the exact validation scope.
+v2.26.2 supports Container 1.6.1 while retaining legacy output parsing. The GUI does not automatically upgrade the engine. Use the [official Apple installer](https://github.com/apple/container/releases/tag/1.6.1), wait for database restores and database creation to finish, schedule container downtime, then restart services and verify both client and server versions. See the [1.6.1 compatibility record](specs/001-container-web-gui/verification/container-1.6.1.md) and [historical 1.5.0 record](specs/001-container-web-gui/verification/container-1.5.0.md) for the exact validation scope.
 
 Install the signed package from Apple’s official [Releases](https://github.com/apple/container/releases), then verify the CLI and system service:
 
@@ -353,7 +353,7 @@ container system status
 
 ### Install the .pkg (recommended)
 
-Download `ContainerGUI-<VERSION>-arm64.pkg` with its `.sha256` file from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest). The current version is `2.26.1`; replace the version below with the version in the downloaded filename.
+Download `ContainerGUI-<VERSION>-arm64.pkg` with its `.sha256` file from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest). The current version is `2.26.2`; replace the version below with the version in the downloaded filename.
 
 ```bash
 CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"

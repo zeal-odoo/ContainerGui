@@ -271,6 +271,50 @@ final class ImageAndCreationCLITests: XCTestCase {
         XCTAssertEqual(inspected.observedAt, observedAt)
     }
 
+    func testImageListPreservesDistinctReferencesSharingContentID() throws {
+        let list = try CLIOutputParser.parseImageList(
+            data: fixture("images-list.json", version: "1.6.1"),
+            observedAt: observedAt
+        )
+
+        XCTAssertEqual(list.items.count, 3)
+        XCTAssertEqual(Set(list.items.map(\.id)).count, 1)
+        XCTAssertEqual(Set(list.items.map(\.digest)).count, 1)
+        XCTAssertEqual(Set(list.items.map(\.name)).count, 3)
+        XCTAssertEqual(list.items.map(\.name).prefix(2), ["example.invalid/demo:1", "example.invalid/demo:stable"])
+    }
+
+    func testImageListRejectsDuplicateReferences() throws {
+        let images = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: fixture("images-list.json", version: "1.6.1")
+        ) as? [[String: Any]])
+        let image = try XCTUnwrap(images.first)
+        let duplicate = try JSONSerialization.data(withJSONObject: [image, image])
+
+        XCTAssertThrowsError(try CLIOutputParser.parseImageList(data: duplicate)) { error in
+            XCTAssertEqual(error as? ContainerCLIError, .invalidOutput)
+        }
+    }
+
+    func testImageListRejectsNonzeroExitEvenWithValidPartialOutput() async throws {
+        let executor = ResourceScriptedCommandExecutor(steps: [
+            .success(resourceVersionResult()),
+            .success(CommandResult(
+                stdout: try fixture("images-list.json", version: "1.6.1"),
+                stderr: Data(),
+                exitCode: 1,
+                duration: .zero
+            )),
+        ])
+
+        do {
+            _ = try await resourceClient(executor).listImages()
+            XCTFail("Expected incomplete image listing to fail")
+        } catch let error as ContainerCLIError {
+            XCTAssertEqual(error, .nonZeroExit(1))
+        }
+    }
+
     func testParsesPlainImagePullProgressIntoOverallPercentage() throws {
         let fetching = try XCTUnwrap(CLIOutputParser.parseImagePullProgress(
             line: "[1/2] Fetching image 37% (19 of 31 blobs, 6.9/18.2 MB, 4.3 MB/s) [5s]",
@@ -359,6 +403,47 @@ final class ImageAndCreationCLITests: XCTestCase {
         XCTAssertEqual(mutation.arguments, ["image", "delete", "example.invalid/demo:1"])
         XCTAssertFalse(mutation.arguments.contains("--all"))
         XCTAssertFalse(mutation.arguments.contains("--force"))
+    }
+
+    func testDeleteImagePreservesOtherAliasesOfTheSameContent() async throws {
+        let data = try fixture("images-list.json", version: "1.6.1")
+        let images = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [[String: Any]])
+        let reference = "example.invalid/demo@sha256:" + String(repeating: "a", count: 64)
+        let remaining = try JSONSerialization.data(withJSONObject: Array(images.prefix(2)))
+        let executor = ResourceScriptedCommandExecutor(steps: [
+            .success(resourceVersionResult()),
+            .success(CommandResult(stdout: data, stderr: Data(), exitCode: 0, duration: .zero)),
+            .success(resourceContainerListResult()),
+            .success(resourceEmptySuccess()),
+            .success(CommandResult(stdout: remaining, stderr: Data(), exitCode: 0, duration: .zero)),
+        ])
+
+        let outcome = try await resourceClient(executor).deleteImage(reference: reference)
+
+        XCTAssertTrue(outcome.targetAbsent)
+        let requests = await executor.requests
+        let mutation = try XCTUnwrap(requests.first(where: { $0.arguments.prefix(2) == ["image", "delete"] }))
+        XCTAssertEqual(mutation.arguments, ["image", "delete", reference])
+    }
+
+    func testDeleteImageRejectsAmbiguousContentIDBeforeMutation() async throws {
+        let executor = ResourceScriptedCommandExecutor(steps: [
+            .success(resourceVersionResult()),
+            .success(CommandResult(
+                stdout: try fixture("images-list.json", version: "1.6.1"),
+                stderr: Data(), exitCode: 0, duration: .zero
+            )),
+        ])
+
+        do {
+            _ = try await resourceClient(executor).deleteImage(reference: String(repeating: "a", count: 64))
+            XCTFail("Expected ambiguous image reference to fail")
+        } catch let problem as ProblemDetail {
+            XCTAssertEqual(problem.code, .stateConflict)
+        }
+
+        let requests = await executor.requests
+        XCTAssertFalse(requests.contains(where: { $0.arguments.prefix(2) == ["image", "delete"] }))
     }
 
     func testDeleteImageRejectsContainerReferenceBeforeMutation() async throws {
@@ -720,12 +805,12 @@ final class ImageAndCreationCLITests: XCTestCase {
         }
     }
 
-    private func fixture(_ name: String) throws -> Data {
+    private func fixture(_ name: String, version: String = "1.3.1") throws -> Data {
         let url = try XCTUnwrap(
             Bundle.module.url(
                 forResource: name,
                 withExtension: nil,
-                subdirectory: "Fixtures/CLI/1.3.1/resources"
+                subdirectory: "Fixtures/CLI/\(version)/resources"
             )
         )
         return try Data(contentsOf: url)
