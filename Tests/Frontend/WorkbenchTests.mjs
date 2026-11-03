@@ -65,6 +65,88 @@ test("the selected row and accessible toggle state stay in sync", () => {
   assert.equal(buttons[0].row.classList["is-selected"], false);
 });
 
+function containerListContext(containers) {
+  const node = () => ({
+    children: [], dataset: {},
+    append(...children) { this.children.push(...children); },
+    replaceChildren() { this.children = []; },
+    contains(target) { return this.children.some((child) => child === target || child.contains(target)); },
+    setAttribute() {}, addEventListener() {},
+  });
+  const elements = Object.fromEntries([
+    "containerRows", "runningContainerRows", "inactiveContainerRows", "runningContainerGroup", "inactiveContainerGroup",
+    "runningContainerCount", "inactiveContainerCount", "loadingState", "errorState", "emptyState", "tableWrap"
+  ].map((id) => [id, node()]));
+  elements.containerRows.append(elements.runningContainerRows, elements.inactiveContainerRows);
+  elements.searchInput = { value: "" };
+  return {
+    elements, state: { containers }, document: { activeElement: null, createElement: node },
+    stateLabels: { running: "运行中", stopped: "已停止", created: "已创建", unknown: "未知" },
+    shortImageReference: (value) => value || "—", cpuDisplay: () => ({ value: "—" }),
+    memoryDisplay: () => ({ value: "—" }), renderMetricCell() {}, syncDetailButtons() {},
+  };
+}
+
+test("containers are grouped by running state while retaining their order and exact status", () => {
+  const containers = ["stopped", "running", "created", "running", "error", "unknown"].map((state, index) => ({
+    id: `container-${index}`, displayName: `Container ${index}`, state
+  }));
+  const context = containerListContext(containers);
+  loadFunction("renderContainers", context)();
+  const { elements } = context;
+  assert.deepEqual(elements.runningContainerRows.children.map((row) => row.dataset.containerId), ["container-1", "container-3"]);
+  assert.deepEqual(elements.inactiveContainerRows.children.map((row) => row.dataset.containerId), ["container-0", "container-2", "container-4", "container-5"]);
+  assert.equal(elements.runningContainerCount.textContent, "2");
+  assert.equal(elements.inactiveContainerCount.textContent, "4");
+  assert.equal(elements.inactiveContainerRows.children[1].children[1].children[0].textContent, "已创建");
+  assert.equal(elements.runningContainerGroup.hidden, false);
+  assert.equal(elements.inactiveContainerGroup.hidden, false);
+});
+
+test("groups appear and disappear as containers change state and disappear entirely when empty", () => {
+  const container = { id: "demo", displayName: "demo", state: "stopped" };
+  const context = containerListContext([container]);
+  const render = loadFunction("renderContainers", context);
+  render();
+  assert.equal(context.elements.runningContainerGroup.hidden, true);
+  assert.equal(context.elements.inactiveContainerGroup.hidden, false);
+  container.state = "running";
+  render();
+  assert.equal(context.elements.runningContainerGroup.hidden, false);
+  assert.equal(context.elements.inactiveContainerGroup.hidden, true);
+  assert.equal(context.elements.inactiveContainerRows.children.length, 0);
+  context.state.containers = [];
+  render();
+  assert.equal(context.elements.runningContainerGroup.hidden, true);
+  assert.equal(context.elements.inactiveContainerGroup.hidden, true);
+  assert.equal(context.elements.tableWrap.hidden, true);
+  assert.equal(context.elements.emptyState.hidden, false);
+});
+
+test("one search filters both groups and hides groups without matches", () => {
+  const context = containerListContext([
+    { id: "database", displayName: "Database", imageReference: "postgres:latest", state: "running" },
+    { id: "app", displayName: "App", imageReference: "odoo:19", state: "stopped" }
+  ]);
+  const render = loadFunction("renderContainers", context);
+  context.elements.searchInput.value = "ODOO";
+  render();
+  assert.equal(context.elements.runningContainerGroup.hidden, true);
+  assert.equal(context.elements.inactiveContainerGroup.hidden, false);
+  assert.equal(context.elements.inactiveContainerCount.textContent, "1");
+  context.elements.searchInput.value = "no match";
+  render();
+  assert.equal(context.elements.runningContainerGroup.hidden, true);
+  assert.equal(context.elements.inactiveContainerGroup.hidden, true);
+  assert.equal(context.elements.tableWrap.hidden, true);
+  assert.equal(context.elements.errorState.textContent, "没有符合筛选条件的容器。");
+  context.elements.searchInput.value = "";
+  render();
+  assert.equal(context.elements.runningContainerGroup.hidden, false);
+  assert.equal(context.elements.inactiveContainerGroup.hidden, false);
+  assert.equal(context.state.containers.length, 2);
+});
+
 test("late log responses cannot overwrite the newly selected container", async () => {
   for (const fail of [false, true]) {
     let resolve;

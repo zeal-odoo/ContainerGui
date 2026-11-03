@@ -39,6 +39,8 @@ const elements = Object.fromEntries([
   "hostMemoryValue", "hostMemoryDetail", "hostMemoryMeter",
   "anePowerStatus", "anePowerValue", "anePowerWindow", "aneUtilizationValue",
   "loadingState", "emptyState", "errorState", "tableWrap", "containerRows",
+  "runningContainerRows", "inactiveContainerRows", "runningContainerGroup", "inactiveContainerGroup",
+  "runningContainerCount", "inactiveContainerCount",
   "detailPanel", "detailPlaceholder", "detailContent", "detailTitle", "detailFacts",
   "sshConnectionPanel", "sshStatusLabel", "sshConnectionCommand", "copySSHCommandButton",
   "containerActions", "operationStatus", "closeDetailButton", "loadLogsButton", "followLogsButton",
@@ -338,7 +340,8 @@ function renderContainers() {
   );
 
   const focusedID = elements.containerRows.contains(document.activeElement) ? document.activeElement.dataset.detailId : null;
-  elements.containerRows.replaceChildren();
+  elements.runningContainerRows.replaceChildren();
+  elements.inactiveContainerRows.replaceChildren();
   for (const container of visible) {
     const row = document.createElement("tr");
     row.dataset.containerId = container.id;
@@ -378,14 +381,21 @@ function renderContainers() {
     detailButton.addEventListener("click", () => toggleDetail(container.id));
     actionCell.append(detailButton);
     row.append(nameCell, stateCell, cpuCell, memoryCell, actionCell);
-    elements.containerRows.append(row);
+    const groupRows = container.state === "running" ? elements.runningContainerRows : elements.inactiveContainerRows;
+    groupRows.append(row);
     if (focusedID === container.id) detailButton.focus({ preventScroll: true });
   }
 
+  const runningCount = visible.filter((container) => container.state === "running").length;
+  const inactiveCount = visible.length - runningCount;
+  elements.runningContainerCount.textContent = String(runningCount);
+  elements.inactiveContainerCount.textContent = String(inactiveCount);
+  elements.runningContainerGroup.hidden = runningCount === 0;
+  elements.inactiveContainerGroup.hidden = inactiveCount === 0;
   elements.loadingState.hidden = true;
   elements.errorState.hidden = true;
   elements.emptyState.hidden = state.containers.length !== 0;
-  elements.tableWrap.hidden = state.containers.length === 0;
+  elements.tableWrap.hidden = visible.length === 0;
   if (state.containers.length !== 0 && visible.length === 0) {
     elements.errorState.hidden = false;
     elements.errorState.textContent = "没有符合筛选条件的容器。";
