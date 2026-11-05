@@ -298,9 +298,38 @@ enum CLIOutputParser {
             ipv4Address: network?["ipv4Address"]?.stringValue,
             ipv6Address: network?["ipv6Address"]?.stringValue,
             createdAt: configuration["creationDate"]?.stringValue.flatMap(parseDate),
+            publishedPorts: publishedPorts(from: configuration["publishedPorts"]),
             ssh: ContainerSSHConnection(labels: labels),
             observedAt: observedAt
         )
+    }
+
+    private static func publishedPorts(from value: JSONValue?) -> [ContainerPublishedPort]? {
+        guard let entries = value?.arrayValue else { return nil }
+        var ports: [ContainerPublishedPort] = []
+        for entry in entries {
+            guard let port = entry.objectValue else { return nil }
+            let countValue = port["count"] == .null ? .number(1) : port["count"] ?? .number(1)
+            guard let hostAddress = port["hostAddress"]?.stringValue, !hostAddress.isEmpty,
+                  case .number(let rawHostPort) = port["hostPort"],
+                  let hostPort = Int(exactly: rawHostPort), (0...65_535).contains(hostPort),
+                  case .number(let rawContainerPort) = port["containerPort"],
+                  let containerPort = Int(exactly: rawContainerPort), (0...65_535).contains(containerPort),
+                  case .number(let rawCount) = countValue,
+                  let count = Int(exactly: rawCount), (1...65_535).contains(count),
+                  hostPort + count - 1 <= 65_535, containerPort + count - 1 <= 65_535,
+                  let protocolName = port["proto"]?.stringValue, ["tcp", "udp"].contains(protocolName) else {
+                return nil
+            }
+            ports.append(ContainerPublishedPort(
+                hostAddress: hostAddress,
+                hostPort: hostPort,
+                containerPort: containerPort,
+                protocolName: protocolName,
+                count: count
+            ))
+        }
+        return ports
     }
 
     private static func imageSummary(from raw: RawImage, observedAt: Date) throws -> ImageSummary {

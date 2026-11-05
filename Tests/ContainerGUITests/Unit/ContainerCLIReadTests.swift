@@ -54,6 +54,84 @@ final class ContainerCLIReadTests: XCTestCase {
         XCTAssertTrue(empty.items.isEmpty)
     }
 
+    func testPublishedPortsReachBothListAndDetailSummaries() throws {
+        let data = Data(#"""
+        [{"id":"demo","configuration":{"publishedPorts":[
+            {"hostAddress":"127.0.0.1","hostPort":18080,"containerPort":8069,"proto":"tcp","count":1},
+            {"hostAddress":"0.0.0.0","hostPort":110,"containerPort":5432,"proto":"tcp","count":1},
+            {"hostAddress":"::1","hostPort":5300,"containerPort":53,"proto":"udp","count":3}
+        ]},"status":{"state":"stopped"}}]
+        """#.utf8)
+        let list = try CLIOutputParser.parseContainerList(data: data)
+        let detail = try CLIOutputParser.parseContainerDetail(data: data, expectedID: "demo")
+        for summary in [list.items[0], detail.summary] {
+            let object = try XCTUnwrap(JSONSerialization.jsonObject(
+                with: JSONEncoder.containerGUI.encode(summary)
+            ) as? [String: Any])
+            let ports = try XCTUnwrap(object["publishedPorts"] as? [[String: Any]])
+            XCTAssertEqual(ports.count, 3)
+            XCTAssertEqual(ports[0]["hostAddress"] as? String, "127.0.0.1")
+            XCTAssertEqual(ports[0]["hostPort"] as? Int, 18080)
+            XCTAssertEqual(ports[0]["containerPort"] as? Int, 8069)
+            XCTAssertEqual(ports[0]["protocol"] as? String, "tcp")
+            XCTAssertEqual(ports[1]["hostPort"] as? Int, 110)
+            XCTAssertEqual(ports[2]["hostAddress"] as? String, "::1")
+            XCTAssertEqual(ports[2]["count"] as? Int, 3)
+            XCTAssertEqual(ports[2]["protocol"] as? String, "udp")
+        }
+    }
+
+    func testPublishedPortsDistinguishUnmappedFromUnavailableAndDefaultSinglePorts() throws {
+        let list = try CLIOutputParser.parseContainerList(data: Data(#"""
+        [
+            {"id":"unmapped","configuration":{"publishedPorts":[]}},
+            {"id":"unavailable","configuration":{}},
+            {"id":"legacy","configuration":{"publishedPorts":[
+                {"hostAddress":"127.0.0.1","hostPort":2222,"containerPort":22,"proto":"tcp"},
+                {"hostAddress":"::","hostPort":65535,"containerPort":65535,"proto":"udp","count":null}
+            ]}}
+        ]
+        """#.utf8))
+        XCTAssertEqual(list.items[0].publishedPorts, [])
+        XCTAssertNil(list.items[1].publishedPorts)
+        XCTAssertEqual(list.items[2].publishedPorts?.first?.count, 1)
+        XCTAssertEqual(list.items[2].publishedPorts?.last?.count, 1)
+        XCTAssertEqual(list.items[2].publishedPorts?.last?.hostPort, 65_535)
+        let sshDetail = try CLIOutputParser.parseContainerDetail(
+            data: fixture("ssh-container-detail.json"), expectedID: "ssh-demo"
+        )
+        XCTAssertEqual(sshDetail.summary.publishedPorts?.first?.containerPort, 22)
+    }
+
+    func testInvalidPortDataDoesNotHideContainerOrClaimNoMappings() throws {
+        let valid: [String: Any] = [
+            "hostAddress": "127.0.0.1", "hostPort": 18080,
+            "containerPort": 8069, "proto": "tcp", "count": 1
+        ]
+        let invalidFields: [(String, Any)] = [
+            ("hostAddress", ""), ("hostPort", -1), ("hostPort", 65_536),
+            ("hostPort", 80.5), ("hostPort", "8080"), ("containerPort", -1),
+            ("containerPort", 65_536), ("count", 0), ("count", -1),
+            ("count", 0.5), ("count", 65_536), ("count", 60_000),
+            ("proto", "sctp"), ("proto", NSNull())
+        ]
+        for (key, value) in invalidFields {
+            var invalid = valid
+            invalid[key] = value
+            let data = try JSONSerialization.data(withJSONObject: [[
+                "id": "demo", "configuration": ["publishedPorts": [valid, invalid]],
+                "status": ["state": "running"]
+            ]])
+            let item = try XCTUnwrap(CLIOutputParser.parseContainerList(data: data).items.first)
+            XCTAssertEqual(item.state, .running)
+            XCTAssertNil(item.publishedPorts, "\(key): \(value)")
+        }
+        for ports in ["null", "{}", "[null]"] {
+            let data = Data(#"[{"id":"demo","configuration":{"publishedPorts":\#(ports)}}]"#.utf8)
+            XCTAssertNil(try CLIOutputParser.parseContainerList(data: data).items[0].publishedPorts)
+        }
+    }
+
     func testParses141NestedServerWithoutChangingHealthContract() throws {
         let health = try CLIOutputParser.parseSystemHealth(
             data: fixture("system-healthy.json", version: "1.4.1"),

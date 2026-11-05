@@ -47,6 +47,19 @@ enum ContainerState: String, Codable, Equatable, Sendable {
     }
 }
 
+struct ContainerPublishedPort: Codable, Equatable, Sendable {
+    let hostAddress: String
+    let hostPort: Int
+    let containerPort: Int
+    let protocolName: String
+    let count: Int
+
+    private enum CodingKeys: String, CodingKey {
+        case hostAddress, hostPort, containerPort, count
+        case protocolName = "protocol"
+    }
+}
+
 struct ContainerSummary: Codable, Equatable, Sendable {
     let id: String
     let displayName: String
@@ -57,6 +70,7 @@ struct ContainerSummary: Codable, Equatable, Sendable {
     let ipv4Address: String?
     let ipv6Address: String?
     let createdAt: Date?
+    let publishedPorts: [ContainerPublishedPort]?
     let ssh: ContainerSSHConnection?
     let observedAt: Date
 
@@ -70,6 +84,7 @@ struct ContainerSummary: Codable, Equatable, Sendable {
         ipv4Address: String?,
         ipv6Address: String?,
         createdAt: Date?,
+        publishedPorts: [ContainerPublishedPort]? = nil,
         ssh: ContainerSSHConnection? = nil,
         observedAt: Date
     ) {
@@ -82,6 +97,7 @@ struct ContainerSummary: Codable, Equatable, Sendable {
         self.ipv4Address = ipv4Address
         self.ipv6Address = ipv6Address
         self.createdAt = createdAt
+        self.publishedPorts = publishedPorts
         self.ssh = ssh
         self.observedAt = observedAt
     }

@@ -20,11 +20,14 @@ final class ContainerReadAPITests: XCTestCase {
                 XCTAssertEqual(response.status, .ok)
                 let value = try JSONDecoder.containerGUI.decode(ContainerList.self, from: response.body)
                 XCTAssertEqual(value.items.map(\.id), ["demo-running"])
+                XCTAssertEqual(value.items.first?.publishedPorts?.first?.hostPort, 8080)
             }
             try await client.execute(uri: "/api/v1/containers/demo-running", method: .get) { response in
                 XCTAssertEqual(response.status, .ok)
                 let value = try JSONDecoder.containerGUI.decode(ContainerDetail.self, from: response.body)
                 XCTAssertEqual(value.summary.id, "demo-running")
+                XCTAssertEqual(value.summary.publishedPorts?.first?.containerPort, 80)
+                XCTAssertEqual(value.summary.publishedPorts?.first?.hostAddress, "127.0.0.1")
             }
         }
     }
@@ -86,6 +89,10 @@ private actor StubContainerReader: ContainerReading {
                 ipv4Address: "192.0.2.10/24",
                 ipv6Address: nil,
                 createdAt: nil,
+                publishedPorts: [ContainerPublishedPort(
+                    hostAddress: "127.0.0.1", hostPort: 8080, containerPort: 80,
+                    protocolName: "tcp", count: 1
+                )],
                 observedAt: Date(timeIntervalSince1970: 1_787_987_200)
             )
         ]

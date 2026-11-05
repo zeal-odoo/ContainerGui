@@ -46,6 +46,22 @@ test("image display shortens only the Docker Hub prefix without losing tag or di
   assert.equal(shortImageReference(null), "—");
 });
 
+test("published ports show host bindings, protocols and ranges without implying reachability", () => {
+  const display = loadFunction("portMappingsText");
+  const ports = [
+    { hostAddress: "127.0.0.1", hostPort: 18080, containerPort: 8069, count: 1, protocol: "tcp" },
+    { hostAddress: "0.0.0.0", hostPort: 110, containerPort: 5432, count: 1, protocol: "tcp" },
+    { hostAddress: "::1", hostPort: 5300, containerPort: 53, count: 3, protocol: "udp" }
+  ];
+  const expected = "127.0.0.1:18080 → 8069/TCP\n0.0.0.0:110 → 5432/TCP\n[::1]:5300-5302 → 53-55/UDP";
+  for (const state of ["running", "stopped", "created"]) {
+    assert.equal(display({ state, publishedPorts: ports }), expected);
+  }
+  assert.equal(display({ publishedPorts: [] }), "未映射");
+  assert.equal(display({}), "端口信息不可用");
+  assert.equal(display({ publishedPorts: null }), "端口信息不可用");
+});
+
 test("the selected row and accessible toggle state stay in sync", () => {
   const buttons = ["odoo19", "postgres"].map((id) => ({
     dataset: { detailId: id, detailName: id },
@@ -89,8 +105,42 @@ function containerListContext(containers) {
     stateLabels: { running: "运行中", stopped: "已停止", created: "已创建", unknown: "未知" },
     shortImageReference: (value) => value || "—", cpuDisplay: () => ({ value: "—" }),
     memoryDisplay: () => ({ value: "—" }), renderMetricCell() {}, syncDetailButtons() {},
+    portMappingsText: loadFunction("portMappingsText"),
   };
 }
+
+test("port mappings remain visible in both groups and in the selected container details", () => {
+  const containers = [
+    { id: "running", state: "running", publishedPorts: [{ hostAddress: "127.0.0.1", hostPort: 18080, containerPort: 8069, protocol: "tcp", count: 1 }] },
+    { id: "stopped", state: "stopped", publishedPorts: [{ hostAddress: "::1", hostPort: 5353, containerPort: 53, protocol: "udp", count: 1 }] },
+    { id: "unmapped", state: "created", publishedPorts: [] },
+    { id: "unknown", state: "running" }
+  ].map((item) => ({ ...item, displayName: item.id }));
+  const context = containerListContext(containers);
+  loadFunction("renderContainers", context)();
+  const rows = [...context.elements.runningContainerRows.children, ...context.elements.inactiveContainerRows.children];
+  const expected = {
+    running: "127.0.0.1:18080 → 8069/TCP", stopped: "[::1]:5353 → 53/UDP",
+    unmapped: "未映射", unknown: "端口信息不可用"
+  };
+  for (const row of rows) {
+    assert.equal(row.children[2].textContent, expected[row.dataset.containerId]);
+    assert.equal(row.children[2].className, "container-ports");
+    assert.equal(row.children[2].children.length, 0);
+  }
+  for (const id of ["detailFacts", "detailExtraFacts", "detailState"]) context.elements[id] = context.document.createElement("div");
+  context.storageDisplay = () => ({ value: "—" });
+  context.formatTime = () => "00:00";
+  const renderFacts = loadFunction("renderFacts", context);
+  for (const container of containers) {
+    renderFacts(container);
+    const facts = context.elements.detailFacts.children;
+    const label = facts.findIndex((node) => node.textContent === "端口映射（本机 → 容器）");
+    assert.ok(label >= 0);
+    assert.equal(facts[label + 1].textContent, expected[container.id]);
+    assert.equal(facts[label + 1].className, "container-ports");
+  }
+});
 
 test("row icons offer only valid start or stop actions and route feedback to the list", () => {
   const containers = ["running", "stopped", "created", "stopping", "error", "unknown"].map((state) => ({ id: state, displayName: state, state }));
@@ -103,7 +153,7 @@ test("row icons offer only valid start or stop actions and route feedback to the
   const rows = [...context.elements.runningContainerRows.children, ...context.elements.inactiveContainerRows.children];
   for (const row of rows) {
     const action = row.dataset.containerId === "running" ? "stop" : ["stopped", "created"].includes(row.dataset.containerId) ? "start" : null;
-    const controls = row.children[4].children[0].children;
+    const controls = row.children[5].children[0].children;
     const button = controls.find((item) => item.dataset.containerAction);
     if (!action) { assert.equal(button, undefined); continue; }
     assert.equal(button.dataset.containerAction, action);
@@ -119,7 +169,7 @@ test("row icons offer only valid start or stop actions and route feedback to the
   context.state.submitting = true;
   render();
   for (const row of [...context.elements.runningContainerRows.children, ...context.elements.inactiveContainerRows.children]) {
-    const button = row.children[4].children[0].children.find((item) => item.dataset.containerAction);
+    const button = row.children[5].children[0].children.find((item) => item.dataset.containerAction);
     if (button) assert.equal(button.disabled, true);
   }
 });
@@ -129,7 +179,7 @@ test("row controls retain keyboard focus across refreshes without focusing the o
   const context = containerListContext([container]);
   const render = loadFunction("renderContainers", context);
   render();
-  const previous = context.elements.inactiveContainerRows.children[0].children[4].children[0].children[0];
+  const previous = context.elements.inactiveContainerRows.children[0].children[5].children[0].children[0];
   context.document.activeElement = previous;
   render();
   assert.notEqual(context.document.activeElement, previous);

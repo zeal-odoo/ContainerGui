@@ -330,6 +330,16 @@ async function startSystem() {
   }
 }
 
+function portMappingsText(summary) {
+  if (!Array.isArray(summary.publishedPorts)) return "端口信息不可用";
+  if (!summary.publishedPorts.length) return "未映射";
+  return summary.publishedPorts.map((port) => {
+    const host = port.hostAddress.includes(":") ? `[${port.hostAddress}]` : port.hostAddress;
+    const range = (start) => port.count > 1 ? `${start}-${start + port.count - 1}` : String(start);
+    return `${host}:${range(port.hostPort)} → ${range(port.containerPort)}/${port.protocol.toUpperCase()}`;
+  }).join("\n");
+}
+
 function renderContainers() {
   const locale = globalThis.ContainerGUII18n?.locale() || "zh-Hans";
   const query = elements.searchInput.value.trim().toLocaleLowerCase(locale);
@@ -370,6 +380,9 @@ function renderContainers() {
     const memory = memoryDisplay(container);
     memoryCell.textContent = memory.detail || memory.value;
     memoryCell.title = memory.value;
+    const portsCell = document.createElement("td");
+    portsCell.className = "container-ports";
+    portsCell.textContent = portMappingsText(container);
     const actionCell = document.createElement("td");
     const rowActions = document.createElement("div");
     rowActions.className = "container-row-actions";
@@ -410,7 +423,7 @@ function renderContainers() {
     detailButton.addEventListener("click", () => toggleDetail(container.id));
     rowActions.append(detailButton);
     actionCell.append(rowActions);
-    row.append(nameCell, stateCell, cpuCell, memoryCell, actionCell);
+    row.append(nameCell, stateCell, portsCell, cpuCell, memoryCell, actionCell);
     const groupRows = container.state === "running" ? elements.runningContainerRows : elements.inactiveContainerRows;
     groupRows.append(row);
     if (focusedID === container.id) {
@@ -1323,7 +1336,8 @@ function renderFacts(summary) {
     ["CPU 配置", Number.isInteger(summary.cpuCount) && summary.cpuCount > 0 ? `${summary.cpuCount} 核` : "—"],
     ["内存", memory.detail || memory.value],
     ["存储", storage.detail || storage.value],
-    ["IPv4", summary.ipv4Address || "—"]
+    ["IPv4", summary.ipv4Address || "—"],
+    ["端口映射（本机 → 容器）", portMappingsText(summary)]
   ];
   const facts = [
     ["完整标识", summary.id], ["状态", stateLabels[summary.state] || stateLabels.unknown],
@@ -1341,6 +1355,7 @@ function renderFacts(summary) {
       term.textContent = label;
       const description = document.createElement("dd");
       description.textContent = value;
+      if (label === "端口映射（本机 → 容器）") description.className = "container-ports";
       target.append(term, description);
     }
   }

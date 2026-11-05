@@ -565,24 +565,38 @@ tbody tr.is-selected {
 }
 .container-table {
   table-layout: fixed;
+  min-width: 860px;
 }
 .container-table th:first-child {
-  width: 32%;
+  width: 26%;
 }
 .container-table th:nth-child(2) {
-  width: 17%;
+  width: 11%;
 }
 .container-table th:nth-child(3) {
-  width: 15%;
-}
-.container-table th:nth-child(4) {
   width: 23%;
 }
+.container-table th:nth-child(4) {
+  width: 9%;
+}
+.container-table th:nth-child(5) {
+  width: 17%;
+}
 .container-table th:last-child {
-  width: 13%;
+  width: 14%;
 }
 .container-table td {
   height: 100px;
+}
+.container-ports {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.port-direction {
+  display: block;
+  margin-top: 4px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 12px;
 }
 .container-name {
   display: block;
@@ -1777,21 +1791,6 @@ dialog[open].is-closing::backdrop {
   .stats article:last-child {
     margin-left: 0;
   }
-  .container-table th:first-child {
-    width: 30%;
-  }
-  .container-table th:nth-child(2) {
-    width: 17%;
-  }
-  .container-table th:nth-child(3) {
-    width: 15%;
-  }
-  .container-table th:nth-child(4) {
-    width: 23%;
-  }
-  .container-table th:last-child {
-    width: 15%;
-  }
   .container-table .pill {
     font-size: 12px;
     gap: 4px;
@@ -1990,21 +1989,6 @@ dialog[open].is-closing::backdrop {
   .container-table td {
     padding: 16px 6px;
     font-size: 12px;
-  }
-  .container-table th:first-child {
-    width: 28%;
-  }
-  .container-table th:nth-child(2) {
-    width: 18%;
-  }
-  .container-table th:nth-child(3) {
-    width: 15%;
-  }
-  .container-table th:nth-child(4) {
-    width: 23%;
-  }
-  .container-table th:last-child {
-    width: 16%;
   }
   .container-name {
     font-size: 13px;

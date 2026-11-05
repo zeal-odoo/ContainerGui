@@ -26,6 +26,12 @@ test("static interface copy translates in both directions", () => {
   assert.equal(api.translate("检查更新", "en"), "Check for updates");
   assert.equal(api.translate("前往 GitHub 下载 PKG", "en"), "Open GitHub to download the PKG");
   assert.equal(api.translate("Container runtime status", "zh"), "容器运行状态");
+  assert.equal(api.translate("端口映射", "en"), "Port mappings");
+  assert.equal(api.translate("本机 → 容器", "en"), "Host → Container");
+  assert.equal(api.translate("端口映射（本机 → 容器）", "en"), "Port mappings (Host → Container)");
+  assert.equal(api.translate("未映射", "en"), "Not published");
+  assert.equal(api.translate("端口信息不可用", "en"), "Port information unavailable");
+  assert.equal(api.translate("Port mappings (Host → Container)", "zh"), "端口映射（本机 → 容器）");
 });
 
 test("dynamic interface patterns preserve user-owned identifiers and counts", () => {
