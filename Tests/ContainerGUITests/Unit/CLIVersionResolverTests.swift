@@ -35,7 +35,7 @@ final class CLIVersionResolverTests: XCTestCase {
     }
 
     func testRejectsUnsupportedMajorOrMinor() {
-        for text in ["container 1.2.9", "container 1.4.0", "container 1.7.0", "container 2.0.0"] {
+        for text in ["container 1.2.9", "container 1.4.0", "container 1.7.0", "container 1.8.0", "container 2.0.0"] {
             XCTAssertEqual(CLIVersionResolver.classify(versionText: text).compatibility, .unsupported)
         }
     }
@@ -74,5 +74,15 @@ final class CLIVersionResolverTests: XCTestCase {
         let result = CLIVersionResolver.classify(versionText: "container development build")
         XCTAssertNil(result.semanticVersion)
         XCTAssertEqual(result.compatibility, .unrecognized)
+    }
+
+    func testSupports171AndCompatiblePatchReleases() {
+        for version in ["1.7.1", "1.7.2"] {
+            let result = CLIVersionResolver.classify(
+                versionText: "container CLI version \(version) (build: release, commit: a15b460)"
+            )
+            XCTAssertEqual(result.semanticVersion?.description, version)
+            XCTAssertEqual(result.compatibility, .supported)
+        }
     }
 }

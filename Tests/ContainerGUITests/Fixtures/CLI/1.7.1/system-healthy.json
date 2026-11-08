@@ -1,0 +1,8 @@
+{
+  "client": { "appName": "container", "build": "release", "commit": "fixture-client", "version": "1.7.1" },
+  "host": { "architecture": "arm64", "cpus": 16, "operatingSystem": "Version 27.2 (Build 26B123)" },
+  "paths": { "appRoot": "/Users/example/Library/Application Support/com.apple.container/", "installRoot": "/usr/local/" },
+  "resources": { "containersRunning": 1, "containersTotal": 2, "images": 3 },
+  "server": { "appName": "container-apiserver", "build": "release", "commit": "fixture-server", "version": "1.7.1" },
+  "status": "running"
+}

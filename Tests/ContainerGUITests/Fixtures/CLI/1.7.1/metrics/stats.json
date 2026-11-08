@@ -1,0 +1,21 @@
+[
+  {
+    "id": "demo-running",
+    "cpuUsageUsec": 12000000,
+    "cpuUtilization": 2.5,
+    "memoryUsageBytes": 1073741824,
+    "memoryLimitBytes": 4294967296,
+    "blockReadBytes": 4096,
+    "blockWriteBytes": 8192,
+    "networkRxBytes": 1024,
+    "networkTxBytes": 2048,
+    "numProcesses": 3
+  },
+  {
+    "id": "demo-no-utilization",
+    "cpuUsageUsec": 1000000,
+    "memoryUsageBytes": 536870912,
+    "memoryLimitBytes": 1073741824,
+    "numProcesses": 1
+  }
+]

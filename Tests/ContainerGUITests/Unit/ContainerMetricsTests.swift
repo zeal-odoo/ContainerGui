@@ -64,6 +64,27 @@ final class ContainerMetricsTests: XCTestCase {
         )
     }
 
+    func test171StatsAcceptsOptionalUtilizationWithoutChangingCPUSampling() async throws {
+        let data = try fixture("stats.json", version: "1.7.1")
+        let first = try CLIOutputParser.parseContainerResourceSamples(data: data, observedAt: firstObservedAt)
+        XCTAssertEqual(first.samples.map(\.containerID), ["demo-running", "demo-no-utilization"])
+        XCTAssertEqual(first.samples[0].cpuUsageUsec, 12_000_000)
+        XCTAssertEqual(first.samples[0].memoryUsageBytes, 1_073_741_824)
+
+        let sampler = ContainerMetricsSampler()
+        let initial = try await sampler.snapshot { first }
+        XCTAssertEqual(initial.items[0].cpuState, .sampling)
+        XCTAssertNil(initial.items[0].cpuPercent)
+        let laterData = Data(String(decoding: data, as: UTF8.self)
+            .replacingOccurrences(of: "12000000", with: "24500000").utf8)
+        let later = try CLIOutputParser.parseContainerResourceSamples(
+            data: laterData, observedAt: firstObservedAt.addingTimeInterval(5)
+        )
+        let sampled = try await sampler.snapshot { later }
+        XCTAssertEqual(try XCTUnwrap(sampled.items[0].cpuPercent), 250, accuracy: 0.0001)
+        XCTAssertEqual(try XCTUnwrap(sampled.items[1].cpuPercent), 0, accuracy: 0.0001)
+    }
+
     func testParsesRootFilesystemCapacityAsExactBytes() throws {
         let usage = try CLIOutputParser.parseContainerRootFilesystemUsage(
             data: fixture("df-root-valid.txt")
@@ -323,12 +344,12 @@ final class ContainerMetricsTests: XCTestCase {
         )
     }
 
-    private func fixture(_ name: String) throws -> Data {
+    private func fixture(_ name: String, version: String = "1.3.1") throws -> Data {
         let url = try XCTUnwrap(
             Bundle.module.url(
                 forResource: name,
                 withExtension: nil,
-                subdirectory: "Fixtures/CLI/1.3.1/metrics"
+                subdirectory: "Fixtures/CLI/\(version)/metrics"
             )
         )
         return try Data(contentsOf: url)

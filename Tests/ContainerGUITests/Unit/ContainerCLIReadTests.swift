@@ -150,8 +150,8 @@ final class ContainerCLIReadTests: XCTestCase {
     }
 
     func testNestedServerVersionIsNotInferredFromClientDuringUpgrade() throws {
-        for clientVersion in ["1.5.0", "1.6.1"] {
-            for serverVersion in ["1.3.1", "1.4.1", "1.5.0", "1.6.1", nil] {
+        for clientVersion in ["1.5.0", "1.6.1", "1.7.1"] {
+            for serverVersion in ["1.3.1", "1.4.1", "1.5.0", "1.6.1", "1.7.1", nil] {
                 let servers = serverVersion.map {
                     [#"{"version":"\#($0)","build":"release","commit":"fixture-server"}"#]
                 } ?? ["null", "{}"]
@@ -168,7 +168,7 @@ final class ContainerCLIReadTests: XCTestCase {
     }
 
     func testParsesRecentNestedServerWithoutExposingHostMetadata() throws {
-        for version in ["1.5.0", "1.6.1"] {
+        for version in ["1.5.0", "1.6.1", "1.7.1"] {
             let health = try CLIOutputParser.parseSystemHealth(
                 data: fixture("system-healthy.json", version: version),
                 installation: installation,
