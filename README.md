@@ -6,11 +6,11 @@ A lightweight local web interface for Apple [`container`](https://github.com/app
 
 [中文](#中文说明) · [English](#english-guide)
 
-**源码 / Source v2.28.1** · [已发布 PKG / Published PKG v2.26.2](https://github.com/zeal-odoo/ContainerGui/releases/tag/v2.26.2) · Apple `container` `1.3.x / 1.4.x (≥1.4.1) / 1.5.x / 1.6.x / 1.7.x (≥1.7.1)` · `http://127.0.0.1:8787`
+**v2.28.2 · [PKG 下载 / Download](https://github.com/zeal-odoo/ContainerGui/releases/tag/v2.28.2)** · Apple `container` `1.3.x / 1.4.x (≥1.4.1) / 1.5.x / 1.6.x / 1.7.x (≥1.7.1)` · `http://127.0.0.1:8787`
 
-v2.28.1 兼容 Apple Container 1.7.1，保留旧版兼容范围和现有容器管理功能。兼容新版统计输出，维持现有 CPU 采样与显示口径；CLI 与后台服务的版本分别读取，GUI 不会自动安装或重启引擎。
+v2.28.2 兼容 Apple Container 1.7.1，保留旧版兼容范围和现有容器管理功能。兼容新版统计输出，维持现有 CPU 采样与显示口径；CLI 与后台服务的版本分别读取，GUI 不会自动安装或重启引擎。
 
-v2.28.1 supports Apple Container 1.7.1 while retaining the previous compatibility range and existing container management. New statistics output preserves the existing CPU sampling and display semantics. CLI and server versions are read independently; the GUI does not automatically install or restart the engine.
+v2.28.2 supports Apple Container 1.7.1 while retaining the previous compatibility range and existing container management. New statistics output preserves the existing CPU sampling and display semantics. CLI and server versions are read independently; the GUI does not automatically install or restart the engine.
 
 > Container GUI is a local, single-user tool. It never listens on the LAN or public Internet and is not a replacement for Docker Desktop, Compose, Kubernetes, or a multi-user remote administration platform.
 >
@@ -27,13 +27,13 @@ Container GUI 为 Apple `container` CLI 提供浏览器管理界面。后端直�
 | 任务 | 当前能力 |
 | --- | --- |
 | 启动系统服务 | 服务已停止或未注册时，顶部显示“启动 container”；只启动服务并验证健康状态，不自动启动已停止的容器 |
-| 查看容器 | 展示运行状态、镜像、IPv4/IPv6、CPU、内存和根文件系统容量，每 5 秒刷新 |
+| 查看容器 | 运行中与未运行容器上下分组、隐藏空组；显示镜像、IP、端口映射和资源用量 |
 | 主机用量汇总 | 容器页展示所有运行中容器合计占 Mac CPU、物理内存的比例，每 5 秒刷新，不受搜索筛选影响 |
 | 整机 ANE | 独立展示 ANE 估算功耗（W），可见容器页约每 5 秒刷新；计算使用率明确显示不可用 |
 | 查看详情 | 同一个按钮展开或收起详情；支持脱敏原始信息、最近日志和实时日志 |
 | 本地 AI 日志分析 | 默认关闭；确认下载后使用固定 Qwen3-1.7B 分析所选容器日志，提供中英文建议；关闭后确认模型进程退出 |
 | AI 分析历史 | 自动保存结果和脱敏日志；关闭 AI 后可回看，每页 10 条，支持单条 JSON 导出和确认删除 |
-| 生命周期管理 | 启动、正常停止、重启和安全删除，并进行目标确认与状态回读 |
+| 生命周期管理 | 列表提供启动/停止图标；支持正常停止、重启和安全删除，并进行目标确认与状态回读 |
 | 本机镜像 | 折叠/展开、每页 10 条数字分页、真实拉取进度、安全删除未引用镜像 |
 | Docker Hub | 搜索公开仓库和标签，每页 10 条数字分页；选择标签不会自动拉取 |
 | 创建容器 | 配置名称、CPU、内存、回环端口、环境变量、进程参数和一个共享目录 |
@@ -55,7 +55,7 @@ ANE 是**整机所有应用**的估算功耗，不计入容器合计，也不是
 - Xcode 提供的 Swift 6.1 或更高版本（仅从源码运行或打包时需要；安装 `.pkg` 不需要）
 - Apple `container` CLI `1.3.x`、`1.4.x`（从 `1.4.1` 起）、`1.5.x`、`1.6.x` 或 `1.7.x`（从 `1.7.1` 起）；兼容性测试覆盖 `1.3.1`、`1.4.1`、`1.5.0`、`1.6.1` 与 `1.7.1`。其他次版本需另行验证。
 
-v2.28.1 兼容 Container 1.7.1，保留旧版输出解析。安装新版 CLI 后，正在运行的后台服务可能仍是旧版；应单独核对服务版本，并等待数据库操作结束后再安排重启。GUI 不会自动升级或重启引擎。验证范围见 [1.7.1 兼容性记录](specs/001-container-web-gui/verification/container-1.7.1.md)；历史记录：[1.6.1](specs/001-container-web-gui/verification/container-1.6.1.md)、[1.5.0](specs/001-container-web-gui/verification/container-1.5.0.md)。
+v2.28.2 兼容 Container 1.7.1，保留旧版输出解析。安装新版 CLI 后，正在运行的后台服务可能仍是旧版；应单独核对服务版本，并等待数据库操作结束后再安排重启。GUI 不会自动升级或重启引擎。验证范围见 [1.7.1 兼容性记录](specs/001-container-web-gui/verification/container-1.7.1.md)；历史记录：[1.6.1](specs/001-container-web-gui/verification/container-1.6.1.md)、[1.5.0](specs/001-container-web-gui/verification/container-1.5.0.md)。
 
 从 Apple 官方 [Releases](https://github.com/apple/container/releases) 安装签名安装包，然后确认 CLI 和系统服务可用：
 
@@ -67,7 +67,7 @@ container system status
 
 ### 安装 .pkg（推荐）
 
-从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 下载 `ContainerGUI-<VERSION>-arm64.pkg` 和对应的 `.sha256` 文件。当前版本为 `2.26.2`，下面的版本号应替换成实际下载文件中的版本。
+从 [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest) 下载 `ContainerGUI-<VERSION>-arm64.pkg` 和对应的 `.sha256` 文件。当前版本为 `2.28.2`，下面的版本号应替换成实际下载文件中的版本。
 
 ```bash
 CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"
@@ -313,13 +313,13 @@ Key capabilities:
 | Task | Current capability |
 | --- | --- |
 | Start system service | The status card offers “Start container service” when stopped or unregistered; verifies health without automatically starting stopped containers |
-| Inspect containers | View runtime state, image, IPv4/IPv6, CPU, memory, and root-filesystem capacity with a five-second refresh interval |
+| Inspect containers | Stack running and inactive groups, hide empty groups, and show images, IP addresses, published ports, and resource usage |
 | Host usage summary | Show all running containers' combined share of the Mac's CPU and physical memory, refreshed every five seconds independently of search filters |
 | Host ANE | Independently show estimated ANE power (W), refreshing about every five seconds on the visible container page; compute utilization is explicitly unavailable |
 | Inspect details | Use the same button to open or close details, with redacted raw data, recent logs, and live logs |
 | Analyse logs with local AI | Off by default; after a confirmed download, fixed Qwen3-1.7B analyses the selected container's logs in Chinese or English; turning it off verifies model-process exit |
 | AI analysis history | Automatically save results and redacted logs; browse with AI off, 10 records per page, export individual JSON records, or delete after confirmation |
-| Manage lifecycle | Start, gracefully stop, restart, and safely delete containers with target confirmation and authoritative readback |
+| Manage lifecycle | Use row start/stop icons; gracefully stop, restart, and safely delete containers with target confirmation and authoritative readback |
 | Manage local images | Collapse or expand the section, browse numbered 10-item pages, view real pull progress, and safely delete unused images |
 | Browse Docker Hub | Search public repositories and tags using numbered 10-item pages; selecting a tag does not pull it automatically |
 | Create containers | Configure name, CPU, memory, loopback ports, environment variables, process arguments, and one shared directory |
@@ -341,7 +341,7 @@ ANE power covers **all applications on the host**, not container totals or Conta
 - Swift 6.1 or later from Xcode (required only to run from source or build a package; not required for `.pkg` installation)
 - Apple `container` CLI `1.3.x`, `1.4.x` (starting at `1.4.1`), `1.5.x`, `1.6.x`, or `1.7.x` (starting at `1.7.1`); compatibility tests cover `1.3.1`, `1.4.1`, `1.5.0`, `1.6.1`, and `1.7.1`. Other minor versions require separate validation.
 
-v2.28.1 supports Container 1.7.1 while retaining legacy output parsing. Installing a new CLI can leave the running server on its earlier version. Check the server independently and schedule its restart after database operations finish. The GUI does not automatically upgrade or restart the engine. See the [1.7.1 compatibility record](specs/001-container-web-gui/verification/container-1.7.1.md) and historical records for [1.6.1](specs/001-container-web-gui/verification/container-1.6.1.md) and [1.5.0](specs/001-container-web-gui/verification/container-1.5.0.md).
+v2.28.2 supports Container 1.7.1 while retaining legacy output parsing. Installing a new CLI can leave the running server on its earlier version. Check the server independently and schedule its restart after database operations finish. The GUI does not automatically upgrade or restart the engine. See the [1.7.1 compatibility record](specs/001-container-web-gui/verification/container-1.7.1.md) and historical records for [1.6.1](specs/001-container-web-gui/verification/container-1.6.1.md) and [1.5.0](specs/001-container-web-gui/verification/container-1.5.0.md).
 
 Install the signed package from Apple’s official [Releases](https://github.com/apple/container/releases), then verify the CLI and system service:
 
@@ -353,7 +353,7 @@ container system status
 
 ### Install the .pkg (recommended)
 
-Download `ContainerGUI-<VERSION>-arm64.pkg` with its `.sha256` file from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest). The current version is `2.26.2`; replace the version below with the version in the downloaded filename.
+Download `ContainerGUI-<VERSION>-arm64.pkg` with its `.sha256` file from [GitHub Releases](https://github.com/zeal-odoo/ContainerGui/releases/latest). The current version is `2.28.2`; replace the version below with the version in the downloaded filename.
 
 ```bash
 CONTAINER_GUI_VERSION="REPLACE_WITH_DOWNLOADED_VERSION"
