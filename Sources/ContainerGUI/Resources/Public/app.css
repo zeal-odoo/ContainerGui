@@ -358,6 +358,46 @@ img {
 .page-heading > .button {
   font-size: 16px;
 }
+.disk-health { padding: 24px 30px 40px; }
+.disk-health-toolbar, .disk-card-heading, .disk-capacity, .disk-space p {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.disk-health-toolbar p { margin: 0; }
+.disk-health-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin: 24px 0 16px;
+}
+.disk-health-summary > div, .disk-card {
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 12px;
+  padding: 20px;
+  min-width: 0;
+}
+.disk-health-summary > div { background: var(--md-sys-color-surface-container-low); }
+.disk-health-summary span { color: var(--md-sys-color-on-surface-variant); }
+.disk-health-summary strong { display: block; font-size: 28px; margin-top: 8px; }
+#diskHealthStatus { display: flex; flex-wrap: wrap; gap: 8px; }
+.disk-health-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 20px; margin-top: 24px; }
+.disk-card-heading { align-items: flex-start; flex-wrap: wrap; }
+.disk-card h2 { font-size: 18px; margin: 0; overflow-wrap: anywhere; }
+.disk-card p, .disk-space { overflow-wrap: anywhere; }
+.disk-facts { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--md-sys-color-on-surface-variant); font-size: 13px; }
+.disk-capacity { padding: 16px 0; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
+.disk-space { margin: 16px 0; padding: 12px; border-radius: 8px; background: var(--md-sys-color-surface-container-low); }
+.disk-space p { margin: 6px 0; flex-wrap: wrap; }
+.disk-space-warning { color: var(--md-sys-color-warning); }
+.disk-failure { color: var(--md-sys-color-error); }
+@media (max-width: 700px) {
+  .disk-health { padding: 20px 16px; }
+  .disk-health-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .disk-health-toolbar { align-items: flex-start; }
+  .disk-health-toolbar .button { flex-shrink: 0; }
+}
 .workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 416px;

@@ -40,6 +40,7 @@ enum AppFactory {
             on: router,
             sampler: ANEPowerSampler(reader: IOReportANEEnergyReader())
         )
+        DiskHealthRoutes.register(on: router, service: DiskHealthService(reader: DiskHealthReader(executor: executor)))
         SSHStatusRoutes.register(
             on: router,
             reader: reader,

@@ -9,6 +9,39 @@ const ContainerGUII18n = (() => {
     "主要导航": "Main navigation",
     "本机工作区": "Local workspace",
     "容器": "Containers",
+    "硬盘健康": "Disk health",
+    "本机所有物理硬盘，包括内置和外置硬盘。": "All physical drives on this Mac, including internal and external drives.",
+    "立即刷新": "Refresh now",
+    "硬盘健康统计": "Disk health summary",
+    "硬盘总数": "Physical drives",
+    "健康检查通过": "Health check passed",
+    "健康告警": "Health warnings",
+    "硬件故障预警": "Hardware failure warning",
+    "需要关注": "Needs attention",
+    "无法检测": "Unable to check",
+    "正在检测硬盘…": "Checking disk health…",
+    "每 5 秒自动更新": "Updates every 5 seconds",
+    "上次成功检测": "Last successful check",
+    "本次检测失败": "Current check failed",
+    "页面可见时每 5 秒更新。S.M.A.R.T. 检查通过不代表不会损坏，也不等同于文件系统检查。空间不足单独提示。": "Updates every 5 seconds while visible. A passed S.M.A.R.T. check does not guarantee against failure or verify the filesystem. Low space is reported separately.",
+    "无法读取最新硬盘信息，正在等待重试；旧结果已隐藏。": "Unable to read current disk information. Retrying automatically; previous results are hidden.",
+    "未发现可识别的物理硬盘。": "No physical drives were found.",
+    "内置硬盘": "Internal drive",
+    "外置硬盘": "External drive",
+    "位置未知": "Location unknown",
+    "固态硬盘": "SSD",
+    "机械硬盘": "HDD",
+    "介质未知": "Media unknown",
+    "连接方式未知": "Connection unknown",
+    "硬盘容量": "Drive capacity",
+    "可用空间": "Available space",
+    "APFS 共享空间，不重复累加": "Shared APFS space, counted once",
+    "可用空间不足 10%": "Less than 10% free space",
+    "空间信息无法读取或磁盘未格式化": "Space information is unavailable or the disk is unformatted",
+    "请尽快备份并检查或更换硬盘。": "Back up promptly and inspect or replace the drive.",
+    "检测到健康告警，请检查硬盘并确认备份。": "A health warning was reported. Check the drive and your backups.",
+    "系统未提供健康结果；安装 smartmontools 可扩展部分外置硬盘的检测支持。": "macOS provides no health result. Installing smartmontools can extend support for some external drives.",
+    "无法读取健康结果；请检查连接、设备支持或访问权限。": "No health result is available. Check the connection, device support or access permissions.",
     "名称 / 镜像": "Name / Image",
     "端口映射": "Port mappings",
     "本机 → 容器": "Host → Container",
@@ -518,7 +551,7 @@ const ContainerGUII18n = (() => {
   }
 
   function shouldSkipText(node) {
-    return Boolean(node.parentElement?.closest("script, style, code, pre, textarea"));
+    return Boolean(node.parentElement?.closest("script, style, code, pre, textarea, [translate='no']"));
   }
 
   function canonicalSource(current, source) {

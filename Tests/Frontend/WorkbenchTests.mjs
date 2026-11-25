@@ -12,20 +12,20 @@ function loadFunction(name, context = {}) {
 }
 
 test("workspace navigation shows exactly one view and retains a safe fallback", () => {
-  const links = ["containers", "images", "registry"].map((view) => ({
+  const links = ["containers", "images", "registry", "disks"].map((view) => ({
     dataset: { view },
     setAttribute(name, value) { this[name] = value; },
     removeAttribute(name) { delete this[name]; }
   }));
   const context = {
     state: {},
-    elements: { containersSection: {}, imagesSection: {}, remoteRegistrySection: {}, pageTitle: {}, openCreateContainerButton: {} },
+    elements: { containersSection: {}, imagesSection: {}, remoteRegistrySection: {}, diskHealthSection: {}, pageTitle: {}, openCreateContainerButton: {} },
     document: { querySelectorAll: () => links },
     window: { location: { hash: "#images" } },
     stopFollowingLogs: () => {},
   };
   const renderWorkspace = loadFunction("renderWorkspace", context);
-  for (const [hash, view, title] of [["#images", "images", "本机镜像"], ["#registry", "registry", "镜像仓库"], ["#containers", "containers", "容器"], ["#main", "containers", "容器"], ["#__proto__", "containers", "容器"]]) {
+  for (const [hash, view, title] of [["#images", "images", "本机镜像"], ["#registry", "registry", "镜像仓库"], ["#disks", "disks", "硬盘健康"], ["#containers", "containers", "容器"], ["#main", "containers", "容器"], ["#__proto__", "containers", "容器"]]) {
     context.window.location.hash = hash;
     renderWorkspace();
     assert.equal(context.state.activeView, view);
@@ -33,7 +33,8 @@ test("workspace navigation shows exactly one view and retains a safe fallback", 
     assert.equal(context.elements.containersSection.hidden, view !== "containers");
     assert.equal(context.elements.imagesSection.hidden, view !== "images");
     assert.equal(context.elements.remoteRegistrySection.hidden, view !== "registry");
-    assert.equal(context.elements.openCreateContainerButton.hidden, view === "registry");
+    assert.equal(context.elements.diskHealthSection.hidden, view !== "disks");
+    assert.equal(context.elements.openCreateContainerButton.hidden, view === "registry" || view === "disks");
     assert.equal(links.filter((link) => link["aria-current"] === "page").length, 1);
   }
 });

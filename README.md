@@ -6,11 +6,11 @@ A lightweight local web interface for Apple [`container`](https://github.com/app
 
 [中文](#中文说明) · [English](#english-guide)
 
-**v2.28.2 · [PKG 下载 / Download](https://github.com/zeal-odoo/ContainerGui/releases/tag/v2.28.2)** · Apple `container` `1.3.x / 1.4.x (≥1.4.1) / 1.5.x / 1.6.x / 1.7.x (≥1.7.1)` · `http://127.0.0.1:8787`
+**源码 / Source v2.29.0 · [已发布 PKG v2.28.2 / Published PKG](https://github.com/zeal-odoo/ContainerGui/releases/tag/v2.28.2)** · Apple `container` `1.3.x / 1.4.x (≥1.4.1) / 1.5.x / 1.6.x / 1.7.x (≥1.7.1)` · `http://127.0.0.1:8787`
 
-v2.28.2 兼容 Apple Container 1.7.1，保留旧版兼容范围和现有容器管理功能。兼容新版统计输出，维持现有 CPU 采样与显示口径；CLI 与后台服务的版本分别读取，GUI 不会自动安装或重启引擎。
+v2.29.0 新增“硬盘健康”页面：读取 Mac 内置及外置物理硬盘的健康和空间信息，页面可见时每 5 秒自动更新。继续兼容 Apple Container 1.7.1 及原有版本范围，GUI 不会自动安装或重启引擎。
 
-v2.28.2 supports Apple Container 1.7.1 while retaining the previous compatibility range and existing container management. New statistics output preserves the existing CPU sampling and display semantics. CLI and server versions are read independently; the GUI does not automatically install or restart the engine.
+v2.29.0 adds a Disk health page for the Mac's internal and external physical drives, refreshing health and space information every five seconds while visible. Apple Container 1.7.1 and the existing compatibility range remain supported; the GUI does not automatically install or restart the engine.
 
 > Container GUI is a local, single-user tool. It never listens on the LAN or public Internet and is not a replacement for Docker Desktop, Compose, Kubernetes, or a multi-user remote administration platform.
 >
@@ -30,6 +30,7 @@ Container GUI 为 Apple `container` CLI 提供浏览器管理界面。后端直�
 | 查看容器 | 运行中与未运行容器上下分组、隐藏空组；显示镜像、IP、端口映射和资源用量 |
 | 主机用量汇总 | 容器页展示所有运行中容器合计占 Mac CPU、物理内存的比例，每 5 秒刷新，不受搜索筛选影响 |
 | 整机 ANE | 独立展示 ANE 估算功耗（W），可见容器页约每 5 秒刷新；计算使用率明确显示不可用 |
+| 硬盘健康 | 独立页面列出内置/外置物理硬盘的 S.M.A.R.T. 状态、容量和可用空间；可见时每 5 秒刷新，返回页面立即检测 |
 | 查看详情 | 同一个按钮展开或收起详情；支持脱敏原始信息、最近日志和实时日志 |
 | 本地 AI 日志分析 | 默认关闭；确认下载后使用固定 Qwen3-1.7B 分析所选容器日志，提供中英文建议；关闭后确认模型进程退出 |
 | AI 分析历史 | 自动保存结果和脱敏日志；关闭 AI 后可回看，每页 10 条，支持单条 JSON 导出和确认删除 |
@@ -47,6 +48,8 @@ Container GUI 为 Apple `container` CLI 提供浏览器管理界面。后端直�
 汇总口径：CPU 为容器原始 CPU 百分比之和 ÷ Mac 总核心数；内存为容器内存用量之和 ÷ Mac 物理内存。数据来自 Apple `container stats`，不包含虚拟机和系统服务开销，也不等同于 macOS 活动监视器的进程内存。首次 CPU 采样、样本不完整或读取失败会显示提示，不会作为零用量显示。
 
 ANE 是**整机所有应用**的估算功耗，不计入容器合计，也不是 Container GUI 专属。它由只读系统能量计数器的增量除以采样时长得到，不能换算成计算使用率；使用率显示“不可用”。读取不需要管理员权限、不启动模型、不联网。首次或长时间离开后显示“采样中”，缺失/异常数据清除旧值并显示不可用。底层 IOReport 为未公开系统接口，目前仅在 M4 Max/macOS 26.6.2 验证，其他机型/系统可能无法读取；功耗估算不用于不同设备的精确比较。
+
+硬盘健康使用 macOS `diskutil` 只读查询；系统未提供健康结果时，可使用已安装的 `smartmontools` 补充支持。设备或权限不支持时显示“无法检测”，不会当作健康。检测失败隐藏旧结果并保留上次成功检测时间；单块硬盘读取失败不影响其他硬盘。APFS 共享容量按容器显示，不按卷重复累加；可用空间低于 10% 单独提示。S.M.A.R.T. 检查通过不保证不会损坏，也不是文件系统检查。功能不安装工具、不提权、不执行自检或修复、不改动容器。
 
 ### 环境要求
 
@@ -316,6 +319,7 @@ Key capabilities:
 | Inspect containers | Stack running and inactive groups, hide empty groups, and show images, IP addresses, published ports, and resource usage |
 | Host usage summary | Show all running containers' combined share of the Mac's CPU and physical memory, refreshed every five seconds independently of search filters |
 | Host ANE | Independently show estimated ANE power (W), refreshing about every five seconds on the visible container page; compute utilization is explicitly unavailable |
+| Disk health | A separate page lists internal/external physical drives' S.M.A.R.T. status, capacity and available space; refreshes every five seconds while visible and immediately on return |
 | Inspect details | Use the same button to open or close details, with redacted raw data, recent logs, and live logs |
 | Analyse logs with local AI | Off by default; after a confirmed download, fixed Qwen3-1.7B analyses the selected container's logs in Chinese or English; turning it off verifies model-process exit |
 | AI analysis history | Automatically save results and redacted logs; browse with AI off, 10 records per page, export individual JSON records, or delete after confirmation |
@@ -333,6 +337,8 @@ Key capabilities:
 The summary divides the sum of raw container CPU percentages by the Mac's total core count, and combined container memory usage by the Mac's physical memory. It uses [Apple `container stats`](https://github.com/apple/container/blob/main/docs/resource-usage.md), excluding VM and system-service overhead; it is not the same as process memory in macOS Activity Monitor. First CPU samples, incomplete samples, and read failures are shown explicitly instead of as zero usage.
 
 ANE power covers **all applications on the host**, not container totals or Container GUI alone. It is estimated from read-only system energy-counter deltas divided by the sampling duration, not converted into compute utilization; utilization is shown as unavailable. Reading requires no administrator privileges, model loading, or network access. Initial samples and returns after a long gap show “Sampling”; missing or invalid readings clear the old value and show unavailable. The underlying IOReport interface is private and has only been validated here on M4 Max/macOS 26.6.2; other Macs or OS versions may not expose it. Power estimates should not be used for precise cross-device comparisons.
+
+Disk health uses read-only macOS `diskutil` queries, falling back to an already installed `smartmontools` when macOS provides no health result. Unsupported devices or permissions show “Unable to check,” never a healthy result. Failed checks hide old results and retain the last successful timestamp; one unreadable drive does not hide other drives. Shared APFS capacity is displayed once per container, not summed per volume; less than 10% free space is reported separately. A passed S.M.A.R.T. check does not guarantee against failure or verify the filesystem. The feature does not install tools, elevate privileges, run self-tests or repairs, or change containers.
 
 ### Requirements
 

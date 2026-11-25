@@ -31,7 +31,7 @@ let toastVisibilityTimer = null;
 let toastExitTimer = null;
 
 const elements = Object.fromEntries([
-  "pageTitle", "containersSection", "detailState", "detailExtraFacts", "workspaceOperationStatus",
+  "pageTitle", "containersSection", "diskHealthSection", "detailState", "detailExtraFacts", "workspaceOperationStatus",
   "appVersionBadge", "checkUpdatesButton", "versionBadge", "healthCard", "healthLabel", "healthDetail",
   "startSystemButton", "systemStartHint", "systemOperationStatus",
   "totalCount", "runningCount", "stoppedCount", "observedAt", "searchInput",
@@ -107,7 +107,7 @@ const healthLabels = {
 
 function renderWorkspace() {
   const requested = window.location.hash.slice(1);
-  const view = ["containers", "images", "registry"].includes(requested) ? requested : "containers";
+  const view = ["containers", "images", "registry", "disks"].includes(requested) ? requested : "containers";
   if (state.activeView === "containers" && view !== "containers") {
     stopFollowingLogs("已停止跟随");
     globalThis.ContainerGUIAILogs?.setContainer(null);
@@ -117,8 +117,10 @@ function renderWorkspace() {
   elements.containersSection.hidden = view !== "containers";
   elements.imagesSection.hidden = view !== "images";
   elements.remoteRegistrySection.hidden = view !== "registry";
-  elements.pageTitle.textContent = { containers: "容器", images: "本机镜像", registry: "镜像仓库" }[view];
-  elements.openCreateContainerButton.hidden = view === "registry";
+  elements.diskHealthSection.hidden = view !== "disks";
+  globalThis.ContainerGUIDisks?.setActive(view === "disks");
+  elements.pageTitle.textContent = { containers: "容器", images: "本机镜像", registry: "镜像仓库", disks: "硬盘健康" }[view];
+  elements.openCreateContainerButton.hidden = view === "registry" || view === "disks";
   for (const link of document.querySelectorAll("[data-view]")) {
     if (link.dataset.view === view) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
@@ -2384,6 +2386,7 @@ document.addEventListener("container-gui-language-change", () => {
 window.setInterval(() => {
   if (document.visibilityState === "visible") refreshDashboard();
 }, REFRESH_INTERVAL_MS);
+globalThis.ContainerGUIDisks = globalThis.ContainerGUIDiskHealth.start(fetchJSON, formatBytes);
 renderWorkspace();
 loadApplicationVersion();
 updateImageSpecificCreateFields();
