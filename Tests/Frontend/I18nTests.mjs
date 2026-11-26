@@ -57,6 +57,13 @@ test("unknown runtime values are not modified", () => {
   assert.equal(api.translate("postgres-odoo-apple", "en"), "postgres-odoo-apple");
 });
 
+test("disk power-on duration and original hours translate without changing their values", () => {
+  assert.equal(api.translate("累计使用时间", "en"), "Total power-on time");
+  assert.equal(api.translate("3年/4月/27天", "en"), "3 yr/4 mo/27 d");
+  assert.equal(api.translate("累计通电 29808 小时", "en"), "Power-on hours: 29808");
+  assert.equal(api.canonicalSource("3 yr/4 mo/27 d", "3年/4月/27天"), "3年/4月/27天");
+});
+
 test("an English rendering keeps its canonical Chinese source when switching back", () => {
   assert.equal(
     api.canonicalSource("Container runtime status", "容器运行状态"),

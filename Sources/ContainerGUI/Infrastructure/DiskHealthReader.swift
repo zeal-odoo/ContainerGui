@@ -50,21 +50,32 @@ struct DiskHealthReader: DiskHealthReading {
         let validInfo = info.flatMap { $0.id == disk.id && $0.whole == true ? $0 : nil }
         var health: DiskHealthState = .unavailable
         var source: String?
+        var powerOnHours: Int64?
+        var hardware: SmartHardware?
         var reason: String? = validInfo == nil ? "read_failed" : "unsupported"
         switch validInfo?.smartStatus?.lowercased() {
         case "verified": health = .passed; source = "macos"; reason = nil
         case "failing": health = .failing; source = "macos"; reason = nil
         default: break
         }
-        if health == .unavailable, validInfo != nil {
+        // Hardware counters do not require access to the volume's files.
+        // A failed metadata query must not prevent an independent SMART read.
+        if info == nil || validInfo != nil {
             if let smartctlURL {
                 do {
-                    let result = try await command(smartctlURL, ["-H", "-j", "/dev/\(disk.id)"], deadline: deadline)
-                    health = Self.smartHealth(result)
-                    source = "smartctl"
-                    reason = health == .unavailable ? "read_failed" : nil
-                } catch { reason = "read_failed" }
-            } else { reason = "tool_unavailable" }
+                    let result = try await command(smartctlURL, ["-i", "-H", "-A", "-j", "/dev/\(disk.id)"], deadline: deadline)
+                    powerOnHours = Self.smartPowerOnHours(result)
+                    if (0...255).contains(result.exitCode), result.exitCode & 7 == 0 {
+                        hardware = try? JSONDecoder().decode(SmartHardware.self, from: result.stdout)
+                    }
+                    let reportedHealth = Self.smartHealth(result)
+                    if health == .unavailable || reportedHealth == .failing || (reportedHealth == .warning && health != .failing) {
+                        health = reportedHealth
+                        source = "smartctl"
+                        reason = health == .unavailable ? "read_failed" : nil
+                    }
+                } catch { if health == .unavailable { reason = "read_failed" } }
+            } else if health == .unavailable, validInfo != nil { reason = "tool_unavailable" }
         }
 
         let partitions = disk.partitions ?? []
@@ -86,9 +97,9 @@ struct DiskHealthReader: DiskHealthReading {
                volume.id == partition.id, let space = Self.volumeSpace(volume) { spaces.append(space) }
         }
         if partitions.isEmpty, let validInfo, let space = Self.volumeSpace(validInfo) { spaces.append(space) }
-        return .init(id: disk.id, model: validInfo?.model ?? disk.id, internalDisk: validInfo?.internalDisk,
-                     solidState: validInfo?.solidState, connection: validInfo?.connection,
-                     capacityBytes: Self.bytes(validInfo?.size ?? disk.size), health: health,
+        return .init(id: disk.id, model: validInfo?.model ?? hardware?.model_name ?? disk.id, internalDisk: validInfo?.internalDisk,
+                     solidState: validInfo?.solidState ?? hardware?.solidState, connection: validInfo?.connection,
+                     capacityBytes: Self.bytes(validInfo?.size ?? disk.size), powerOnHours: powerOnHours, health: health,
                      source: source, reason: reason, spaces: spaces)
     }
 
@@ -104,6 +115,19 @@ struct DiskHealthReader: DiskHealthReading {
         if result.exitCode & 7 != 0 { return .unavailable }
         if result.exitCode & 0xf0 != 0 { return .warning }
         return report.smart_status?.passed == true ? .passed : .unavailable
+    }
+
+    static func smartPowerOnHours(_ result: CommandResult) -> Int64? {
+        struct Report: Decodable {
+            struct Time: Decodable { let hours: Int64? }
+            let power_on_time: Time?
+        }
+        guard (0...255).contains(result.exitCode), result.exitCode & 7 == 0,
+              let report = try? JSONDecoder().decode(Report.self, from: result.stdout),
+              let hours = report.power_on_time?.hours,
+              (0...9_007_199_254_740_991).contains(hours) else { return nil }
+        // smartctl normalizes vendor-specific counters to hours for ATA, SCSI and NVMe.
+        return hours
     }
 
     private static func validID(_ id: String, whole: Bool) -> Bool {
@@ -128,15 +152,31 @@ struct DiskHealthReader: DiskHealthReading {
     private func command(_ executable: URL, _ arguments: [String], deadline: ContinuousClock.Instant) async throws -> CommandResult {
         let remaining = ContinuousClock.now.duration(to: deadline)
         guard remaining > .zero, !Task.isCancelled else { throw CommandExecutionError.timedOut }
+        // USB device discovery can make diskutil info take more than five seconds.
+        let timeout: Duration = executable.lastPathComponent == "diskutil" && arguments.first == "info" ? .seconds(8) : .seconds(4)
         return try await executor.run(.init(executableURL: executable, arguments: arguments,
                                             environment: ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "LC_ALL": "C"],
-                                            timeout: min(.seconds(4), remaining), maximumOutputBytes: 2 * 1024 * 1024))
+                                            timeout: min(timeout, remaining), maximumOutputBytes: 2 * 1024 * 1024))
     }
 
     private func plist<Value: Decodable>(_ arguments: [String], deadline: ContinuousClock.Instant) async throws -> Value {
         let result = try await command(URL(fileURLWithPath: "/usr/sbin/diskutil"), arguments, deadline: deadline)
         guard result.exitCode == 0 else { throw CommandExecutionError.streamFailed }
         return try PropertyListDecoder().decode(Value.self, from: result.stdout)
+    }
+
+    private struct SmartHardware: Decodable {
+        let model_name: String?
+        let rotation_rate: Int?
+        let device: Device?
+        struct Device: Decodable {
+            let storageProtocol: String?
+            enum CodingKeys: String, CodingKey { case storageProtocol = "protocol" }
+        }
+        var solidState: Bool? {
+            if device?.storageProtocol == "NVMe" { return true }
+            return rotation_rate.flatMap { $0 >= 0 ? $0 == 0 : nil }
+        }
     }
 
     private struct Inventory: Decodable, Sendable {

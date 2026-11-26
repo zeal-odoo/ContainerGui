@@ -359,7 +359,7 @@ img {
   font-size: 16px;
 }
 .disk-health { padding: 24px 30px 40px; }
-.disk-health-toolbar, .disk-card-heading, .disk-capacity, .disk-space p {
+.disk-health-toolbar, .disk-card-heading, .disk-capacity, .disk-usage, .disk-space p {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -388,6 +388,7 @@ img {
 .disk-card p, .disk-space { overflow-wrap: anywhere; }
 .disk-facts { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--md-sys-color-on-surface-variant); font-size: 13px; }
 .disk-capacity { padding: 16px 0; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
+.disk-usage { flex-wrap: wrap; margin: 12px 0 4px; }
 .disk-space { margin: 16px 0; padding: 12px; border-radius: 8px; background: var(--md-sys-color-surface-container-low); }
 .disk-space p { margin: 6px 0; flex-wrap: wrap; }
 .disk-space-warning { color: var(--md-sys-color-warning); }

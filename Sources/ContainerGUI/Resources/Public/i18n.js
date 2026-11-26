@@ -34,6 +34,10 @@ const ContainerGUII18n = (() => {
     "介质未知": "Media unknown",
     "连接方式未知": "Connection unknown",
     "硬盘容量": "Drive capacity",
+    "累计使用时间": "Total power-on time",
+    "无法获取": "Unavailable",
+    "无法读取累计通电时间": "Cumulative power-on time is unavailable",
+    "使用时间取自硬盘累计通电小时：24 小时为 1 天、365 天为 1 年，余下按 30 天为 1 月折算，不足 1 天不计。": "Usage comes from the drive's cumulative power-on hours: 24 hours per day, 365 days per year, then 30 days per remaining month. Partial days are omitted.",
     "可用空间": "Available space",
     "APFS 共享空间，不重复累加": "Shared APFS space, counted once",
     "可用空间不足 10%": "Less than 10% free space",
@@ -489,6 +493,8 @@ const ContainerGUII18n = (() => {
   ));
 
   const patterns = Object.freeze([
+    [/^(\d+)年\/(\d+)月\/(\d+)天$/, (_, years, months, days) => `${years} yr/${months} mo/${days} d`],
+    [/^累计通电 (\d+) 小时$/, (_, hours) => `Power-on hours: ${hours}`],
     [/^已用 ([\d.]+) 核 \/ 主机 (\d+) 核$/, (_, used, total) => `${used} cores used / ${total} host cores`],
     [/^已更新 (.+)$/, (_, time) => `Updated ${time}`],
     [/^采样窗口 ([\d.]+) 秒$/, (_, seconds) => `Sample window ${seconds} s`],

@@ -19,6 +19,7 @@ struct DiskHealth: Codable, Sendable {
     let solidState: Bool?
     let connection: String?
     let capacityBytes: Int64?
+    let powerOnHours: Int64?
     let health: DiskHealthState
     let source: String?
     let reason: String?

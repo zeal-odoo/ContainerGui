@@ -111,3 +111,34 @@ test("unknown or malformed health states are rejected and low space is separate"
   assert.equal(api.lowSpace({ totalBytes: 100, freeBytes: null }), false);
   assert.equal(api.lowSpace({ totalBytes: 0, freeBytes: 0 }), false);
 });
+
+test("power-on hours use complete 24-hour days and the documented year and month conversion", () => {
+  const { api } = setup(async () => healthy());
+  for (const [hours, expected] of [
+    [0, "0年/0月/0天"], [23, "0年/0月/0天"], [24, "0年/0月/1天"],
+    [24 * 30, "0年/1月/0天"], [24 * 364, "0年/12月/4天"], [24 * 365, "1年/0月/0天"],
+    [(3 * 365 + 4 * 30 + 27) * 24 + 23, "3年/4月/27天"],
+    [57680, "6年/7月/3天"]
+  ]) assert.equal(api.formatPowerOnTime(hours), expected);
+  for (const invalid of [null, undefined, -1, 1.5, "24", true, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.equal(api.formatPowerOnTime(invalid), "无法获取");
+  }
+});
+
+test("usage time refreshes from disk readings and missing hours never retain an old value", async () => {
+  const disk = { id: "disk0", model: "SSD", health: "passed", spaces: [], powerOnHours: 29808 };
+  let result = healthy([disk]);
+  const f = setup(async () => result);
+  f.monitor.setActive(true); await tick();
+  assert.ok(text(f.elements.diskHealthCards).includes("3年/4月/27天"));
+  assert.ok(text(f.elements.diskHealthCards).includes("累计通电 29808 小时"));
+  result = healthy([{ ...disk, powerOnHours: 29832 }]); await f.monitor.refresh();
+  assert.ok(text(f.elements.diskHealthCards).includes("3年/4月/28天"));
+  result = healthy([{ ...disk, powerOnHours: null }]); await f.monitor.refresh();
+  assert.ok(text(f.elements.diskHealthCards).includes("无法获取"));
+  assert.ok(!text(f.elements.diskHealthCards).includes("29832"));
+  assert.equal(f.elements.diskPassedCount.textContent, "1");
+  result = healthy([{ ...disk, powerOnHours: 0 }]); await f.monitor.refresh();
+  assert.ok(text(f.elements.diskHealthCards).includes("0年/0月/0天"));
+  assert.ok(!text(f.elements.diskHealthCards).includes("无法获取"));
+});

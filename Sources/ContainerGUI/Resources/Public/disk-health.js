@@ -17,6 +17,12 @@ globalThis.ContainerGUIDiskHealth = (() => {
       Number.isFinite(space.freeBytes) && space.freeBytes >= 0 && space.freeBytes / space.totalBytes < 0.1;
   }
 
+  function formatPowerOnTime(hours) {
+    if (!Number.isSafeInteger(hours) || hours < 0) return "无法获取";
+    const days = Math.floor(hours / 24);
+    return `${Math.floor(days / 365)}年/${Math.floor((days % 365) / 30)}月/${days % 365 % 30}天`;
+  }
+
   function start(request, formatBytes) {
     const section = document.getElementById("diskHealthSection");
     const cards = document.getElementById("diskHealthCards");
@@ -60,7 +66,11 @@ globalThis.ContainerGUIDiskHealth = (() => {
           node("span", disk.connection || "连接方式未知"));
         const capacity = node("p", undefined, "disk-capacity");
         capacity.append(node("span", "硬盘容量"), node("strong", formatBytes(disk.capacityBytes)));
-        card.append(header, model, facts, capacity);
+        const usage = node("p", undefined, "disk-usage");
+        const duration = formatPowerOnTime(disk.powerOnHours);
+        usage.append(node("span", "累计使用时间"), node("strong", duration));
+        card.append(header, model, facts, capacity, usage,
+          node("small", duration === "无法获取" ? "无法读取累计通电时间" : `累计通电 ${disk.powerOnHours} 小时`, "quiet"));
         for (const space of disk.spaces) {
           const row = node("div", undefined, "disk-space");
           const name = node("span", space.names.join(" / "));
@@ -155,5 +165,5 @@ globalThis.ContainerGUIDiskHealth = (() => {
     return { setActive, refresh };
   }
 
-  return Object.freeze({ start, validSnapshot, lowSpace, INTERVAL_MS });
+  return Object.freeze({ start, validSnapshot, lowSpace, formatPowerOnTime, INTERVAL_MS });
 })();

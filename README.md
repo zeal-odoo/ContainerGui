@@ -6,11 +6,11 @@ A lightweight local web interface for Apple [`container`](https://github.com/app
 
 [中文](#中文说明) · [English](#english-guide)
 
-**源码 / Source v2.29.0 · [已发布 PKG v2.28.2 / Published PKG](https://github.com/zeal-odoo/ContainerGui/releases/tag/v2.28.2)** · Apple `container` `1.3.x / 1.4.x (≥1.4.1) / 1.5.x / 1.6.x / 1.7.x (≥1.7.1)` · `http://127.0.0.1:8787`
+**源码 / Source v2.30.0 · [已发布 PKG v2.28.2 / Published PKG](https://github.com/zeal-odoo/ContainerGui/releases/tag/v2.28.2)** · Apple `container` `1.3.x / 1.4.x (≥1.4.1) / 1.5.x / 1.6.x / 1.7.x (≥1.7.1)` · `http://127.0.0.1:8787`
 
-v2.29.0 新增“硬盘健康”页面：读取 Mac 内置及外置物理硬盘的健康和空间信息，页面可见时每 5 秒自动更新。继续兼容 Apple Container 1.7.1 及原有版本范围，GUI 不会自动安装或重启引擎。
+v2.30.0 在“硬盘健康”页面新增累计使用时间，以“几年/几月/几天”显示硬盘累计通电时长，并保留原始小时数。健康、空间和时间信息在页面可见时每 5 秒自动更新。继续兼容 Apple Container 1.7.1 及原有版本范围，GUI 不会自动安装或重启引擎。
 
-v2.29.0 adds a Disk health page for the Mac's internal and external physical drives, refreshing health and space information every five seconds while visible. Apple Container 1.7.1 and the existing compatibility range remain supported; the GUI does not automatically install or restart the engine.
+v2.30.0 adds cumulative power-on time to Disk health, shown as years/months/days alongside the original hour count. Health, space and usage readings refresh every five seconds while visible. Apple Container 1.7.1 and the existing compatibility range remain supported; the GUI does not automatically install or restart the engine.
 
 > Container GUI is a local, single-user tool. It never listens on the LAN or public Internet and is not a replacement for Docker Desktop, Compose, Kubernetes, or a multi-user remote administration platform.
 >
@@ -50,6 +50,8 @@ Container GUI 为 Apple `container` CLI 提供浏览器管理界面。后端直�
 ANE 是**整机所有应用**的估算功耗，不计入容器合计，也不是 Container GUI 专属。它由只读系统能量计数器的增量除以采样时长得到，不能换算成计算使用率；使用率显示“不可用”。读取不需要管理员权限、不启动模型、不联网。首次或长时间离开后显示“采样中”，缺失/异常数据清除旧值并显示不可用。底层 IOReport 为未公开系统接口，目前仅在 M4 Max/macOS 26.6.2 验证，其他机型/系统可能无法读取；功耗估算不用于不同设备的精确比较。
 
 硬盘健康使用 macOS `diskutil` 只读查询；系统未提供健康结果时，可使用已安装的 `smartmontools` 补充支持。设备或权限不支持时显示“无法检测”，不会当作健康。检测失败隐藏旧结果并保留上次成功检测时间；单块硬盘读取失败不影响其他硬盘。APFS 共享容量按容器显示，不按卷重复累加；可用空间低于 10% 单独提示。S.M.A.R.T. 检查通过不保证不会损坏，也不是文件系统检查。功能不安装工具、不提权、不执行自检或修复、不改动容器。
+
+累计使用时间从已安装的 smartmontools 读取硬盘自身的累计通电小时，按 24 小时为 1 天、365 天为 1 年，余下按 30 天为 1 月折算，不足 1 天不计；这是固定单位折算，不是购买日期或日历年龄。未提供或无法读取时显示“无法获取”，不会当作零小时或沿用上次读数。通电小时的增长以硬盘报告为准。
 
 ### 环境要求
 
@@ -339,6 +341,8 @@ The summary divides the sum of raw container CPU percentages by the Mac's total 
 ANE power covers **all applications on the host**, not container totals or Container GUI alone. It is estimated from read-only system energy-counter deltas divided by the sampling duration, not converted into compute utilization; utilization is shown as unavailable. Reading requires no administrator privileges, model loading, or network access. Initial samples and returns after a long gap show “Sampling”; missing or invalid readings clear the old value and show unavailable. The underlying IOReport interface is private and has only been validated here on M4 Max/macOS 26.6.2; other Macs or OS versions may not expose it. Power estimates should not be used for precise cross-device comparisons.
 
 Disk health uses read-only macOS `diskutil` queries, falling back to an already installed `smartmontools` when macOS provides no health result. Unsupported devices or permissions show “Unable to check,” never a healthy result. Failed checks hide old results and retain the last successful timestamp; one unreadable drive does not hide other drives. Shared APFS capacity is displayed once per container, not summed per volume; less than 10% free space is reported separately. A passed S.M.A.R.T. check does not guarantee against failure or verify the filesystem. The feature does not install tools, elevate privileges, run self-tests or repairs, or change containers.
+
+Cumulative usage is read from the drive's own power-on hours using an installed smartmontools. It is converted using 24 hours per day, 365 days per year, then 30 days per remaining month; partial days are omitted. This is a fixed-unit duration, not a purchase date or calendar age. Missing or unreadable values show “Unavailable” rather than zero or a previous reading. The hour counter advances as reported by the drive.
 
 ### Requirements
 
